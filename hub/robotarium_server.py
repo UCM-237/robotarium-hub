@@ -6,7 +6,7 @@ import time
 import zmq
 
 # Configure logs
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # Init socket
 context = zmq.Context()
@@ -30,7 +30,7 @@ def listen(id):
   while True:
     topic = agents[id]['socket'].recv_string()
     message = agents[id]['socket'].recv_json()
-    #logging.info(f'Incoming data from {message["source_id"]} with topic "{topic}"')
+    logging.info(f'Incoming data from {message["source_id"]} with topic "{topic}"')
     logging.debug(message)
 
 OPS = {
@@ -44,6 +44,7 @@ class Server:
     self.running = True
     self.accepting = threading.Thread(target=self.accept, args=()).start()
 
+
   def accept(self):
     #  Wait for next request from client
     while self.running:
@@ -52,7 +53,6 @@ class Server:
       logging.info(f'Received request from {message["source_id"]}')
       OPS[message['operation']](message['source_id'], message['payload']['url'])
       commands_socket.send_json({ 'result': 'ok', })
-      commands_socket.send_json({ 'operation':'Move', 'payload':{ 'v_left':0.8, 'v_right': 100} })
 
 
 
@@ -60,8 +60,16 @@ if __name__ == "__main__":
     end = False
     # Wait for commands
     server = Server()
-    #while not end:
-    #  logging.info('Command sent')
-    #  commands_socket.send_json({ 'operation':'Move', 'payload':{ 'v_left':0.8, 'v_right': 100} })
-    #  time.sleep(2)
-
+    while not end:
+      time.sleep(5)
+      logging.info('Command sent')
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':1, 'v_right': 1} })
+      time.sleep(5)
+      logging.info('Command sent')
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })
+      time.sleep(5)
+      logging.info('Command sent')
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':-1, 'v_right': -1} })
+      time.sleep(5)
+      logging.info('Command sent')
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })
