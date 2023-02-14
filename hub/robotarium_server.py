@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 # Init socket
 context = zmq.Context()
 commands_socket = context.socket(zmq.PAIR)
-commands_socket.bind("tcp://*:5555")
+commands_socket.bind("tcp://*:5555") #seocket for listen
 agents = {}
 
 def add_agent(id, url):
@@ -61,9 +61,9 @@ if __name__ == "__main__":
     # Wait for commands
     server = Server()
     while not end:
-      time.sleep(5)
+      '''time.sleep(5)
       logging.info('Command sent')
-      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':1, 'v_right': 1} })
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':32, 'v_right': 32} })
       time.sleep(5)
       logging.info('Command sent')
       commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })
@@ -72,4 +72,7 @@ if __name__ == "__main__":
       commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':-1, 'v_right': -1} })
       time.sleep(5)
       logging.info('Command sent')
-      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })
+      commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })'''
+      time.sleep(5)
+      logging.info('Command sent')
+      commands_socket.send_json({ 'operation':'PID', 'payload':{ 'P_right': 1, 'I_right' :1, 'D_right':1, 'P_left':2, 'I_left':2, 'D_left':2  } })
