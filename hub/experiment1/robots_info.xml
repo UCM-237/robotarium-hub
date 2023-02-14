@@ -1,0 +1,22 @@
+<Robotarium>
+    <robot>
+        <ID>01</ID>
+        <IP>192.168.78.5</IP>
+        <PORT>4243</PORT>
+    </robot>
+    <robot>
+        <ID>02</ID>
+        <IP>192.168.78.6</IP>
+        <PORT>4244</PORT>
+    </robot>
+    <robot>
+        <ID>03</ID>
+        <IP>192.168.78.7</IP>
+        <PORT>4245</PORT>
+    </robot>
+    <robot>
+        <ID>04</ID>
+        <IP>192.168.78.7</IP>
+        <PORT>4245</PORT>
+    </robot>
+</Robotarium>

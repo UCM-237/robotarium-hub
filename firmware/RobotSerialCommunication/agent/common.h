@@ -13,6 +13,8 @@ const int HEADER_LEN (sizeof(unsigned short)*3);
 
 
 struct appdata {
+  unsigned short start;
+  unsigned short id;
   unsigned short op; //codigo de operacion
   unsigned short len;                       /* longitud de datos */
   unsigned char data [MAXDATASIZE-HEADER_LEN];//datos
@@ -99,7 +101,7 @@ short bytesToShort(unsigned char *b)
 #define D 6.7//cm
 #define R 3.35 //cm
 #define L 9.5 // cm distancia entre ruedas
-
+const int ID=1;
 
      //     ---------------motor setup---------------*/
 const int pinENA = 12;//señal de PWM
@@ -167,8 +169,8 @@ unsigned long         currentTimeI, previousTimeI=0;;
 double                elapsedTimeI;
 double                errorI=0, lastErrorI=0, cumErrorI=0, rateErrorI;
 // +++++++++++++++  ++++Constantes del controlador+++++++++++++++
-double                KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;
-double                KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;
+double                P_right=0.2, I_right=0.05, D_right = 0;/*KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;*/
+double                P_left=0.2, I_left=0.05, D_left=0;/*KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;*/
 double                MAXCUMERROR = 5;
 //-------------------------GIROSCOPIO------------------------------------------------------------------------------------------------//
 float x, y, z;
