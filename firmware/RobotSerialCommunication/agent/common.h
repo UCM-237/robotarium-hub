@@ -7,12 +7,14 @@
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
-#define MAXDATASIZE 255
-#define HEADER_LEN (sizeof(unsigned short)*3)
-#define ID 2
+#include "operation.h"
+const int MAXDATASIZE=255;
+const int HEADER_LEN (sizeof(unsigned short)*3);
+
 
 struct appdata {
-  unsigned short id; //identificador
+  unsigned short start;
+  unsigned short id;
   unsigned short op; //codigo de operacion
   unsigned short len;                       /* longitud de datos */
   unsigned char data [MAXDATASIZE-HEADER_LEN];//datos
@@ -78,6 +80,8 @@ short bytesToShort(unsigned char *b)
     x.b[0] = b[0];
     return(x.i);
 }
+
+/*
 //operacion error
 #define OP_ERROR            0xFFFF
 //operaciones requeridas por central
@@ -87,16 +91,17 @@ short bytesToShort(unsigned char *b)
 #define OP_STOP_WHEEL       0x0003
 #define OP_VEL_ROBOT        0X0005
 #define OP_POSITION         0x0008
+#define OP_CONF_PID         0x0009
 //operaciones cliente
 #define OP_MESSAGE_RECIVE   0x0004
 
 #define OP_STOP_SERIAL      0X0006
-#define OP_RUN_SERIAL       0X0007
+#define OP_RUN_SERIAL       0X0007*/
 //----------------parametros RObot-------------------
 #define D 6.7//cm
 #define R 3.35 //cm
 #define L 9.5 // cm distancia entre ruedas
-
+const int ID=1;
 
      //     ---------------motor setup---------------*/
 const int pinENA = 12;//señal de PWM
@@ -164,8 +169,8 @@ unsigned long         currentTimeI, previousTimeI=0;;
 double                elapsedTimeI;
 double                errorI=0, lastErrorI=0, cumErrorI=0, rateErrorI;
 // +++++++++++++++  ++++Constantes del controlador+++++++++++++++
-double                KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;
-double                KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;
+double                P_right=0.2, I_right=0.05, D_right = 0;/*KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;*/
+double                P_left=0.2, I_left=0.05, D_left=0;/*KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;*/
 double                MAXCUMERROR = 5;
 //-------------------------GIROSCOPIO------------------------------------------------------------------------------------------------//
 float x, y, z;
