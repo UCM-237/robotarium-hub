@@ -14,6 +14,6 @@ enum Operation{
 };
 
 
-typedef enum Operation Operation;
+Operation operation;
 
 #endif
