@@ -1,9 +1,11 @@
+
+
 //robot2
 #include "common.h"
 #include <SimpleKalmanFilter.h>
 
 using namespace std;
-char packetBuffer[256]; //buffer to hold incoming packet
+uint8_t packetBuffer[256]; //buffer to hold incoming packet
 
 //--------------------------------------------filtro de media movil simple para estabilizar la lectura de rad/s---------------------------------------
 MeanFilter<long> meanFilterD(10);
@@ -56,7 +58,8 @@ void setup() {
   fullStop(pinMotorD);
   fullStop(pinMotorI);
   // Comunicacion por puerto serie
-  Serial1.begin(9600);
+  Serial1.begin(9600);//for debuggin
+  Serial.begin(9600);
   pinMode(led, OUTPUT); 
 }
   
@@ -107,7 +110,7 @@ void loop() {
       auxPWMD = PWM_D;
     }
 
-    if (sendDataSerial) {
+    if (1) {
       op_vel_robot();
     }
   }
@@ -129,25 +132,25 @@ void do_operation(int operation) {
     case OP_VEL_ROBOT:
       sendDataSerial = true;
       break;
+    case OP_CONF_PID:
+      //Operacion
     default:
       break;
   }
 }
 
 void send(unsigned int operation, byte *data) {
-  operation_send.id = ID;
   operation_send.op = operation;
   operation_send.len = sizeof(data);
-  Serial1.write((char*)&operation_send.id, 2);
-  Serial1.write((char*)&operation_send.op, 2);
-  Serial1.write((char*)&operation_send.len, 2);
-  Serial1.write((char*)&data, operation_send.len);
-  Serial1.flush();
+  Serial.write((char*)&operation_send.op, 2);
+  Serial.write((char*)&operation_send.len, 2);
+  Serial.write((char*)&data, operation_send.len);
+  Serial.flush();
 }
 
 void op_saludo() {
   operation_send.op = OP_SALUDO;
-  operation_send.id = ID;
+
   operation_send.len = sizeof (operation_send.data);  /* len */
   Serial.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
   Serial.flush();
@@ -199,8 +202,8 @@ void op_StopWheel() {
 }
 
 void op_vel_robot() {
+  //Serial.println(OP_VEL_ROBOT);
   operation_send.op = OP_VEL_ROBOT;
-  operation_send.id = ID;
   short int a=1;
   doubleToBytes(wD, &operation_send.data[0]);
   doubleToBytes(wI, &operation_send.data[8]);
@@ -211,14 +214,16 @@ void op_vel_robot() {
     shortToBytes(a, &operation_send.data[18]);
   }
   operation_send.len = 20; //strlen((char*)operation_send.data);
-  Serial1.write((char*)&operation_send.id, 2);
-  Serial1.write((char*)&operation_send.op, 2);
-  Serial1.write((char*)&operation_send.len, 2);
-  Serial1.write((char*)&operation_send.data, 20);
-  Serial1.flush();
+
+  Serial.write((char*)&operation_send.op, 2);
+  Serial.write((char*)&operation_send.len, 2);
+  Serial.write((char*)&operation_send.data, 20);
+  Serial.flush();
   //send(ID, OP_VEL_ROBOT, &operation_send.data);
 }
-
+void op_conf_pid(){
+  
+}
 
 void motorSetup() {
   pinMode(pinIN1, OUTPUT);
@@ -348,23 +353,10 @@ void feedForwardI(){
     constrain(round((setpointWI + 1.656) / 0.0720), MINPWM, MAXPWM) : 0;
 }
 
-//void tokenize(const string s, char c,vector<string>& v) { // sirve para separa la entrada string.
-//  string::size_type i = 0;
-//  string::size_type j = s.find(c);
-//  while (j != string::npos) {
-//    v.push_back(s.substr(i, j - i));
-//    i = ++j;
-//    j = s.find(c, j);
-//    if (j == string::npos) {
-//      v.push_back(s.substr(i, s.length()));
-//    }
-//  }
-//}
-
 void serialEvent() {
   read_ptr = (unsigned char*)&packetBuffer;
-  while (Serial1.available()) {
-    *(read_ptr++) = Serial1.read();
+  while (Serial.available()) {
+    *(read_ptr++) = Serial.read();
     //Serial.readBytes(packetBuffer, MAXDATASIZE);
     server_operation = (struct appdata *)&packetBuffer;
     serialCom = true;
