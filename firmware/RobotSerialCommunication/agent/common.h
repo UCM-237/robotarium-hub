@@ -7,12 +7,12 @@
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
-#define MAXDATASIZE 255
-#define HEADER_LEN (sizeof(unsigned short)*3)
-#define ID 2
+#include "operation.h"
+const int MAXDATASIZE=255;
+const int HEADER_LEN (sizeof(unsigned short)*3);
+
 
 struct appdata {
-  unsigned short id; //identificador
   unsigned short op; //codigo de operacion
   unsigned short len;                       /* longitud de datos */
   unsigned char data [MAXDATASIZE-HEADER_LEN];//datos
@@ -78,6 +78,8 @@ short bytesToShort(unsigned char *b)
     x.b[0] = b[0];
     return(x.i);
 }
+
+/*
 //operacion error
 #define OP_ERROR            0xFFFF
 //operaciones requeridas por central
@@ -87,11 +89,12 @@ short bytesToShort(unsigned char *b)
 #define OP_STOP_WHEEL       0x0003
 #define OP_VEL_ROBOT        0X0005
 #define OP_POSITION         0x0008
+#define OP_CONF_PID         0x0009
 //operaciones cliente
 #define OP_MESSAGE_RECIVE   0x0004
 
 #define OP_STOP_SERIAL      0X0006
-#define OP_RUN_SERIAL       0X0007
+#define OP_RUN_SERIAL       0X0007*/
 //----------------parametros RObot-------------------
 #define D 6.7//cm
 #define R 3.35 //cm
