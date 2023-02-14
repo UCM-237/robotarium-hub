@@ -28,7 +28,7 @@ context = zmq.Context()
 class Robot:
   '''Encapsulates the communication with Arduino'''
   OP_MOVE_WHEEL: int = 2
-  OP_VEL_ROBOT: int = 5
+  OP_VEL_ROBOT: int = 4
   OP_CONF_PID: int = 9
   connected: bool = False
   arduino: Serial = None
@@ -96,6 +96,7 @@ class Robot:
       struct.pack('d', v_left) +
       struct.pack('d', v_right)
     )
+    self.arduino.flush()
 
 
   def speed(self, data) -> dict:
@@ -109,6 +110,7 @@ class Robot:
   def K(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
      bytes_written = self.arduino.write(
+      struct.pack('H', 112) + 
       struct.pack('H', AGENT_ID) +
       struct.pack('H', self.OP_CONF_PID) +
       struct.pack('H', 48) + #size of data
@@ -119,6 +121,7 @@ class Robot:
       struct.pack('d', I_left) +
       struct.pack('d', D_left) 
     )
+     self.arduino.flush()
 
   def parse(self, operation: int, data: bytes) -> dict: #comprueba que la operación esta en la lista de operaciones
     if operation not in self.parsers:
@@ -189,10 +192,17 @@ if __name__ == "__main__":
     # Wait for commands
    # robot.update()
     agent = Agent()
-    agent.register(f'tcp://{SERVER_IP}:5555')
-    logging.info(f'Agent {agent.name} is listening')
-    agent.send_measurement(2)
+    #agent.register(f'tcp://{SERVER_IP}:5555')
+    #logging.info(f'Agent {agent.name} is listening')
+    while True:
+
+      agent.robot.K(1,1,1,2,2,2)
+      time.sleep(5)
+      agent.robot.K(2,2,2,1,1,1)
+      time.sleep(5)
+    '''agent.send_measurement(2)
     while not end:
       #  Wait for next request
       message = agent.accept_command()
-      logging.info(f'Receiving command from server')
+      logging.info(f'Receiving command from server')'''
+   
