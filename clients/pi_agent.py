@@ -5,24 +5,23 @@ from serial import Serial, SerialException, serial_for_url
 from serial.tools import list_ports
 from threading import Thread
 import logging
-import time
 import struct
-import zmq
+import json
+
+from agent import Agent
 
 # Configure logs
 logging.basicConfig(level=logging.INFO)
 
 # Who I am
-AGENT_ID = 2
-AGENT_NAME = 'Orange'
-#AGENT_IP = socket.gethostbyname(socket.gethostname())
-AGENT_IP = '147.96.22.221'
-AGENT_PORT = 5556
-
-SERVER_IP = '147.96.22.201'
-
-# Init sockets
-context = zmq.Context()
+AGENT_ID = 'Robot_2'
+AGENT_IP = '127.0.0.1'
+AGENT_CMD_PORT = 5561
+AGENT_DATA_PORT = 5562
+# Where the server is 
+HUB_IP = '127.0.0.1'
+HUB_CMD_PORT = 5555
+HUB_DATA_PORT = 5556
 
 
 class Robot:
@@ -35,14 +34,14 @@ class Robot:
   listeners: list = None
   auto_discovery: list = ['Arduino', 'USB2.0-Serial']
 
-  def __init__(self, listeners: list) -> None:
+  def __init__(self, agent: Agent) -> None:
     self.parsers = {
       self.OP_VEL_ROBOT: self.speed,
     }
     self.operations = {
       'MOVE': { 'id': self.OP_MOVE_WHEEL, 'method': self.move_wheels },
     }
-    self.listeners = listeners
+    self.agent = agent
 
 
   def connect(self) -> None:
@@ -59,12 +58,12 @@ class Robot:
       except:
         logging.info(f'Cannot connect to {p.device}, trying another port')
     if self.arduino is None or not self.arduino.is_open:
-      logging.error('Cannot connect to arduino, stopping server.')
+      logging.error('Cannot open device.')
 
 
   def update(self) -> None:
     '''Parse data received from the robot'''
-    print('Starting Arduino update thread')
+    logging.info('Starting Arduino update thread')
     while True:
       try:
         id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
@@ -73,15 +72,13 @@ class Robot:
         data = self.arduino.read(size=len)
         measurement = self.parse(operation, data)
         logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-        for l in self.listeners:
-          l.send_measurement(measurement)
+        self.agent.send_measurement(measurement)
       except (ValueError, TypeError) as e:
-        print('[WARNING] Ignoring invalid data from Arduino')
+        logging.debug('Ignoring invalid data from Arduino')
         print(e)
       except SerialException as e:
-        print('[WARNING] Disconnected from Arduino.')
+        logging.info('Disconnected from Arduino.')
         print(e)
-    print('[INFO] Stopping arduino thread')
 
 
   def move_wheels(self, v_left, v_right) -> None:
@@ -116,66 +113,20 @@ class Robot:
     self.operations[operation]['method'](**kwargs)
 
 
-class Agent:
-  proto: str = 'tcp'
-  ip: str = AGENT_IP
-  id: str = AGENT_ID
-  name: str = AGENT_NAME
-  port: int = AGENT_PORT
-
-
-  def __init__(self) -> None:
-    context = zmq.Context()
-    self.control = context.socket(zmq.PAIR)
-    self.data = context.socket(zmq.PUB)
-    self.data.bind("tcp://*:5556")
-    self.robot = Robot(listeners=[self])
-    self.robot.connect()
-
-
-  def register(self, server_url: str) -> None:
-    '''Register to the control hub'''
-    print(f'Registering agent')
-    self.control.connect(server_url)
-    self.control.send_json({
-      'operation': 'hello',
-      'source_id': self.id,
-      'payload': {
-        'url' : f'{self.proto}://{self.ip}:{self.port}'
-      },
-      'timestamp': 1000*time.time(),
-    })
-    response = self.control.recv_json()
-    self.connected = response['result'] == 'ok'
-
-
-  def send_measurement(self, data) -> None:
-    '''Sends a new measurement'''
-    self.data.send_string('data', flags=zmq.SNDMORE)
-    self.data.send_json({
-      'operation': 'measurement',
-      'source_id': AGENT_ID,
-      'payload': data,
-      'timestamp': 1000*time.time(),
-    })
-
-
-  def accept_command(self) -> None:
-    logging.info('Agent waiting for commands')
-    command = self.control.recv_json()
-    self.robot.exec(command['operation'], **command['payload'])
-    logging.info('Command received')
-    return command
+  def on_data(self, topic: str, message: str) -> None:
+    if topic.startswith('control/'):
+      cmd = topic[len(f'control/{AGENT_ID}')+1:].upper()
+      params = json.loads(message)
+      self.exec(cmd, **params)
 
 
 if __name__ == "__main__":
-    end = False
-    # Wait for commands
-    agent = Agent()
-    agent.register(f'tcp://{SERVER_IP}:5555')
-    logging.info(f'Agent {agent.name} is listening')
-    agent.send_measurement(2)
-    while not end:
-      #  Wait for next request
-      message = agent.accept_command()
-      logging.info(f'Receiving command from server')
+  agent = Agent(
+    device_class=Robot,
+    id=AGENT_ID,
+    ip=AGENT_IP,
+    cmd_port=AGENT_CMD_PORT,
+    data_port=AGENT_DATA_PORT,
+    hub_cmd_port=HUB_CMD_PORT,
+    hub_data_port=HUB_DATA_PORT,
+  )
