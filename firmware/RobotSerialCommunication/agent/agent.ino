@@ -73,10 +73,10 @@ void loop() {
   serialEvent();
   if (serialCom) {
     Serial.println(server_operation->id);
-    Serial.print("operation: \t");
+    if (server_operation->InitFlag == INIT_FLAG){
+          Serial.print("operation: \t");
     Serial.println(server_operation->op);
-    Serial.println(server_operation->start);
-    if (server_operation->start == 112){
+    Serial.println(server_operation->InitFlag);
       do_operation(server_operation->op);
       serialCom = false;
     }
@@ -211,6 +211,7 @@ void op_StopWheel() {
 
 void op_vel_robot() {
   //Serial.println(OP_VEL_ROBOT);
+  operation_send.InitFlag=INIT_FLAG;
   operation_send.id=1;
   operation_send.op = 4;
   short int a=1;
@@ -227,6 +228,8 @@ void op_vel_robot() {
   Serial.println(wD);
   Serial.print("len \t");
   Serial.println(operation_send.len);*/
+  Serial.println(operation_send.InitFlag);
+  Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,2);
   Serial1.write((char*)&operation_send.op, 2);
   Serial1.write((char*)&operation_send.len, 2);
