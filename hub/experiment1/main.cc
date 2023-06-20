@@ -31,6 +31,9 @@
 #include <opencv2/core.hpp> //PREDEFINED_DICTIONARY
 #include <opencv2/highgui/highgui.hpp>  // Video write
 #include <zmqpp/zmqpp.hpp>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 using namespace std;
 using namespace tinyxml2;
 
@@ -52,7 +55,7 @@ const char* keys  =
         "{v        |<none>| Custom video source, otherwise '0'}"
 	;
 }
-
+int registerAgent();
 void *dataAruco(void *arg);
 void SetupRobots();
 vector<cv::Point3f> getCornersInCameraWorld(double side, cv::Vec3d rvec, cv::Vec3d tvec);
@@ -110,7 +113,7 @@ struct record_data//struct for share information between threads
     
 };
 list<record_data> arucoInfo;//list for save the information of all the arucos
-list<record_data>::iterator it;//for save data
+list<record_data>::iterator it, it2;//for save data
 
 struct signalAlarm{
     bool finish=false;
@@ -120,14 +123,16 @@ enum {r1, r2, r3, r4,r5};
      //definition of robots
 Robot robot1,robot2,robot3,robot4;//se define la clase para los distintos robots.
 
+static const string PUBLISH_ENDPOINT = "tcp://*:5557";
+static const string HUB_IP = "127.0.0.1";
 
 
 
 
-
-pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-pthread_t _Move,_Move2,_Move3, _detectAruco; ;
-
+pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER,mutex2_ = PTHREAD_MUTEX_INITIALIZER;
+pthread_t  _detectAruco; 
+pthread_cond_t listBlock;
+bool EmptyList = false;
 
 
 int main(int argc,char **argv)
@@ -240,6 +245,8 @@ int main(int argc,char **argv)
     
    
     pthread_create(&_detectAruco,NULL,dataAruco,NULL);//create thread for store the values of the markers
+    sleep(2);
+    registerAgent();
      data.n =  0;
     //main loop
     while (in_video.grab())
@@ -253,11 +260,6 @@ int main(int argc,char **argv)
         std::vector<std::vector<cv::Point2f> > corners;
         cv::aruco::detectMarkers(grayMat, dictionary, corners, ids);
        
-            
-        while(!arucoInfo.empty()){//avoid fill list more than markers there are
-            data.n=0;
-            arucoInfo.pop_back();
-        }
         // if at least one marker detected
         if (ids.size() > 0)
         {
@@ -304,6 +306,8 @@ int main(int argc,char **argv)
                 data.n++;
                 pthread_mutex_lock(&mutex_);
                 arucoInfo.push_back(data);
+                EmptyList=false;
+                pthread_cond_signal(&listBlock);
                 int status = pthread_mutex_unlock (&mutex_);
                 if (status != 0)
                     exit(status);
@@ -343,6 +347,11 @@ int main(int argc,char **argv)
             }
             
         }
+
+        pthread_mutex_lock(&mutex_);
+        EmptyList=true;
+        arucoInfo.erase(arucoInfo.begin(),arucoInfo.end());
+        pthread_mutex_unlock (&mutex_);
          //outputVideo << image_copy;
         // cv::resize(image,image,cv::Size(1200,1600));
       
@@ -357,38 +366,66 @@ int main(int argc,char **argv)
     in_video.release();
     video.release();
     //destroyALLWindows();
+    
     return 0;
 }
 
 
 
 
+/*def register(self, server_url: str) -> None: #Hello op
+    '''Register to the control hub'''
+    print(f'Registering agent')
+    self.control.connect(server_url)
+    self.control.send_json({
+      'operation': 'hello',
+      'source_id': self.id,
+      'payload': {
+        'url' : f'{self.proto}://{self.ip}:{self.port}'
+      },
+      'timestamp': 1000*time.time(),
+    })
+    response = self.control.recv_json()
+    self.connected = response['result'] == 'ok'*/
+
 void *dataAruco(void *arg)
 {//thread function
 
-    const string endpoint = "tcp://localhost:5555";
+    //const string endpoint = "tcp://127.0.0.1:4242"; //5555
     // initialize the 0MQ context
     zmqpp::context context;
 
     // generate a push socket
-    zmqpp::socket_type type = zmqpp::socket_type::req;
-    zmqpp::socket socket (context, type);
+    zmqpp::socket_type type = zmqpp::socket_type::publish;
+    zmqpp::socket publisher (context, type);
+   
     // open the connection
-    cout << "Opening connection to " << endpoint << "..." << endl;
-    socket.connect(endpoint);
+    cout << "Binding to " << PUBLISH_ENDPOINT << "..." << endl;
+     publisher.bind(PUBLISH_ENDPOINT);
+    
 
-    zmqpp::message_t message, mssg_rcv;
+    
     while(arucoInfo.size()<=0);//the thread stop it until an aruco is detected
     std::string data;
     //main code for read variables
     while(true){
-       
+        bool ExitCondition = false;
         if(arucoInfo.size()>0)
         {
             
             for(it=arucoInfo.begin();it !=arucoInfo.end();it++)
-            {
-                if(arucoInfo.size()==0){
+            {   if(arucoInfo.size()>0)
+                { 
+                pthread_mutex_lock(&mutex_);
+                while(EmptyList)
+                {
+                    pthread_cond_wait(&listBlock,&mutex_);
+                    ExitCondition=true;
+                }
+                if (ExitCondition)
+                {   
+                    pthread_mutex_unlock (&mutex_);
+                    ExitCondition=false;
                     break;
                 }
 
@@ -396,31 +433,91 @@ void *dataAruco(void *arg)
                 doubleToBytes(it->x,&data[4]);
                 doubleToBytes(it->y,&data[12]);
                 doubleToBytes(it->yaw,&data[20]);*/
-
+                string topic ="position";
                 string id = to_string(it->id);
                 string x = to_string(it->x);
                 string y = to_string(it->y);
                 string yaw = to_string(it->yaw);
-                string sep = ":";
-                data= id + sep + x+ sep +y+sep+yaw;
+                
+                string sep = "/";
+                data=  x+ sep +y+sep+yaw;
                 cout<<data<<endl;
-                message<<data;
-                socket.send(message);
+                json message;
+                
 
-                socket.receive(mssg_rcv);
-               
-  
-            }
+                 message["operation"] = "position";
+                message["source_id"] = "0";
+                message["payload"] = data;
+                message["timestamp"] = 1000 * time(nullptr);
+                std::string jsonStr = message.dump();
+                zmqpp::message_t zmqMessage;
+                 zmqpp::message_t ztopic;
+                zmqMessage<<jsonStr;
+                ztopic<<topic;
+                //publisher.send(ztopic);
+                publisher.send(zmqMessage);
+    // self.control.send_json({
+    //   'operation': 'hello',
+    //   'source_id': self.id,
+    //   'payload': {
+    //     'url' : f'tcp://mi_ip:5555'
+    //   },
+    //   'timestamp': 1000*time.time(),
+    // })
+
+                pthread_mutex_unlock (&mutex_);
+                }
+                else{
+                    break;
+                }
+
+                }
+           
         }
 	    
     }
     
-   
+    publisher.close();
     pthread_exit(NULL);
     return NULL;
 }
 
+int registerAgent()
+{
+    //Register to the control hub
+    cout<<"Registering Localization"<<endl;
+    zmqpp::context context;
 
+    // generate a push socket
+    zmqpp::socket_type type = zmqpp::socket_type::request;
+    zmqpp::socket control (context, type);
+    cout << "connecting" << endl;
+    control.connect("tcp://127.0.0.1:5555");
+
+    json message;
+    message["operation"] = "Camera";
+    message["source_id"] = "1";
+    message["payload"]["url"] = "tcp://127.0.0.1:5557";
+    message["timestamp"] = 1000 * time(nullptr);
+    std::string jsonStr = message.dump();
+
+    zmqpp::message_t zmqMessage;
+    // memcpy(zmqMessage.data(), jsonStr.c_str(), jsonStr.size());
+    zmqMessage<<jsonStr;
+    control.send(zmqMessage);
+
+
+    zmqpp::message_t response;
+    //control.receive(response);
+
+   /*std::string jsonStr(static_cast<const char*>(response.data()), response.size());
+    json jsonResponse = json::parse(jsonStr);
+    std::string result = jsonResponse["result"].get<std::string>();
+    bool connected = (result == "ok");*/
+    
+    control.close();
+    return 0;
+}
 
 
 vector<cv::Point3f> getCornersInCameraWorld(double side, cv::Vec3d rvec, cv::Vec3d tvec){
