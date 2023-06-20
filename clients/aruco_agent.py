@@ -15,14 +15,11 @@ logging.basicConfig(level=logging.INFO)
 # Who I am
 AGENT_ID = 2
 AGENT_NAME = 'Orange'
-AGENT_IP = '127.0.0.1'
-AGENT_CMD_PORT = 5561
-AGENT_DATA_PORT = 5562
+#AGENT_IP = socket.gethostbyname(socket.gethostname())
+AGENT_IP = '127.0.0.1'#'147.96.22.221'
+AGENT_PORT = 5556
 
-# Where the server is 
-HUB_IP = '127.0.0.1'
-HUB_CMD_PORT = 5555
-HUB_DATA_PORT = 5556
+SERVER_IP = '127.0.0.1'#'147.96.22.201'
 
 # Init sockets
 context = zmq.Context()
@@ -139,26 +136,22 @@ class Robot:
                 struct.pack('H',operation) + struct.pack('H',len))
     message=head + data
     bytes_written= self.arduino.write(message )
+
 class Agent:
-  
+  proto: str = 'tcp'
+  ip: str = AGENT_IP
+  id: str = AGENT_ID
+  name: str = AGENT_NAME
+  port: int = AGENT_PORT
 
 
   def __init__(self) -> None:
     context = zmq.Context()
     self.control = context.socket(zmq.PAIR)
     self.data = context.socket(zmq.PUB)
-    self.data.bind("tcp://*:AGENT_DATA_PORT")
+    self.data.bind("tcp://*:5556")
     #self.robot = Robot(listeners=[self])#le pasa la clase que se ha conectado en un principio
     #self.robot.connect()
-    '''Atributte'''
-    self.proto: str = 'tcp'
-    self.ip: str = AGENT_IP
-    self.id: str = AGENT_ID
-    self.name: str = AGENT_NAME
-    self.cmd_port=AGENT_CMD_PORT,
-    self.data_port=AGENT_DATA_PORT
-    self.hub_cmd_port=HUB_CMD_PORT
-    self.hub_data_port=HUB_DATA_PORT
 
 
   def register(self, server_url: str) -> None: #Hello op
@@ -169,7 +162,7 @@ class Agent:
       'operation': 'hello',
       'source_id': self.id,
       'payload': {
-        'url' : f'{self.proto}://{self.ip}:{self.data_port}'
+        'url' : f'{self.proto}://{self.ip}:{self.port}'
       },
       'timestamp': 1000*time.time(),
     })
@@ -191,7 +184,7 @@ class Agent:
   def accept_command(self) -> None:
     logging.info('Agent waiting for commands')
     command = self.control.recv_json()
-    self.robot.exec(command['operation'], **command['payload'])
+    #self.robot.exec(command['operation'], **command['payload'])
     logging.info('Command received')
     return command
 
@@ -201,15 +194,15 @@ if __name__ == "__main__":
     # Wait for commands
    # robot.update()
     agent = Agent()
-    agent.register(f'tcp://{HUB_IP}:HUB_CMD_PORT')
+    agent.register(f'tcp://{SERVER_IP}:5555')
     logging.info(f'Agent {agent.name} is listening')
-    #while True:
+    '''while True:
 
-   #   agent.robot.conf_PID(1,1,1,2,2,2)
-   #   time.sleep(5)
-   #   agent.robot.conf_PID(2,2,2,1,1,1)
-   #   time.sleep(5)
-   # agent.send_measurement(2)
+      agent.robot.conf_PID(1,1,1,2,2,2)
+      time.sleep(5)
+      agent.robot.conf_PID(2,2,2,1,1,1)
+      time.sleep(5)'''
+    #agent.send_measurement(2)
     while not end:
       #  Wait for next request
       message = agent.accept_command()

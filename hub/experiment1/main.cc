@@ -444,8 +444,8 @@ void *dataAruco(void *arg)
                 cout<<data<<endl;
                 json message;
                 
-
-                 message["operation"] = "position";
+                //message["topic"]="poition";
+                message["operation"] = "position";
                 message["source_id"] = "0";
                 message["payload"] = data;
                 message["timestamp"] = 1000 * time(nullptr);
@@ -454,7 +454,7 @@ void *dataAruco(void *arg)
                  zmqpp::message_t ztopic;
                 zmqMessage<<jsonStr;
                 ztopic<<topic;
-                //publisher.send(ztopic);
+                publisher.send(ztopic);
                 publisher.send(zmqMessage);
     // self.control.send_json({
     //   'operation': 'hello',
@@ -496,7 +496,7 @@ int registerAgent()
 
     json message;
     message["operation"] = "Camera";
-    message["source_id"] = "1";
+    message["source_id"] = "0";
     message["payload"]["url"] = "tcp://127.0.0.1:5557";
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();

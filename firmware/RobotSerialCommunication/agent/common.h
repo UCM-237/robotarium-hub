@@ -13,7 +13,7 @@ const int HEADER_LEN (sizeof(unsigned short)*3);
 
 
 struct appdata {
-  unsigned short start;
+  int InitFlag;
   unsigned short id;
   unsigned short op; //codigo de operacion
   unsigned short len;                       /* longitud de datos */
@@ -102,7 +102,7 @@ short bytesToShort(unsigned char *b)
 #define R 3.35 //cm
 #define L 9.5 // cm distancia entre ruedas
 const int ID=1;
-
+const int INIT_FLAG = 112;
      //     ---------------motor setup---------------*/
 const int pinENA = 12;//señal de PWM
 const int pinIN1 = 7;//indica sentido de giro
