@@ -85,7 +85,7 @@ class RobotariumHub:
             'socket': self.context.socket(zmq.SUB)
         }
         self.agents[id]['socket'].connect(url)
-        self.agents[id]['socket'].subscribe('')
+        self.agents[id]['socket'].subscribe("")
         self.poller.register(self.agents[id]['socket'], zmq.POLLIN)
 
         #self.agents[id]['thread'] = Thread(target=self.listen2, args=(id))
@@ -101,7 +101,7 @@ class RobotariumHub:
                 if s in socks and socks[s] == zmq.POLLIN:
                     try:
                         topic = s.recv_string()
-                        message = self.agents[a]['socket'].recv_json()
+                        message = s.recv_json()
                     except json.JSONDecodeError:
                         logging.error(f'Agent {id} sent invalid JSON')
 
