@@ -443,7 +443,9 @@ void *dataAruco(void *arg)
                 data=  x+ sep +y+sep+yaw;
                 cout<<data<<endl;
                 json message;
-                
+                zmqpp::message_t ztopic;
+                ztopic<<topic;
+                publisher.send(topic,0);
                 //message["topic"]="poition";
                 message["operation"] = "position";
                 message["source_id"] = "0";
@@ -451,11 +453,12 @@ void *dataAruco(void *arg)
                 message["timestamp"] = 1000 * time(nullptr);
                 std::string jsonStr = message.dump();
                 zmqpp::message_t zmqMessage;
-                 zmqpp::message_t ztopic;
+                
+                
                 zmqMessage<<jsonStr;
-                ztopic<<topic;
-                publisher.send(ztopic);
-                publisher.send(zmqMessage);
+                
+                
+                publisher.send(zmqMessage,0);
     // self.control.send_json({
     //   'operation': 'hello',
     //   'source_id': self.id,
