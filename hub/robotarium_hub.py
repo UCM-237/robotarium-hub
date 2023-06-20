@@ -61,6 +61,7 @@ class RobotariumHub:
             client.subscribe('#')
             client.on_message = self.on_mqtt_message
             return client
+        
 
     def on_mqtt_message(self, client, userdate, msg):
         self.data_socket.send_string(msg.topic, flags=zmq.SNDMORE)
@@ -85,10 +86,10 @@ class RobotariumHub:
         }
         self.agents[id]['socket'].connect(url)
         self.agents[id]['socket'].subscribe('')
-        #self.poller.register(self.agents[id]['socket'], zmq.POLLIN)
+        self.poller.register(self.agents[id]['socket'], zmq.POLLIN)
 
-        self.agents[id]['thread'] = Thread(target=self.listen2, args=(id))
-        self.agents[id]['thread'].start()
+        #self.agents[id]['thread'] = Thread(target=self.listen2, args=(id))
+        #self.agents[id]['thread'].start()
 
     def listen(self):
         logging.info(f'Listening to agents')
@@ -100,7 +101,7 @@ class RobotariumHub:
                 if s in socks and socks[s] == zmq.POLLIN:
                     try:
                         topic = s.recv_string()
-                        message = s.recv_json()
+                        message = self.agents[a]['socket'].recv_json()
                     except json.JSONDecodeError:
                         logging.error(f'Agent {id} sent invalid JSON')
 
@@ -110,11 +111,13 @@ class RobotariumHub:
                             topic = f'{topic}/{message["source_id"]}/{k}'
                             self.data_socket.send_string(topic, flags=zmq.SNDMORE)
                             self.data_socket.send_json(data[k])
+                    elif topic == 'position':
+                        logging.debug(message)
                     else:
                         self.data_socket.send_string(topic, flags=zmq.SNDMORE)
                         self.data_socket.send_json(message)
                     
-                    self.mqtt_client.publish(topic, json.dumps(message))
+                    #self.mqtt_client.publish(topic, json.dumps(message))
                     
 
     def listen2(self,id):
