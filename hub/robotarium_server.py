@@ -10,12 +10,15 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Init socket
 context = zmq.Context()
+#localization_socket = context.socket(zmq.PAIR)
+#localization_socket.bind("tcp://4242")
 commands_socket = context.socket(zmq.PAIR)
 commands_socket.bind("tcp://*:5555") #seocket for listen
 agents = {}
+camera={}
 
 def add_agent(id, url):
-  logging.info(f'Agent {id} registered with url {url}');
+  logging.info(f'Agent {id} registered with url {url}')
   agents[id] = {
     'url': url,
     'socket': context.socket(zmq.SUB)
@@ -33,8 +36,22 @@ def listen(id):
     logging.info(f'Incoming data from {message["source_id"]} with topic "{topic}"')
     logging.debug(message)
 
-OPS = {
-  'hello': lambda id, url: add_agent(id, url)
+def add_Localization(id,url):
+  logging.info(f'Camera {id} registered with url {url}');
+  camera[id] = {
+    'url': url,
+    'socket': context.socket(zmq.SUB)
+  }
+  camera[id]['socket'].connect(url)
+  camera[id]['socket'].subscribe('position')
+  camera[id]['thread'] = threading.Thread(target=listen, args=(id,))
+  camera[id]['thread'].start()
+
+
+
+OPS = {   #dictionary for register agent
+  'Agent': add_agent,
+  'Camera': add_Localization
 }
 
 
@@ -73,6 +90,6 @@ if __name__ == "__main__":
       time.sleep(5)
       logging.info('Command sent')
       commands_socket.send_json({ 'operation':'MOVE', 'payload':{ 'v_left':0, 'v_right': 0} })'''
-      time.sleep(5)
-      logging.info('Command sent')
+      #time.sleep(5)
+      #logging.info('Command sent')
       commands_socket.send_json({ 'operation':'PID', 'payload':{ 'P_right': 1, 'I_right' :1, 'D_right':1, 'P_left':2, 'I_left':2, 'D_left':2  } })
