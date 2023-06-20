@@ -30,6 +30,7 @@ class Robot:
   OP_MOVE_WHEEL: int = 2
   OP_VEL_ROBOT: int = 4
   OP_CONF_PID: int = 9
+  INIT_FLAG = 112
   connected: bool = False
   arduino: Serial = None
   thread: Thread = None
@@ -42,7 +43,7 @@ class Robot:
     }
     self.operations = {
       'MOVE': { 'id': self.OP_MOVE_WHEEL, 'method': self.move_wheels },
-      'PID' : { 'id': self.OP_CONF_PID,  'method' : self.K },
+      'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
     }
     self.listeners = listeners
 
@@ -69,15 +70,17 @@ class Robot:
     print('Starting Arduino update thread')
     while True:
       try:
-        id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        data = self.arduino.read(size=len)
-        measurement = self.parse(operation, data)#comprueba que la operacion existe
-        logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-        
-        for l in self.listeners:
-          l.send_measurement(measurement)
+        initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
+        if initFlag == self.INIT_FLAG:
+          id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          data = self.arduino.read(size=len)
+          measurement = self.parse(operation, data)#comprueba que la operacion existe
+          logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
+          
+          for l in self.listeners:
+            l.send_measurement(measurement)
       except (ValueError, TypeError) as e:
         print('[WARNING] Ignoring invalid data from Arduino')
         print(e)
@@ -89,14 +92,10 @@ class Robot:
 
   def move_wheels(self, v_left, v_right) -> None:
     '''Set the wheels' speed setpoint'''
-    bytes_written = self.arduino.write(
-      struct.pack('H', AGENT_ID) +
-      struct.pack('H', self.OP_MOVE_WHEEL) +
-      struct.pack('H', 16) + #size of data
-      struct.pack('d', v_left) +
-      struct.pack('d', v_right)
-    )
-    self.arduino.flush()
+    len=16#bytes
+    data=( struct.pack('d', v_left) +
+      struct.pack('d', v_right))
+    self.ArduinoSerialWrite(self.OP_MOVE_WHEEL,len,data)
 
 
   def speed(self, data) -> dict:
@@ -107,21 +106,19 @@ class Robot:
       'v_right': v_right
     }
   
-  def K(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
+  def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
-     bytes_written = self.arduino.write(
-      struct.pack('H', 112) + 
-      struct.pack('H', AGENT_ID) +
-      struct.pack('H', self.OP_CONF_PID) +
-      struct.pack('H', 48) + #size of data
-      struct.pack('d', P_right) +
+    len=48#bytes
+    data=(struct.pack('d', P_right) +
       struct.pack('d', I_right) +
       struct.pack('d', D_right) +
       struct.pack('d', P_left) +
       struct.pack('d', I_left) +
-      struct.pack('d', D_left) 
-    )
-     self.arduino.flush()
+      struct.pack('d', D_left))
+    
+    self.ArduinoSerialWrite(self.OP_CONF_PID,len,data)
+ 
+     
 
   def parse(self, operation: int, data: bytes) -> dict: #comprueba que la operación esta en la lista de operaciones
     if operation not in self.parsers:
@@ -134,7 +131,11 @@ class Robot:
       raise ValueError(f'Undefined operation {operation}')
     self.operations[operation]['method'](**kwargs)
 
-
+  def ArduinoSerialWrite(self,operation,len,data):
+    head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',AGENT_ID) + 
+                struct.pack('H',operation) + struct.pack('H',len))
+    message=head + data
+    bytes_written= self.arduino.write(message )
 class Agent:
   proto: str = 'tcp'
   ip: str = AGENT_IP
@@ -196,9 +197,9 @@ if __name__ == "__main__":
     #logging.info(f'Agent {agent.name} is listening')
     while True:
 
-      agent.robot.K(1,1,1,2,2,2)
+      agent.robot.conf_PID(1,1,1,2,2,2)
       time.sleep(5)
-      agent.robot.K(2,2,2,1,1,1)
+      agent.robot.conf_PID(2,2,2,1,1,1)
       time.sleep(5)
     '''agent.send_measurement(2)
     while not end:
