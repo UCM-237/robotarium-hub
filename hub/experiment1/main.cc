@@ -454,7 +454,7 @@ void *dataAruco(void *arg)
                  zmqpp::message_t ztopic;
                 zmqMessage<<jsonStr;
                 ztopic<<topic;
-                //publisher.send(ztopic);
+                publisher.send(ztopic);
                 publisher.send(zmqMessage);
     // self.control.send_json({
     //   'operation': 'hello',
