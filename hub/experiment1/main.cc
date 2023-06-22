@@ -443,13 +443,18 @@ void *dataAruco(void *arg)
                 data=  x+ sep +y+sep+yaw;
                 cout<<data<<endl;
                 json message;
+                json position;
+            
+                position[id]["x"] =x;
+                position[id]["y"] =y;
+                position[id]["yaw"] =yaw;
                 zmqpp::message_t ztopic;
                 ztopic<<topic;
                 publisher.send(topic,0);
                 //message["topic"]="poition";
                 message["operation"] = "position";
-                message["source_id"] = "0";
-                message["payload"] = data;
+                message["source_id"] = 'Camara_0';
+                message["payload"] = position;
                 message["timestamp"] = 1000 * time(nullptr);
                 std::string jsonStr = message.dump();
                 zmqpp::message_t zmqMessage;
@@ -498,7 +503,7 @@ int registerAgent()
     control.connect("tcp://127.0.0.1:5555");
 
     json message;
-    message["operation"] = "Camera";
+    message["operation"] = "hello";
     message["source_id"] = "0";
     message["payload"]["url"] = "tcp://127.0.0.1:5557";
     message["timestamp"] = 1000 * time(nullptr);
