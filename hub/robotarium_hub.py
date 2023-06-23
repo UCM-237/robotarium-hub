@@ -29,7 +29,6 @@ class RobotariumHub:
     def __init__(self):
         self.OPS = {
         'hello': self.add_agent,
-        'Camera': self.add_Localization
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
@@ -77,20 +76,6 @@ class RobotariumHub:
         self.agents[id]['socket'].subscribe('')
         self.poller.register(self.agents[id]['socket'], zmq.POLLIN)
 
-
-    def add_Localization(self,id,url):
-        logging.info(f'Camera {id} registered with url {url}')
-        self.agents[id] = {
-            'url': url,
-            'socket': self.context.socket(zmq.SUB)
-        }
-        self.agents[id]['socket'].connect(url)
-        self.agents[id]['socket'].subscribe('')
-        self.poller.register(self.agents[id]['socket'], zmq.POLLIN)
-
-        #self.agents[id]['thread'] = Thread(target=self.listen2, args=(id))
-        #self.agents[id]['thread'].start()
-
     def listen(self):
         logging.info(f'Listening to agents')
         while self.running:
@@ -101,32 +86,32 @@ class RobotariumHub:
                 if s in socks and socks[s] == zmq.POLLIN:
                     try:
                         topic = s.recv_string()
-                        message = self.agents[a]['socket'].recv_json()
+                        message = s.recv_json()
                     except json.JSONDecodeError:
                         logging.error(f'Agent {id} sent invalid JSON')
 
                     if topic == 'data':
                         data = message['payload']
                         for k in data:
-                            topic = f'{topic}/{message["source_id"]}/{k}'
-                            self.data_socket.send_string(topic, flags=zmq.SNDMORE)
+                            new_topic = f'{topic}/{message["source_id"]}/{k}'
+                            self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
                             self.data_socket.send_json(data[k])
                     elif topic == 'position':
-                        logging.debug(message)
+                        # logging.debug(message)
+                        data = message['payload']
+                        for agent in data:
+                            new_topic = f'{agent}/data'
+                            #new_messsage = [float(data[agent][k]) for k in ['x', 'y', 'yaw']]
+                            self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
+                            new_data={"position":data[agent]}
+                            print(new_data)
+                            self.data_socket.send_json(new_data)
                     else:
                         self.data_socket.send_string(topic, flags=zmq.SNDMORE)
                         self.data_socket.send_json(message)
                     
                     #self.mqtt_client.publish(topic, json.dumps(message))
                     
-
-    def listen2(self,id):
-        logging.info(f'Listening to agent {id}')
-        while True:
-            topic = self.agents[id]['socket'].recv_string()
-            message = self.agents[id]['socket'].recv_json()
-            logging.info(f'Incoming data from {message["source_id"]} with topic "{topic}"')
-            logging.debug(message)
 
     def accept(self):
         '''Wait for next request from client'''
@@ -136,9 +121,6 @@ class RobotariumHub:
             logging.info(f'Received request from {message["source_id"]}')
             self.OPS[message['operation']](message['source_id'], message['payload']['url'])
             self.commands_socket.send_json({ 'result': 'ok' })
-
-
-
 
 
 def subscribe(client: mqtt_client):
