@@ -117,7 +117,7 @@ const int pinMotorD[3] = { pinENB, pinIN3, pinIN4 };
 
 //-----------------contador encoder------------------------------------------------------------------------------------
 const int             N=                  20;//Resolucion encoder       
-const int             encoderI =          3;//pin de entrada de encoder derecha
+const int             encoderI =          2;//pin de entrada de encoder derecha
 const int             encoderD=           15;//pin de entrada de encoder izquierda
 volatile unsigned     encoder_countD=      0;//cuenta los pulsos de encoder derecha
 int                   encoder_countD_after=0;

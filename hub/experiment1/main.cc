@@ -433,7 +433,7 @@ void *dataAruco(void *arg)
                 doubleToBytes(it->x,&data[4]);
                 doubleToBytes(it->y,&data[12]);
                 doubleToBytes(it->yaw,&data[20]);*/
-                string topic ="position";
+                string topic ="data";
                 string id = to_string(it->id);
                 string x = to_string(it->x);
                 string y = to_string(it->y);
@@ -451,9 +451,9 @@ void *dataAruco(void *arg)
                 zmqpp::message_t ztopic;
                 ztopic<<topic;
                 publisher.send(topic,0);
-                //message["topic"]="poition";
-                message["operation"] = "position";
-                message["source_id"] = 'Camara_0';
+                message["topic"]="position";
+                //message["operation"] = "position";
+                message["source_id"] = "Camara_0";
                 message["payload"] = position;
                 message["timestamp"] = 1000 * time(nullptr);
                 std::string jsonStr = message.dump();
@@ -500,12 +500,12 @@ int registerAgent()
     zmqpp::socket_type type = zmqpp::socket_type::request;
     zmqpp::socket control (context, type);
     cout << "connecting" << endl;
-    control.connect("tcp://127.0.0.1:5555");
+    control.connect("tcp://192.168.1.109:5555");
 
     json message;
     message["operation"] = "hello";
     message["source_id"] = "0";
-    message["payload"]["url"] = "tcp://127.0.0.1:5557";
+    message["payload"]["url"] = "tcp://192.168.1.109:5557";
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();
 
