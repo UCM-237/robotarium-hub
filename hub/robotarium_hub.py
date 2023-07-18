@@ -93,7 +93,7 @@ class RobotariumHub:
                     if topic == 'data':
                         data = message['payload']
                         for k in data:
-                            new_topic = f'{topic}/{message["source_id"]}/{k}'
+                            new_topic = f'{topic}/{k}/{message["topic"]}'
                             self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
                             self.data_socket.send_json(data[k])
                     elif topic == 'position':
@@ -106,6 +106,7 @@ class RobotariumHub:
                             new_data={"position":data[agent]}
                             print(new_data)
                             self.data_socket.send_json(new_data)
+                            
                     else:
                         self.data_socket.send_string(topic, flags=zmq.SNDMORE)
                         self.data_socket.send_json(message)
