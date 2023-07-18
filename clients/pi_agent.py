@@ -14,12 +14,12 @@ from agent import Agent
 logging.basicConfig(level=logging.INFO)
 
 # Who I am
-AGENT_ID = 'Robot_2'
+AGENT_ID = '2'
 AGENT_IP = '192.168.1.115'
 AGENT_CMD_PORT = 5561
 AGENT_DATA_PORT = 5562
 # Where the server is 
-HUB_IP = '192.168.1.130'
+HUB_IP = '192.168.1.109'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 
@@ -69,16 +69,17 @@ class Robot:
     logging.info('Starting Arduino update thread')
     while True:
       try:
-	initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
+        initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
         if initFlag == self.INIT_FLAG:
 
-        id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-	operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        data = self.arduino.read(size=len)
-        measurement = self.parse(operation, data)
-        logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-        self.agent.send_measurement(measurement)
+            id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+            operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+            len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+            data = self.arduino.read(size=len)
+            measurement = self.parse(operation, data)
+            logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
+            data={'data','AGENT_ID'}
+            self.agent.send_measurement(measurement)
       except (ValueError, TypeError) as e:
         logging.debug('Ignoring invalid data from Arduino')
         print(e)
@@ -89,17 +90,9 @@ class Robot:
 
   def move_wheels(self, v_left, v_right) -> None:
     '''Set the wheels' speed setpoint'''
-'''    bytes_written = self.arduino.write(
-      struct.pack('H', AGENT_ID) +
-      struct.pack('H', self.OP_MOVE_WHEEL) +
-      struct.pack('H', 16) +
-      struct.pack('d', v_left) +
-      struct.pack('d', v_right)
-    )'''
-    len=16#bytes
-    data=( struct.pack('d', v_left) +
-      struct.pack('d', v_right))
-    self.ArduinoSerialWrite(self.OP_MOVE_WHEEL,len,data)
+    lent=16#bytes
+    data=( struct.pack('d', v_left) + struct.pack('d', v_right))
+    self.ArduinoSerialWrite(self.OP_MOVE_WHEEL,lent,data)
 
 
   def speed(self, data) -> dict:
@@ -155,6 +148,7 @@ if __name__ == "__main__":
     ip=AGENT_IP,
     cmd_port=AGENT_CMD_PORT,
     data_port=AGENT_DATA_PORT,
+    hub_ip = HUB_IP,
     hub_cmd_port=HUB_CMD_PORT,
     hub_data_port=HUB_DATA_PORT,
   )
