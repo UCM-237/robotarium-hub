@@ -213,10 +213,12 @@ void op_vel_robot() {
   //Serial.println(OP_VEL_ROBOT);
   operation_send.InitFlag=INIT_FLAG;
   operation_send.id=1;
-  operation_send.op = 4;
+  operation_send.op = 5;
   short int a=1;
   doubleToBytes(wD, &operation_send.data[0]);
   doubleToBytes(wI, &operation_send.data[8]);
+  //Serial.println(wD);
+  //Serial.println(wI);
   /*if(backD) {
     shortToBytes(a, &operation_send.data[16]);
   }
