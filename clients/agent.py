@@ -78,8 +78,8 @@ class Agent:
     '''Receive data from other agents'''
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
-    logging.debug('Subscribing to *')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'')
+    logging.debug('Subscribing to data')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()

@@ -68,13 +68,15 @@ class Robot:
     logging.info('Starting Arduino update thread')
     while True:
       try:
-        id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
-        data = self.arduino.read(size=len)
-        measurement = self.parse(operation, data)
-        logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-        self.agent.send_measurement(measurement)
+        initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
+        if initFlag == self.INIT_FLAG:
+          id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          operation = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          len = int.from_bytes(self.arduino.read(size=2), byteorder='little')
+          data = self.arduino.read(size=len)
+          measurement = self.parse(operation, data)
+          logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
+          self.agent.send_measurement(measurement)
       except (ValueError, TypeError) as e:
         logging.debug('Ignoring invalid data from Arduino')
         print(e)
