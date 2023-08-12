@@ -72,7 +72,7 @@ void loop() {
   delay(100);
   serialEvent();
   if (serialCom) {
-    Serial.println(server_operation->id);
+    Serial.println(server_operation->InitFlag);
     if (server_operation->InitFlag == INIT_FLAG){
           Serial.print("operation: \t");
     Serial.println(server_operation->op);
@@ -166,6 +166,7 @@ void op_saludo() {
 void op_message() { }
 
 void op_moveWheel() {
+  Serial.println("movee");
   digitalWrite(led, LOW);
   setpointWD = bytesToDouble(&server_operation->data[0]);
   setpointWI = bytesToDouble(&server_operation->data[8]);
@@ -230,7 +231,7 @@ void op_vel_robot() {
   Serial.println(wD);
   Serial.print("len \t");
   Serial.println(operation_send.len);*/
-  Serial.println(operation_send.InitFlag);
+  //Serial.println(operation_send.InitFlag);
   Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,2);
   Serial1.write((char*)&operation_send.op, 2);

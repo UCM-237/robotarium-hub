@@ -46,12 +46,7 @@ class Algorithm:
     self.A = [[self.L/(2*self.R), 1/self.R],
         [-self.L/(2*self.R), 1/self.R]]
 
-  def test(self):
-    while(1):
-      self.agent.send('control/2/move',{'v_left':8.0,'v_right':8.0})
-      time.sleep(2)
-      self.agent.send('control/2/move',{'v_left':-1.0,'v_right':-1.0})
-      time.sleep(2)
+  
   def connect(self):
     logging.debug('starting device')
     #self.thread = Thread(target=self.test).start()
@@ -64,10 +59,9 @@ class Algorithm:
 
   def orientation(self,agent):
     
-    giro = True
+    giro = False
     PI=math.pi
     vel=0
-    angularWheel = [0.0, 0.0]
    # while(True):
 
     
@@ -75,7 +69,6 @@ class Algorithm:
     posdataAgent=json.loads(Position[agent])
     x=float(posdataMeta['x'])-float(posdataAgent['x'])
     y=float(posdataMeta['y'])-float(posdataAgent['y'])
-    modulo=math.sqrt((x*x)+(y*y))
     angle=math.atan2(y,x)
     angleError=float(posdataAgent['yaw'])-angle
     print("angle:")
@@ -107,30 +100,26 @@ class Algorithm:
 
          self.cumError=-14
 
-    auxcumError=self.cumError
-    if modulo>0.25:        
-      if(angleError>0.65 or angleError<-0.65):
-              
-        w=(0.4*angleError)+0.1*self.cumError#*self.SAMPLETIME/1000 
-        print("w:")
-        print(w)
-      else:
-        w=0
-        giro=True
-
-      
-      vel=0.0
-     
-    
-      if giro:
-        self.next=True
-      self.tval_after=time.time()*1000
-      self.tval_sample = self.tval_after-self.tval_before
-      if self.next:
-        vel=8.2*3.35
+    auxcumError=self.cumError;        
+    if(angleError>0.65 or angleError<-0.65):
+            
+      w=(0.65*angleError)+0.2*self.cumError#*self.SAMPLETIME/1000 
+      print("w:")
+      print(w)
     else:
       w=0
-      vel=0
+      giro=True
+
+    
+    vel=0.0
+    angularWheel = [0.0, 0.0]
+   
+    if giro:
+      self.next=True
+    self.tval_after=time.time()*1000
+    self.tval_sample = self.tval_after-self.tval_before
+    if self.next:
+      vel=8.2*3.35
     velocity_robot=[w,vel]
     self.angularWheelSpeed(angularWheel,velocity_robot)
     self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
@@ -177,14 +166,7 @@ class Algorithm:
     except:
       print("invalid message")
       return
-    # if agent not in self.state:
-    #   self.state[agent]={}
-    # self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in Position and '2' in Position:
-      self.tval_before=time.time()*1000 
-      self.orientation('2')
-    if topic == "position":
-      Position[agent]=message
+    
       
     
  
