@@ -16,10 +16,10 @@ logging.basicConfig(level=logging.INFO)
 AGENT_ID = 2
 AGENT_NAME = 'Orange'
 #AGENT_IP = socket.gethostbyname(socket.gethostname())
-AGENT_IP = '127.0.0.1'#'147.96.22.221'
+AGENT_IP = '192.168.1.115'#'147.96.22.221'
 AGENT_PORT = 5556
 
-SERVER_IP = '127.0.0.1'#'147.96.22.201'
+SERVER_IP = '192.168.1.130'#'147.96.22.201'
 
 # Init sockets
 context = zmq.Context()
@@ -196,12 +196,12 @@ if __name__ == "__main__":
     agent = Agent()
     agent.register(f'tcp://{SERVER_IP}:5555')
     logging.info(f'Agent {agent.name} is listening')
-    '''while True:
+    while True:
 
       agent.robot.conf_PID(1,1,1,2,2,2)
       time.sleep(5)
       agent.robot.conf_PID(2,2,2,1,1,1)
-      time.sleep(5)'''
+      time.sleep(5)
     #agent.send_measurement(2)
     while not end:
       #  Wait for next request
