@@ -80,6 +80,7 @@ class Robot:
             logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
             data={'data','AGENT_ID'}
             self.agent.send_measurement(measurement)
+
       except (ValueError, TypeError) as e:
         logging.debug('Ignoring invalid data from Arduino')
         print(e)

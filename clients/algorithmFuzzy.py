@@ -1,14 +1,13 @@
 # -*- coding: UTF-8 -*-
 #!/bin/python3
-import array
 from serial import Serial, SerialException, serial_for_url
-from serial.tools import list_ports
-from threading import Thread
 import logging
 import math
 import time
 import json
-
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
 
 from agent import Agent
 
@@ -35,7 +34,7 @@ class Algorithm:
     self.agent = agent
     self.Position={}
     self.Meta = '1'
-    self.SAMPLETIME=150
+    self.SAMPLETIME=250
     self.tval_before = 0
     self.tval_after= 0
     self.tval_sample = 0
@@ -45,7 +44,32 @@ class Algorithm:
     self.cumError=0
     self.A = [[self.L/(2*self.R), 1/self.R],
         [-self.L/(2*self.R), 1/self.R]]
+    self.PI=math.pi
 
+    self.AngleError = ctrl.Antecedent(np.arange(-self.PI/2, self.PI/2, 0.1), 'AngleError')
+    self.AngleError['bigNegative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/2,-self.PI/4])
+    self.AngleError['negative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/4,-0.65])
+    self.AngleError['zero'] = fuzz.trimf(self.AngleError.universe, [-0.65,0,0.65,])
+    self.AngleError['positive'] = fuzz.trimf(self.AngleError.universe, [0.65, self.PI/4, self.PI/2])
+    self.AngleError['bigPositive'] = fuzz.trimf(self.AngleError.universe, [self.PI/4, self.PI/2, self.PI/2])
+
+    self.W = ctrl.Consequent(np.arange(-self.PI, self.PI, 0.01), 'W')
+    # Membership functions for the consequent
+    # Membership functions for the consequent
+    self.W['farLeft'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI, -self.PI/2])
+    self.W['left'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI/2, 0])
+    self.W['center'] = fuzz.trimf(self.W.universe, [-self.PI/2, 0, self.PI/2])
+    self.W['right'] = fuzz.trimf(self.W.universe, [0, self.PI/2, self.PI])
+    self.W['farRight'] = fuzz.trimf(self.W.universe, [self.PI/2, self.PI, self.PI])
+
+    self.rule1 = ctrl.Rule(self.AngleError['bigNegative'], self.W['farLeft'])
+    self.rule2 = ctrl.Rule(self.AngleError['negative'], self.W['left'])
+    self.rule3 = ctrl.Rule(self.AngleError['zero'], self.W['center'])
+    self.rule4 = ctrl.Rule(self.AngleError['positive'], self.W['right'])
+    self.rule5 = ctrl.Rule(self.AngleError['bigPositive'], self.W['farRight'])
+
+    self.W_ctrl = ctrl.ControlSystem([self.rule1, self.rule2, self.rule3,self.rule4,self.rule5])
+    self.heading=ctrl.ControlSystemSimulation(self.W_ctrl)
   def test(self):
     while(1):
       self.agent.send('control/2/move',{'v_left':8.0,'v_right':8.0})
@@ -64,75 +88,35 @@ class Algorithm:
 
   def orientation(self,agent):
     
-    giro = True
-    PI=math.pi
     vel=0
     angularWheel = [0.0, 0.0]
-   # while(True):
-
     
     posdataMeta=json.loads(Position[self.Meta])
     posdataAgent=json.loads(Position[agent])
     x=float(posdataMeta['x'])-float(posdataAgent['x'])
     y=float(posdataMeta['y'])-float(posdataAgent['y'])
-    modulo=math.sqrt((x*x)+(y*y))
     angle=math.atan2(y,x)
     angleError=float(posdataAgent['yaw'])-angle
+    modulo=math.sqrt((x*x)+(y*y))
     print("angle:")
     print(angleError)
-    if angleError > PI:
-      angleError=angleError-2*PI
-    elif angleError< (-PI):
-      angleError=angleError+2*PI
-    print("angle:")
-    print(angleError)
-    self.cumError= self.cumError+angleError
+    if angleError > self.PI:
+      angleError=angleError-2*self.PI
+    elif angleError< (-self.PI):
+      angleError=angleError+2*self.PI
 
-    if angleError<0 and  self.cumError>0:
-      self.cumError=0
-        
-    elif(angleError>0 and  self.cumError<0):
-       self.cumError=0
-      
-    if( self.cumError>0):
-
-      if( self.cumError>14):
-          
-           self.cumError=14
-            
-        
-    elif( self.cumError<0):
-
-      if( self.cumError<-14):
-
-         self.cumError=-14
-
-    auxcumError=self.cumError
-    if modulo>0.25:        
-      if(angleError>0.65 or angleError<-0.65):
-              
-        w=(0.4*angleError)+0.1*self.cumError#*self.SAMPLETIME/1000 
-        print("w:")
-        print(w)
-      else:
-        w=0
-        giro=True
-
-      
-      vel=0.0
-     
-    
-      if giro:
-        self.next=True
-      self.tval_after=time.time()*1000
-      self.tval_sample = self.tval_after-self.tval_before
-      if self.next:
-        vel=8.2*3.35
+    if modulo > 0.25:
+      self.heading.input['AngleError']=angleError
+      self.heading.compute()
+      w=self.heading.output['W']
+      print(w)
+      vel=8.2*3.35
     else:
-      w=0
       vel=0
-    velocity_robot=[w,vel]
+      w=0
+    velocity_robot=[float(w),vel]
     self.angularWheelSpeed(angularWheel,velocity_robot)
+    print(angularWheel)
     self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
    # print(angularWheel)
     if self.tval_sample < 0:
@@ -172,8 +156,8 @@ class Algorithm:
 
     try:
       _, agent, topic = topic.split('/')
-      print(agent)
-      print(message)
+      #print(agent)
+      #print(message)
     except:
       print("invalid message")
       return
@@ -193,6 +177,12 @@ class Algorithm:
 
 
 if __name__ == "__main__":
+  # algortihm=Algorithm()
+  # w=0
+  # velocity_robot=[w,6*3.35]
+  # angularWheel=[0,0]
+  # algortihm.angularWheelSpeed(angularWheel,velocity_robot)
+  # print(angularWheel)
   agent = Agent(
     device_class=Algorithm,
     id=AGENT_ID,
