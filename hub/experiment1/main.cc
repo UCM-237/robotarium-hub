@@ -134,6 +134,43 @@ pthread_t  _detectAruco;
 pthread_cond_t listBlock;
 bool EmptyList = false;
 
+const size_t bufferSize = 2;
+std::vector<record_data> buffer(bufferSize);
+size_t readPos = 0;
+size_t writePos = 0;
+bool full = false;
+
+pthread_mutex_t bufferMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t bufferNotEmpty = PTHREAD_COND_INITIALIZER;
+void push(const record_data& data) {
+    pthread_mutex_lock(&bufferMutex);
+    buffer[writePos] = data;
+    writePos = (writePos + 1) % bufferSize;
+    if (writePos == readPos) {
+        full = true;
+        readPos = (readPos + 1) % bufferSize;
+    }
+   pthread_cond_signal(&bufferNotEmpty); // Señalar que hay datos disponibles
+    pthread_mutex_unlock(&bufferMutex);
+}
+
+record_data pop() {
+    pthread_mutex_lock(&bufferMutex);
+    while (!full && writePos == readPos) {
+        // Esperar hasta que haya datos disponibles en el buffer
+        pthread_cond_wait(&bufferNotEmpty, &bufferMutex);
+    }
+    if (!full && writePos == readPos) {
+        // El buffer está vacío
+        pthread_mutex_unlock(&bufferMutex);
+        throw std::runtime_error("Buffer is empty.");
+    }
+    record_data data = buffer[readPos];
+    readPos = (readPos + 1) % bufferSize;
+    full = false;
+    pthread_mutex_unlock(&bufferMutex);
+    return data;
+}
 
 int main(int argc,char **argv)
 {
@@ -190,9 +227,9 @@ int main(int argc,char **argv)
     in_video.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('D', 'I', 'V', 'X'));
     //in_video.set(cv::CAP_PROP_FRAME_WIDTH,800);
     // in_video.set(cv::CAP_PROP_FRAME_HEIGHT,600);
-    // in_video.set(cv::CAP_PROP_FPS,20.0);
-    // in_video.set(cv::CAP_PROP_AUTOFOCUS,0);
-    // in_video.set(cv::CAP_PROP_SETTINGS,1);
+     in_video.set(cv::CAP_PROP_FPS,20.0);
+     in_video.set(cv::CAP_PROP_AUTOFOCUS,0);
+     in_video.set(cv::CAP_PROP_SETTINGS,1);
     if (!parser.check()) {
         parser.printErrors();
         return 1;
@@ -245,7 +282,7 @@ int main(int argc,char **argv)
     
    
     pthread_create(&_detectAruco,NULL,dataAruco,NULL);//create thread for store the values of the markers
-    sleep(2);
+    //sleep(2);
     registerAgent();
      data.n =  0;
     //main loop
@@ -275,6 +312,7 @@ int main(int argc,char **argv)
                 << std::endl;
             */
             // Draw axis for each marker
+            pthread_mutex_lock(&mutex_);
             for(int i=0; i < ids.size(); i++)
             {
                 cv::aruco::drawAxis(image_copy, camera_matrix, dist_coeffs,
@@ -304,13 +342,12 @@ int main(int argc,char **argv)
                // cout<<"data y "<<data.y<<endl;
                 data.id=ids.at(i);
                 data.n++;
-                pthread_mutex_lock(&mutex_);
-                arucoInfo.push_back(data);
+                
+                //arucoInfo.at(i)=data;
+                push(data);
                 EmptyList=false;
                 pthread_cond_signal(&listBlock);
-                int status = pthread_mutex_unlock (&mutex_);
-                if (status != 0)
-                    exit(status);
+                
                 // This section is going to print the data for all the detected
                 // markers. If you have more than a single marker, it is
                 // recommended to change the below section so that either you
@@ -345,19 +382,19 @@ int main(int argc,char **argv)
                             cv::Scalar(0, 252, 124), 1, CV_AVX);
                            
             }
+
+            int status = pthread_mutex_unlock (&mutex_);
+                if (status != 0)
+                    exit(status);
             
         }
 
-        pthread_mutex_lock(&mutex_);
-        EmptyList=true;
-        arucoInfo.erase(arucoInfo.begin(),arucoInfo.end());
-        pthread_mutex_unlock (&mutex_);
          //outputVideo << image_copy;
         // cv::resize(image,image,cv::Size(1200,1600));
       
         video.write(image_copy);
-        //video<<image;
-        imshow("Pose estimation", image_copy);
+        video<<image;
+         imshow("Pose estimation", image_copy);
             char key = (char)cv::waitKey(1);
             if (key == 27)
                 break;
@@ -390,7 +427,9 @@ int main(int argc,char **argv)
 
 void *dataAruco(void *arg)
 {//thread function
-
+    struct timeval tval_before, tval_after, tval_sample;
+    tval_sample.tv_sec=0;
+    tval_sample.tv_usec=0;
     //const string endpoint = "tcp://127.0.0.1:4242"; //5555
     // initialize the 0MQ context
     zmqpp::context context;
@@ -405,85 +444,147 @@ void *dataAruco(void *arg)
     
 
     
-    while(arucoInfo.size()<=0);//the thread stop it until an aruco is detected
-    std::string data;
+    //while(arucoInfo.size()<=0);//the thread stop it until an aruco is detected
+    std::string data2;
     //main code for read variables
-    while(true){
-        bool ExitCondition = false;
-        if(arucoInfo.size()>0)
-        {
-            
-            for(it=arucoInfo.begin();it !=arucoInfo.end();it++)
-            {   if(arucoInfo.size()>0)
-                { 
-                pthread_mutex_lock(&mutex_);
-                while(EmptyList)
-                {
-                    pthread_cond_wait(&listBlock,&mutex_);
-                    ExitCondition=true;
-                }
-                if (ExitCondition)
-                {   
-                    pthread_mutex_unlock (&mutex_);
-                    ExitCondition=false;
-                    break;
-                }
-
-                /*longToBytes(it->id,&data[0]);
-                doubleToBytes(it->x,&data[4]);
-                doubleToBytes(it->y,&data[12]);
-                doubleToBytes(it->yaw,&data[20]);*/
-                string topic ="position";
-                string id = to_string(it->id);
-                string x = to_string(it->x);
-                string y = to_string(it->y);
-                string yaw = to_string(it->yaw);
-                
-                string sep = "/";
-                data=  x+ sep +y+sep+yaw;
-                cout<<data<<endl;
-                json message;
-                json position;
-            
-                position[id]["x"] =x;
-                position[id]["y"] =y;
-                position[id]["yaw"] =yaw;
-                zmqpp::message_t ztopic;
-                ztopic<<topic;
-                publisher.send(topic,0);
-                //message["topic"]="poition";
-                message["operation"] = "position";
-                message["source_id"] = 'Camara_0';
-                message["payload"] = position;
-                message["timestamp"] = 1000 * time(nullptr);
-                std::string jsonStr = message.dump();
-                zmqpp::message_t zmqMessage;
-                
-                
-                zmqMessage<<jsonStr;
-                
-                
-                publisher.send(zmqMessage,0);
-    // self.control.send_json({
-    //   'operation': 'hello',
-    //   'source_id': self.id,
-    //   'payload': {
-    //     'url' : f'tcp://mi_ip:5555'
-    //   },
-    //   'timestamp': 1000*time.time(),
-    // })
-
-                pthread_mutex_unlock (&mutex_);
-                }
-                else{
-                    break;
-                }
-
-                }
-           
+    cout<<"hola"<<endl;
+     while (true) {
+        for(int i=0;i<2;i++){
+        record_data data = pop();
+        string topic ="data";
+        string id = to_string(data.id);
+        string x = to_string(data.x);
+        string y = to_string(data.y);
+        string yaw = to_string(data.yaw);
+        
+        string sep = "/";
+        data2=  x+ sep +y+sep+yaw;
+        cout<<id+sep+data2<<endl;
+        json message;
+        json position;
+    
+        position[id]["x"] =x;
+        position[id]["y"] =y;
+        position[id]["yaw"] =yaw;
+        zmqpp::message_t ztopic;
+        ztopic<<topic;
+        publisher.send(topic,0);
+        message["topic"]="position";
+        //message["operation"] = "position";
+        message["source_id"] = "Camara_0";
+        message["payload"] = position;
+        message["timestamp"] = 1000 * time(nullptr);
+        std::string jsonStr = message.dump();
+        zmqpp::message_t zmqMessage;
+        
+        
+        zmqMessage<<jsonStr;
+        
+        
+        publisher.send(zmqMessage,0);
         }
-	    
+        usleep(400*1000);
     }
+    // while(true){
+    //     gettimeofday(&tval_before,NULL);
+    //     bool ExitCondition = false;
+    //     if(arucoInfo.size()>0)
+    //     {
+    //         pthread_mutex_lock(&mutex_);
+    //         for(it=arucoInfo.begin();it !=arucoInfo.end();it++)
+    //         {   
+                
+                
+                    
+    //                 // while(EmptyList)
+    //                 // {
+    //                 //     pthread_cond_wait(&listBlock,&mutex_);
+    //                 //     ExitCondition=true;
+    //                 // }
+    //                 // if (ExitCondition)
+    //                 // {   
+    //                 //     pthread_mutex_unlock (&mutex_);
+    //                 //     ExitCondition=false;
+    //                 //     break;
+    //                 // }
+
+    //                 /*longToBytes(it->id,&data[0]);
+    //                 doubleToBytes(it->x,&data[4]);
+    //                 doubleToBytes(it->y,&data[12]);
+    //                 doubleToBytes(it->yaw,&data[20]);*/
+    //                 string topic ="data";
+    //                 string id = to_string(it->id);
+    //                 string x = to_string(it->x);
+    //                 string y = to_string(it->y);
+    //                 string yaw = to_string(it->yaw);
+                    
+    //                 string sep = "/";
+    //                 data=  x+ sep +y+sep+yaw;
+    //                 //cout<<data<<endl;
+    //                 json message;
+    //                 json position;
+                
+    //                 position[id]["x"] =x;
+    //                 position[id]["y"] =y;
+    //                 position[id]["yaw"] =yaw;
+    //                 zmqpp::message_t ztopic;
+    //                 ztopic<<topic;
+    //                 publisher.send(topic,0);
+    //                 message["topic"]="position";
+    //                 //message["operation"] = "position";
+    //                 message["source_id"] = "Camara_0";
+    //                 message["payload"] = position;
+    //                 message["timestamp"] = 1000 * time(nullptr);
+    //                 std::string jsonStr = message.dump();
+    //                 zmqpp::message_t zmqMessage;
+                    
+                    
+    //                 zmqMessage<<jsonStr;
+                    
+                    
+    //                 publisher.send(zmqMessage,0);
+    //     // self.control.send_json({
+    //     //   'operation': 'hello',
+    //     //   'source_id': self.id,
+    //     //   'payload': {
+    //     //     'url' : f'tcp://mi_ip:5555'
+    //     //   },
+    //     //   'timestamp': 1000*time.time(),
+    //     // })
+
+                   
+    //         }
+        
+
+            
+            
+    //     EmptyList=true;
+    //     arucoInfo.erase(arucoInfo.begin(),arucoInfo.end());
+        
+    //     pthread_mutex_unlock (&mutex_); 
+    //     }
+        
+
+    //     // gettimeofday(&tval_after,NULL);
+    //     // timersub(&tval_after,&tval_before,&tval_sample);
+    //     // //cout<<(unsigned int)((suseconds_t)30000-tval_sample.tv_usec)<<endl;
+    //     // if( tval_sample.tv_usec<0)
+    //     // {
+    //     //     error("error time");
+    //     // }
+    //     // else if (tval_sample.tv_usec>3000)
+    //     // {
+    //     //     //error("time of program greater than sample time");
+    //     //     cout<<"tiempo de programa mayor "<<tval_sample.tv_usec<<endl;
+    //     // }
+    //     // else if(tval_sample.tv_usec<3000)
+    //     // {
+	    
+    //     //     usleep((unsigned int)((suseconds_t)3000-tval_sample.tv_usec));
+            
+    //     // }
+	    
+    // }
     
     publisher.close();
     pthread_exit(NULL);
