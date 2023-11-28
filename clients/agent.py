@@ -78,9 +78,14 @@ class Agent:
     '''Receive data from other agents'''
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
-    logging.debug('Subscribing to data/*')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data/')
-    self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'control/{self.id}')
+
+    logging.debug('Subscribing to data')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
+
+    logging.debug('Subscribing to *')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
+
+    # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
@@ -94,11 +99,11 @@ class Agent:
 
   def send_measurement(self, data) -> None:
     '''Send a new measurement'''
+    payload ={self.id:data}
     self.data.send_string('data', flags=zmq.SNDMORE)
     self.data.send_json({
-      'operation': 'measurement',
-      'source_id': self.id,
-      'payload': data,
+      'topic': 'measurement',
+       'payload':payload,
       'timestamp': 1000*time.time(),
     })
 
