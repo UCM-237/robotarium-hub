@@ -5,14 +5,15 @@ OPENCVLIBS = -lopencv_highgui -lopencv_aruco -lopencv_imgcodecs -lopencv_core -l
 ZMQLIBS= -lzmq  -lzmqpp
 JLIBS= -lSDL2 -lpthread
 
-all: main joystick
+all:cli
 
-main: main.cc
-	$(CC) $(CFLAGS) -o main main.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
-joystick: joystick.cc 
-	$(CC) $(CFLAGS) -o joystick joystick.cc  $(JLIBS)
+# main: main.cc
+# 	$(CC) $(CFLAGS) -o main main.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
+cli: cli.cc
+	$(CC) $(CFLAGS) -o cli cli.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
 debug: main.cc
 	$(CC) $(CFLAGS) -o main main.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS) --debug
 
 clean:
-	$(RM) main joystick
+	rm -rf cli
+

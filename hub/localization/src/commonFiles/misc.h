@@ -1,11 +1,10 @@
 #ifndef MISC_H
-#define MISC_H 1
-
+#define MISC_H
+#pragma once
 #include <string>
 #include <iostream>
 #include <string>
 #include <vector>
-#include "tinyxml2.h"
 #include <math.h>
 #include <unistd.h>
 
