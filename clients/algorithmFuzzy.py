@@ -54,7 +54,7 @@ class Algorithm:
     self.AngleError['bigPositive'] = fuzz.trimf(self.AngleError.universe, [self.PI/4, self.PI/2, self.PI/2])
 
     self.W = ctrl.Consequent(np.arange(-self.PI, self.PI, 0.01), 'W')
-    # Membership functions for the consequent
+    
     # Membership functions for the consequent
     self.W['farLeft'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI, -self.PI/2])
     self.W['left'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI/2, 0])
