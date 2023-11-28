@@ -9,14 +9,13 @@
             "name": "(gdb) Launch cunit",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/main",
-            "args": [],
+            "program": "${workspaceRoot}/cli",
+            "args": ["-l=0.1","-v=2","-b=0.24","-w=0.34"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
             "externalConsole": true,
             "MIMode": "gdb",
-            "preLaunchTask": "cppbuild",
             "setupCommands": [
               {
                 "description": "Enable pretty-printing for gdb",

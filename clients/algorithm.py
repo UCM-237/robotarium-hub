@@ -58,7 +58,7 @@ class Algorithm:
     
   
   def rendevouz(self,agent)-> None:
-    while self.Meta not in Position or agent not in Position:
+    while self.Meta not in self.Position or agent not in self.Position:
       pass
     self.orientation(agent)
 
@@ -71,8 +71,8 @@ class Algorithm:
    # while(True):
 
     
-    posdataMeta=json.loads(Position[self.Meta])
-    posdataAgent=json.loads(Position[agent])
+    posdataMeta=json.loads(self.Position[self.Meta])
+    posdataAgent=json.loads(self.Position[agent])
     x=float(posdataMeta['x'])-float(posdataAgent['x'])
     y=float(posdataMeta['y'])-float(posdataAgent['y'])
     modulo=math.sqrt((x*x)+(y*y))
@@ -180,11 +180,11 @@ class Algorithm:
     # if agent not in self.state:
     #   self.state[agent]={}
     # self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in Position and '2' in Position:
+    if self.Meta in self.Position and '2' in self.Position:
       self.tval_before=time.time()*1000 
       self.orientation('2')
     if topic == "position":
-      Position[agent]=message
+      self.Position[agent]=message
       
     
  

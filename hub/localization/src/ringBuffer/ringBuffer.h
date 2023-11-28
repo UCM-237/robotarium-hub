@@ -1,0 +1,28 @@
+#pragma once
+#include <vector>   
+#include <pthread.h>
+struct record_data//struct for share information between threads
+{
+    int id; //id of every robot
+    double x, y , z;
+    double yaw;
+    int n;  //counter for know how many robots there are
+};  
+const int BUFFER_SIZE =10;
+
+pthread_mutex_t bufferMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t bufferNotEmpty = PTHREAD_COND_INITIALIZER;
+class ringBuffer
+{
+    public:
+        ringBuffer();
+        ~ringBuffer();
+        void push(const record_data& data);
+        record_data pop();
+
+    private:
+       std::vector<record_data> buffer;
+       size_t readPos = 0;
+       size_t writePos = 0;
+       bool full = false;
+};
