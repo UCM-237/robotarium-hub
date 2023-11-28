@@ -1,9 +1,10 @@
+
 //robot2
 #include "common.h"
 #include <SimpleKalmanFilter.h>
 
 using namespace std;
-char packetBuffer[256]; //buffer to hold incoming packet
+uint8_t packetBuffer[256]; //buffer to hold incoming packet
 
 //--------------------------------------------filtro de media movil simple para estabilizar la lectura de rad/s---------------------------------------
 MeanFilter<long> meanFilterD(10);
@@ -56,7 +57,8 @@ void setup() {
   fullStop(pinMotorD);
   fullStop(pinMotorI);
   // Comunicacion por puerto serie
-  Serial1.begin(9600);
+  Serial1.begin(9600);//for debuggin
+  Serial.begin(9600);
   pinMode(led, OUTPUT); 
 }
   
@@ -70,12 +72,19 @@ void loop() {
   delay(100);
   serialEvent();
   if (serialCom) {
-    do_operation(server_operation->op);
-    serialCom = false;
+    Serial.println(server_operation->InitFlag);
+    if (server_operation->InitFlag == INIT_FLAG){
+          Serial.print("operation: \t");
+    Serial.println(server_operation->op);
+    Serial.println(server_operation->InitFlag);
+      do_operation(server_operation->op);
+      serialCom = false;
+    }
   }
 
   // TO DO: Refactor
   if(currentTime - timeAfter >= SAMPLINGTIME) {
+  
     int auxPWMD = 0, auxPWMI = 0;
     double fD, fI;
     timeStopD = timeStopI = millis();
@@ -107,7 +116,7 @@ void loop() {
       auxPWMD = PWM_D;
     }
 
-    if (sendDataSerial) {
+    if (1) {
       op_vel_robot();
     }
   }
@@ -129,16 +138,16 @@ void do_operation(int operation) {
     case OP_VEL_ROBOT:
       sendDataSerial = true;
       break;
+    case OP_CONF_PID:
+      op_conf_pid();
     default:
       break;
   }
 }
 
 void send(unsigned int operation, byte *data) {
-  operation_send.id = ID;
   operation_send.op = operation;
   operation_send.len = sizeof(data);
-  Serial1.write((char*)&operation_send.id, 2);
   Serial1.write((char*)&operation_send.op, 2);
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&data, operation_send.len);
@@ -147,19 +156,22 @@ void send(unsigned int operation, byte *data) {
 
 void op_saludo() {
   operation_send.op = OP_SALUDO;
-  operation_send.id = ID;
+
   operation_send.len = sizeof (operation_send.data);  /* len */
-  Serial.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
-  Serial.flush();
+  Serial1.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
+  Serial1.flush();
 //  send(ID, OP_SALUDO, )
 }
 
 void op_message() { }
 
 void op_moveWheel() {
+  Serial.println("movee");
   digitalWrite(led, LOW);
   setpointWD = bytesToDouble(&server_operation->data[0]);
   setpointWI = bytesToDouble(&server_operation->data[8]);
+  Serial.println(setpointWD);
+  Serial.println(setpointWI);
   if(setpointWD < 1 && setpointWD > -1) {
     setpointWD = 0;
   }
@@ -199,26 +211,60 @@ void op_StopWheel() {
 }
 
 void op_vel_robot() {
-  operation_send.op = OP_VEL_ROBOT;
-  operation_send.id = ID;
+  //Serial.println(OP_VEL_ROBOT);
+  operation_send.InitFlag=INIT_FLAG;
+  operation_send.id=1;
+  operation_send.op = 5;
   short int a=1;
   doubleToBytes(wD, &operation_send.data[0]);
   doubleToBytes(wI, &operation_send.data[8]);
-  if(backD) {
+  //Serial.println(wD);
+  //Serial.println(wI);
+  /*if(backD) {
     shortToBytes(a, &operation_send.data[16]);
   }
   if(backI) {
     shortToBytes(a, &operation_send.data[18]);
-  }
-  operation_send.len = 20; //strlen((char*)operation_send.data);
-  Serial1.write((char*)&operation_send.id, 2);
+  }*/
+  operation_send.len = sizeof(double)*2;
+  /*Serial.println(operation_send.op);
+  Serial.println(wD);
+  Serial.print("len \t");
+  Serial.println(operation_send.len);*/
+  //Serial.println(operation_send.InitFlag);
+  Serial1.write((char*)&operation_send.InitFlag,4);
+  Serial1.write((char*)&operation_send.id,2);
   Serial1.write((char*)&operation_send.op, 2);
   Serial1.write((char*)&operation_send.len, 2);
-  Serial1.write((char*)&operation_send.data, 20);
+  Serial1.write((char*)&operation_send.data, operation_send.len);
   Serial1.flush();
   //send(ID, OP_VEL_ROBOT, &operation_send.data);
 }
+void op_conf_pid(){
+  P_right= bytesToDouble(&server_operation->data[0]);
+  I_right = bytesToDouble(&server_operation->data[8]);
+  D_right = bytesToDouble(&server_operation->data[16]);
 
+  P_left = bytesToDouble(&server_operation->data[24]);
+  I_left = bytesToDouble(&server_operation->data[32]);
+  D_left = bytesToDouble(&server_operation->data[40]);
+
+  Serial.print(P_right);
+  Serial.print(",");
+  
+  Serial.print(I_right);
+  Serial.print(",");
+  
+  Serial.print(D_right);
+  Serial.print(",");
+
+  Serial.print(P_left);
+  Serial.print(",");
+   Serial.print(I_left);
+  Serial.print(",");
+   Serial.println(D_left);
+
+}
 
 void motorSetup() {
   pinMode(pinIN1, OUTPUT);
@@ -305,7 +351,7 @@ int pidD(double wD) {
     }
     constrain(cumErrorD, -MAXCUMERROR, MAXCUMERROR);
     rateErrorD = (errorD - lastErrorD) / elapsedTimeD; // calcular la derivada del error
-    outputD = static_cast<int> (round(KD_p*errorD + KD_i*cumErrorD + KD_d*rateErrorD ));     // calcular la salida del PID    0.1*errorD +0.0065*cumErrorD + 0.0*rateErrorD
+    outputD = static_cast<int> (round(P_right*errorD + I_right*cumErrorD + D_right*rateErrorD ));     // calcular la salida del PID    0.1*errorD +0.0065*cumErrorD + 0.0*rateErrorD
     lastErrorD = errorD;                               // almacenar error anterior
   }
   previousTimeD=currentTimeD;
@@ -331,7 +377,7 @@ int pidI(double wI) {
     }
     constrain(cumErrorI, -MAXCUMERROR, MAXCUMERROR);
     rateErrorI = (errorI - lastErrorI) / elapsedTimeI; // calcular la derivada del error    
-    outputI = static_cast<int> (round(KI_p*errorI + KI_i*cumErrorI + KI_d*rateErrorI));     // calcular la salida del PID 0.42*errorI  + 0.006*cumErrorI + 0.00*rateErrorI
+    outputI = static_cast<int> (round(P_left*errorI + I_left*cumErrorI + D_left*rateErrorI));     // calcular la salida del PID 0.42*errorI  + 0.006*cumErrorI + 0.00*rateErrorI
     lastErrorI = errorI;
   }
   previousTimeI = currentTimeI;
@@ -347,19 +393,6 @@ void feedForwardI(){
   PWM_I = (setpointWI != 0.0) ? 
     constrain(round((setpointWI + 1.656) / 0.0720), MINPWM, MAXPWM) : 0;
 }
-
-//void tokenize(const string s, char c,vector<string>& v) { // sirve para separa la entrada string.
-//  string::size_type i = 0;
-//  string::size_type j = s.find(c);
-//  while (j != string::npos) {
-//    v.push_back(s.substr(i, j - i));
-//    i = ++j;
-//    j = s.find(c, j);
-//    if (j == string::npos) {
-//      v.push_back(s.substr(i, s.length()));
-//    }
-//  }
-//}
 
 void serialEvent() {
   read_ptr = (unsigned char*)&packetBuffer;
