@@ -1,7 +1,3 @@
-/*
-** listener.c -- a datagram sockets "server" demo
-*/
-
 
 /*
  * Copyright (c) 2019 Flight Dynamics and Control Lab
@@ -25,13 +21,13 @@
  * SOFTWARE.
  *
  */
-#include "common.hh"
-#include <opencv2/opencv.hpp>
-#include <opencv2/aruco.hpp>
-#include <opencv2/core.hpp> //PREDEFINED_DICTIONARY
-#include <opencv2/highgui/highgui.hpp>  // Video write
-#include <zmqpp/zmqpp.hpp>
-#include <nlohmann/json.hpp>
+    #include "common.hh"
+    #include <opencv2/opencv.hpp>
+    #include <opencv2/aruco.hpp>
+    #include <opencv2/core.hpp> //PREDEFINED_DICTIONARY
+    #include <opencv2/highgui/highgui.hpp>  // Video write
+    #include <zmqpp/zmqpp.hpp>
+    #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 using namespace std;
@@ -172,6 +168,10 @@ record_data pop() {
     return data;
 }
 
+void MyestimatePoseSingleMarkers(const std::vector<std::vector<cv::Point2f> >& corners, float markerLength,
+                               const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs,
+                               std::vector<cv::Vec3d>& rvecs, std::vector<cv::Vec3d>& tvecs,
+                               std::vector<float>& reprojectionError);
 int main(int argc,char **argv)
 {
     
@@ -269,7 +269,7 @@ int main(int argc,char **argv)
     cout<<in_video.get(cv::CAP_PROP_FPS)<<endl;;
     cout<<in_video.get(cv::CAP_PROP_FOURCC)<<endl;
     cv::Size S = cv::Size(800,600);
-    cv::VideoWriter video("outcpp.avi", cv::VideoWriter::fourcc('D', 'I', 'V', 'X'),30, S,1);
+    cv::VideoWriter video("outcpp.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),30, S,1);
 
     cv :: Mat Raux = cv::Mat::zeros(3,3,CV_64F);;
 	double ang_roll = 0;
@@ -279,20 +279,51 @@ int main(int argc,char **argv)
     
        // compute rot_mat
     cv::Mat rot_mat,rot_mat2;
-    
-   
+    cv::Mat binary_image;//for detect the arena   
     pthread_create(&_detectAruco,NULL,dataAruco,NULL);//create thread for store the values of the markers
-    //sleep(2);
-    registerAgent();
+    
+    //registerAgent();
      data.n =  0;
     //main loop
+    std::vector<cv::Scalar> cornerColors = {
+    cv::Scalar(0, 255, 0),  // Verde para la primera esquina
+    cv::Scalar(255, 0, 0),  // Azul para la segunda esquina
+    cv::Scalar(0, 0, 255),  // Rojo para la tercera esquina
+    cv::Scalar(255, 255, 0) // Amarillo para la cuarta esquina (ajusta según sea necesario)
+    };
     while (in_video.grab())
     {
         in_video.retrieve(image);
         
         cvtColor(image,grayMat,cv::COLOR_BGR2GRAY);
-        //cv::resize(image,image,cv::Size(resized_width,resized_height));
         image.copyTo(image_copy);
+        //Finding the contours of the arena
+        cv::threshold(grayMat,binary_image,50,255,cv::CHAIN_APPROX_NONE);
+        //cv::adaptiveThreshold(grayMat, binary_image, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 11, 2);
+
+        std::vector<std::vector<cv::Point> > contours;
+        cv::findContours(binary_image,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+        cv::Scalar color(0,0,255);
+        std::vector<std::vector<cv::Point>> filteredContours;
+        double minContourArea = 20000;
+        for (const auto& contour : contours) {
+            double area = cv::contourArea(contour);
+            if (area > minContourArea) {
+                filteredContours.push_back(contour);
+            }
+        }
+        std::vector<cv::Point2f> approxCurve;
+        
+        for(int i=0;i<filteredContours.size();i++){
+            cv::approxPolyDP(filteredContours[i], approxCurve, 0.04 * cv::arcLength(filteredContours[i], true), true);
+            cv::drawContours(image_copy,filteredContours,i,color,2);
+            for (size_t j = 0; j < approxCurve.size(); ++j) {
+                 cv::circle(image_copy, approxCurve[j], 5, cornerColors[j], -1);
+            }
+        }
+        
+        //falta estimar la posicion de la camara con respecto a la arena
+
         std::vector<int> ids;
         std::vector<std::vector<cv::Point2f> > corners;
         cv::aruco::detectMarkers(grayMat, dictionary, corners, ids);
@@ -301,9 +332,10 @@ int main(int argc,char **argv)
         if (ids.size() > 0)
         {
             cv::aruco::drawDetectedMarkers(image, corners, ids);
-
-            std::vector<cv::Vec3d> rvecs, tvecs;
-
+            std::vector<float> reprojectionError;
+            std::vector<cv::Vec3d> rvecs, tvecs,rvecs2,tvecs2;
+            MyestimatePoseSingleMarkers(corners, marker_length_m,
+                    camera_matrix, dist_coeffs, rvecs2, tvecs2,reprojectionError);
             cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
                     camera_matrix, dist_coeffs, rvecs, tvecs);
             // cout<<"corners: "<<getCornersInCameraWorld(marker_length_m, rvecs[0],tvecs[0])<<endl;
@@ -315,6 +347,7 @@ int main(int argc,char **argv)
             pthread_mutex_lock(&mutex_);
             for(int i=0; i < ids.size(); i++)
             {
+                std::cout<<"tvec: "<<tvecs[i]<<std::endl;
                 cv::aruco::drawAxis(image_copy, camera_matrix, dist_coeffs,
                         rvecs[i], tvecs[i], 0.1);
                         
@@ -325,18 +358,6 @@ int main(int argc,char **argv)
                 data.z=tvecs[i](2);
                 cv::Rodrigues(rvecs[i], rot_mat);
                 ang_yaw=atan2(rot_mat.at<double>(1,0),rot_mat.at<double>(0,0));
-                /*     r11=rot_mat.at<double>(0,0);
-            r12=rot_mat.at<double>(0,1);
-            r13=rot_mat.at<double>(0,2);
-            r21=rot_mat.at<double>(1,0);
-            r22=rot_mat.at<double>(1,1);
-            r23=rot_mat.at<double>(1,2);
-            r31=rot_mat.at<double>(2,0);
-            r32=rot_mat.at<double>(2,1);
-            r33=rot_mat.at<double>(2,2);*/
-
-             //   data.rx=rvecs[i](0);
-              //  data.ry=rvecs[i](1);
                 data.yaw=ang_yaw;
 
                // cout<<"data y "<<data.y<<endl;
@@ -408,23 +429,6 @@ int main(int argc,char **argv)
 }
 
 
-
-
-/*def register(self, server_url: str) -> None: #Hello op
-    '''Register to the control hub'''
-    print(f'Registering agent')
-    self.control.connect(server_url)
-    self.control.send_json({
-      'operation': 'hello',
-      'source_id': self.id,
-      'payload': {
-        'url' : f'{self.proto}://{self.ip}:{self.port}'
-      },
-      'timestamp': 1000*time.time(),
-    })
-    response = self.control.recv_json()
-    self.connected = response['result'] == 'ok'*/
-
 void *dataAruco(void *arg)
 {//thread function
     struct timeval tval_before, tval_after, tval_sample;
@@ -485,106 +489,7 @@ void *dataAruco(void *arg)
         }
         usleep(400*1000);
     }
-    // while(true){
-    //     gettimeofday(&tval_before,NULL);
-    //     bool ExitCondition = false;
-    //     if(arucoInfo.size()>0)
-    //     {
-    //         pthread_mutex_lock(&mutex_);
-    //         for(it=arucoInfo.begin();it !=arucoInfo.end();it++)
-    //         {   
-                
-                
-                    
-    //                 // while(EmptyList)
-    //                 // {
-    //                 //     pthread_cond_wait(&listBlock,&mutex_);
-    //                 //     ExitCondition=true;
-    //                 // }
-    //                 // if (ExitCondition)
-    //                 // {   
-    //                 //     pthread_mutex_unlock (&mutex_);
-    //                 //     ExitCondition=false;
-    //                 //     break;
-    //                 // }
-
-    //                 /*longToBytes(it->id,&data[0]);
-    //                 doubleToBytes(it->x,&data[4]);
-    //                 doubleToBytes(it->y,&data[12]);
-    //                 doubleToBytes(it->yaw,&data[20]);*/
-    //                 string topic ="data";
-    //                 string id = to_string(it->id);
-    //                 string x = to_string(it->x);
-    //                 string y = to_string(it->y);
-    //                 string yaw = to_string(it->yaw);
-                    
-    //                 string sep = "/";
-    //                 data=  x+ sep +y+sep+yaw;
-    //                 //cout<<data<<endl;
-    //                 json message;
-    //                 json position;
-                
-    //                 position[id]["x"] =x;
-    //                 position[id]["y"] =y;
-    //                 position[id]["yaw"] =yaw;
-    //                 zmqpp::message_t ztopic;
-    //                 ztopic<<topic;
-    //                 publisher.send(topic,0);
-    //                 message["topic"]="position";
-    //                 //message["operation"] = "position";
-    //                 message["source_id"] = "Camara_0";
-    //                 message["payload"] = position;
-    //                 message["timestamp"] = 1000 * time(nullptr);
-    //                 std::string jsonStr = message.dump();
-    //                 zmqpp::message_t zmqMessage;
-                    
-                    
-    //                 zmqMessage<<jsonStr;
-                    
-                    
-    //                 publisher.send(zmqMessage,0);
-    //     // self.control.send_json({
-    //     //   'operation': 'hello',
-    //     //   'source_id': self.id,
-    //     //   'payload': {
-    //     //     'url' : f'tcp://mi_ip:5555'
-    //     //   },
-    //     //   'timestamp': 1000*time.time(),
-    //     // })
-
-                   
-    //         }
-        
-
-            
-            
-    //     EmptyList=true;
-    //     arucoInfo.erase(arucoInfo.begin(),arucoInfo.end());
-        
-    //     pthread_mutex_unlock (&mutex_); 
-    //     }
-        
-
-    //     // gettimeofday(&tval_after,NULL);
-    //     // timersub(&tval_after,&tval_before,&tval_sample);
-    //     // //cout<<(unsigned int)((suseconds_t)30000-tval_sample.tv_usec)<<endl;
-    //     // if( tval_sample.tv_usec<0)
-    //     // {
-    //     //     error("error time");
-    //     // }
-    //     // else if (tval_sample.tv_usec>3000)
-    //     // {
-    //     //     //error("time of program greater than sample time");
-    //     //     cout<<"tiempo de programa mayor "<<tval_sample.tv_usec<<endl;
-    //     // }
-    //     // else if(tval_sample.tv_usec<3000)
-    //     // {
-	    
-    //     //     usleep((unsigned int)((suseconds_t)3000-tval_sample.tv_usec));
-            
-    //     // }
-	    
-    // }
+    
     
     publisher.close();
     pthread_exit(NULL);
@@ -604,9 +509,13 @@ int registerAgent()
     control.connect("tcp://127.0.0.1:5555");
 
     json message;
+    json size;
+    // size["x"] =x;
+    // size["y"] =y;
     message["operation"] = "hello";
     message["source_id"] = "0";
     message["payload"]["url"] = "tcp://127.0.0.1:5557";
+    message["payload"]["size"] = size;
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();
 
@@ -617,12 +526,6 @@ int registerAgent()
 
 
     zmqpp::message_t response;
-    //control.receive(response);
-
-   /*std::string jsonStr(static_cast<const char*>(response.data()), response.size());
-    json jsonResponse = json::parse(jsonStr);
-    std::string result = jsonResponse["result"].get<std::string>();
-    bool connected = (result == "ok");*/
     
     control.close();
     return 0;
@@ -635,9 +538,7 @@ vector<cv::Point3f> getCornersInCameraWorld(double side, cv::Vec3d rvec, cv::Vec
 
 
      // compute rot_mat
-     cv::Mat rot_mat
-
-;
+     cv::Mat rot_mat;
      cv::Rodrigues(rvec, rot_mat);
 
      // transpose of rot_mat for easy columns extraction
@@ -666,4 +567,47 @@ vector<cv::Point3f> getCornersInCameraWorld(double side, cv::Vec3d rvec, cv::Vec
      ret[3] +=  camWorldE - camWorldF;
 
      return ret;
+}
+
+void MyestimatePoseSingleMarkers(const std::vector<std::vector<cv::Point2f>> &corners, float markerLength, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, std::vector<cv::Vec3d> &rvecs, std::vector<cv::Vec3d> &tvecs, std::vector<float> &reprojectionError)
+{
+    vector<cv::Point3f> objPoints;
+    cv::Point3f p;
+    objPoints.push_back(cv::Point3f(-markerLength/2,markerLength/2,0));
+    objPoints.push_back(cv::Point3f(markerLength/2,markerLength/2,0));
+    objPoints.push_back(cv::Point3f(markerLength/2,-markerLength/2,0));
+    objPoints.push_back(cv::Point3f(-markerLength/2,-markerLength/2,0));
+
+    for (auto c = corners.begin(); c != corners.end(); ++c)
+    {
+        cv::Mat rvec, tvec;
+        
+        if (c->size() >= 4)
+        {
+            cv::Mat rvec, tvec;
+            cv::solvePnP(objPoints,*c , cameraMatrix, distCoeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE_SQUARE);
+            std::cout<< "tvec: "<<tvec<<std::endl;
+            rvecs.push_back(rvec);
+            tvecs.push_back(tvec);
+
+            // Resto del código para el cálculo del error de reproyección
+            // ...
+        }
+        else
+        {
+        }
+        
+        // Calcular el error de reproyección
+        // for (size_t i = 0; i < projectedPoints.size(); ++i)
+        // {
+        //     float error = cv::norm(c[i][0] - projectedPoints[i][0], c[i][1] - projectedPoints[i][1]);
+
+        //     sum += error;
+        // }
+
+        // // Calcular el error promedio y almacenarlo
+        // float avgError = sum / projectedPoints.size();
+        // reprojectionError.push_back(avgError);
+    }
+    
 }
