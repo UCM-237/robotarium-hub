@@ -144,12 +144,18 @@ void Localization::FindArena()
             }
             if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->weightArenaLength, this->rvecs, this->tvecs))
             {
-                RobotariumData.x = this->tvecs[0][0];
-                RobotariumData.y = this->tvecs[0][1];
-                RobotariumData.z = this->tvecs[0][2];
+                RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+
                 agentCommunication->setRobotariumData(RobotariumData);
                 ArenaFound=true;
-                for (int i = 0; i < rvecs.size(); ++i) {
+                for (long unsigned int i = 0; i < rvecs.size(); ++i) {
                     auto rvec = rvecs[i];
                     auto tvec = tvecs[i];
                     cv::drawFrameAxes(this->image_copy,  this->camera_matrix, this->dist_coeffs, rvec, tvec, 0.1);
@@ -200,7 +206,7 @@ void Localization::FindRobot()
            
             // // Draw axis for each marker
              
-            for(int i=0; i < ids.size(); i++)
+            for(long unsigned int i=0; i < ids.size(); i++)
             {
                  cv::aruco::drawAxis(this->image_copy, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
@@ -217,7 +223,6 @@ void Localization::FindRobot()
 
                // cout<<"data y "<<data.y<<endl;
                 this->data.id=ids.at(i);
-                this->data.n++;
                 
                 //arucoInfo.at(i)=data;
                 this->buffer->push(data);
@@ -297,7 +302,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
         }
 }
 
-record_data Localization::getRobotariumData()
+ArenaLimits Localization::getRobotariumData()
 {
     return this->RobotariumData;
 }

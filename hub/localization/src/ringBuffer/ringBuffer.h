@@ -6,8 +6,12 @@ struct record_data//struct for share information between threads
     int id; //id of every robot
     double x, y , z;
     double yaw;
-    int n;  //counter for know how many robots there are
 };  
+struct ArenaLimits
+{
+    std::vector<double> x;
+    std::vector<double> y;
+};
 const int BUFFER_SIZE =10;
 
 pthread_mutex_t bufferMutex = PTHREAD_MUTEX_INITIALIZER;

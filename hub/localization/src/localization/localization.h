@@ -43,7 +43,7 @@ class Localization
                                std::vector<float>& reprojectionError);
         bool EstimateArenaPosition(const std::vector<cv::Point2f>& corners, float baseLength,float weightLength,
                                std::vector<cv::Vec3d>& rvecs, std::vector<cv::Vec3d>& tvecs);
-        record_data getRobotariumData();
+        ArenaLimits getRobotariumData();
     private:
     cv::Ptr<cv::aruco::Dictionary> dictionary;
     pthread_t  _detectAruco; 
@@ -70,7 +70,7 @@ class Localization
     std::ostringstream vector_to_marker;
 
     int arenaSize=30;//cm default value
-    record_data RobotariumData;
+    ArenaLimits RobotariumData;
     std::vector<cv::Scalar> cornerColors = {
     cv::Scalar(0, 255, 0),  // Verde para la primera esquina
     cv::Scalar(255, 0, 0),  // Azul para la segunda esquina
