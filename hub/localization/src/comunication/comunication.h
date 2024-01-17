@@ -13,11 +13,11 @@ class AgentCommunication
     /// @brief 
     AgentCommunication();
     ~AgentCommunication();
-    void setRobotariumData(record_data RobotariumData);
+    void setRobotariumData(ArenaLimits RobotariumData);
     void setRingBuffer(ringBuffer *buff);
     void registerAgent();
     static void *sendArucoPosition(void *arg);
     private:
-        record_data RobotariumData;
+        ArenaLimits RobotariumData;
         static ringBuffer *buffer;
 };
