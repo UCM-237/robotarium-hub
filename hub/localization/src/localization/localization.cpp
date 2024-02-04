@@ -118,7 +118,7 @@ void Localization::FindArena()
         this->in_video.retrieve(this->image);
         
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
-        image.copyTo(this->image_copy);
+        this->image.copyTo(this->image_copy);
         //Finding the contours of the arena
         cv::threshold(this->grayMat,this->binary_image,50,255,cv::CHAIN_APPROX_NONE);
 
@@ -218,7 +218,7 @@ void Localization::FindRobot()
                 //cout<<ids.at(i)<<"datax "<<data.x<<","<<data.y<<endl;
                 this->data.z=this->tvecs[i](2);
                 cv::Rodrigues(this->rvecs[i], this->rot_mat);
-                this->ang_yaw=atan2(this->rot_mat.at<double>(1,0),this->rot_mat.at<double>(0,0));
+                this->ang_yaw=atan2(this->rot_mat.at<double>(1,0),this->rot_mat.at<double>(0,0));//range [-pi,pi]
                 this->data.yaw=this->ang_yaw;
 
                // cout<<"data y "<<data.y<<endl;
