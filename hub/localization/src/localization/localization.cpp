@@ -172,83 +172,81 @@ void Localization::FindArena()
             this->in_video2.grab();
             this->in_video2.retrieve(this->image2);
             // Check if both images have the same number of rows
-        if (this->image.rows != this->image2.rows) {
-            // Resize 'this->image2' to have the same number of rows as 'this->image'
-            double scale = static_cast<double>(this->image.rows) / this->image2.rows;
-            cv::resize(this->image2, this->image2, cv::Size(), scale, scale);
+            if (this->image.rows != this->image2.rows) {
+                // Resize 'this->image2' to have the same number of rows as 'this->image'
+                double scale = static_cast<double>(this->image.rows) / this->image2.rows;
+                cv::resize(this->image2, this->image2, cv::Size(), scale, scale);
+            }
+            try{
+                cv::hconcat(this->image,this->image2,bothImages);
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+            }
         }
-        try{
-            cv::hconcat(this->image,this->image2,bothImages);
-        }
-        catch(const std::exception& e)
-        {
-            std::cerr << e.what() << '\n';
-        }
-
+        else{
 
         }
-        // else{
+        cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
+        this->image.copyTo(this->image_copy);
+        Finding the contours of the arena
+        cv::threshold(this->grayMat,this->binary_image,50,255,cv::CHAIN_APPROX_NONE);
 
-        // }
-        // cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
-        // this->image.copyTo(this->image_copy);
-        // //Finding the contours of the arena
-        // cv::threshold(this->grayMat,this->binary_image,50,255,cv::CHAIN_APPROX_NONE);
-
-        // std::vector<std::vector<cv::Point> > contours;
-        // cv::findContours(binary_image,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
-        // cv::Scalar color(0,0,255);
-        // std::vector<std::vector<cv::Point>> filteredContours;
-        // double minContourArea = 5000;
-        // for (const auto& contour : contours) {
-        //     double area = cv::contourArea(contour);
-        //     if (area > minContourArea) {
+        std::vector<std::vector<cv::Point> > contours;
+        cv::findContours(binary_image,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+        cv::Scalar color(0,0,255);
+        std::vector<std::vector<cv::Point>> filteredContours;
+        double minContourArea = 5000;
+        for (const auto& contour : contours) {
+            double area = cv::contourArea(contour);
+            if (area > minContourArea) {
                
             
-        //      std::vector<cv::Point> approx;
-        //     cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
+             std::vector<cv::Point> approx;
+            cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
 
-        //     if (approx.size() == 4&& std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
-        //         filteredContours.push_back(approx);
+            if (approx.size() == 4&& std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
+                filteredContours.push_back(approx);
 
-        //         // Optionally, you can draw the rectangles on the image
-        //         cv::polylines(image_copy, approx, true, color, 2);
-        //     }
-        // }
-        // }
-        // std::vector<cv::Point2f> approxCurve;
-        // std::cout<<"filtered"<<std::endl;
-        // std::cout<<"filtered size: "<<filteredContours.size()<<std::endl;
-        // // if (filteredContours.size()>0){
-        // //     for( long unsigned int i=0;i<filteredContours.size();i++){
-        // //         cv::approxPolyDP(filteredContours[i], approxCurve, 0.04 * cv::arcLength(filteredContours[i], true), true);
-        // //         cv::drawContours(this->image_copy,filteredContours,i,color,2);
-        // //         for (size_t j = 0; j < approxCurve.size(); ++j) {
-        // //             cv::circle(this->image_copy, approxCurve[j], 5, this->cornerColors[j], -1);
-        // //         }
-        // //     }
-        // //     std::cout<<"Estimating Arena Position"<<std::endl;
-        // //     if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->weightArenaLength, this->rvecs, this->tvecs))
-        // //     {
-        // //         RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
-        // //         RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
-        // //         RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
-        // //         RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
-        // //         RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
-        // //         RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
-        // //         RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
-        // //         RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+                Optionally, you can draw the rectangles on the image
+                cv::polylines(image_copy, approx, true, color, 2);
+            }
+        }
+        }
+        std::vector<cv::Point2f> approxCurve;
+        std::cout<<"filtered"<<std::endl;
+        std::cout<<"filtered size: "<<filteredContours.size()<<std::endl;
+        if (filteredContours.size()>0){
+            for( long unsigned int i=0;i<filteredContours.size();i++){
+                cv::approxPolyDP(filteredContours[i], approxCurve, 0.04 * cv::arcLength(filteredContours[i], true), true);
+                cv::drawContours(this->image_copy,filteredContours,i,color,2);
+                for (size_t j = 0; j < approxCurve.size(); ++j) {
+                    cv::circle(this->image_copy, approxCurve[j], 5, this->cornerColors[j], -1);
+                }
+            }
+            std::cout<<"Estimating Arena Position"<<std::endl;
+            if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->weightArenaLength, this->rvecs, this->tvecs))
+            {
+                RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+                RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+                RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
 
-        // //         agentCommunication->setRobotariumData(RobotariumData);
-        // //         ArenaFound=true;
-        // //         for (long unsigned int i = 0; i < rvecs.size(); ++i) {
-        // //             auto rvec = rvecs[i];
-        // //             auto tvec = tvecs[i];
-        // //             cv::drawFrameAxes(this->image_copy,  this->camera_matrix, this->dist_coeffs, rvec, tvec, 0.1);
-        // //         }
+                agentCommunication->setRobotariumData(RobotariumData);
+                ArenaFound=true;
+                for (long unsigned int i = 0; i < rvecs.size(); ++i) {
+                    auto rvec = rvecs[i];
+                    auto tvec = tvecs[i];
+                    cv::drawFrameAxes(this->image_copy,  this->camera_matrix, this->dist_coeffs, rvec, tvec, 0.1);
+                }
                 
-        // //     }
-        // // }
+            }
+        }
         imshow("Pose estimation", bothImages);
                 char key = (char)cv::waitKey(1);
                 if (key == 27)
