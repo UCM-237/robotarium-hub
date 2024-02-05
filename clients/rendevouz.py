@@ -27,7 +27,7 @@ HUB_DATA_PORT = 5556
 Position={}
 
 
-class Algorithm:
+class rendevouz:
   
   state: dict = {}
   
@@ -194,7 +194,7 @@ class Algorithm:
 
 if __name__ == "__main__":
   agent = Agent(
-    device_class=Algorithm,
+    device_class=rendevouz,
     id=AGENT_ID,
     ip=AGENT_IP,
     cmd_port=AGENT_CMD_PORT,

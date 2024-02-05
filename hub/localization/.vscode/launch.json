@@ -9,7 +9,7 @@
             "name": "(gdb) Launch cunit",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/cli",
+            "program": "${workspaceRoot}/build/src/cli",
             "args": ["-l=0.1","-v=2","-b=0.24","-w=0.34"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
