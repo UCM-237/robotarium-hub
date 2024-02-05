@@ -20,6 +20,7 @@ const char* keys  =
         "{h        |false | Print help }"
         "{l        |      | Actual marker length in meter }"
         "{v        |<none>| Custom video source, otherwise '0' }"
+        "{vv       |<none>| Custom video source, otherwise '0' }"
         "{b        |      | Actual base arena length in m }"
         "{w        |      | Actual weight arena length in m }"
         "{h        |false | Print help }"
@@ -43,16 +44,17 @@ class Localization
                                std::vector<float>& reprojectionError);
         bool EstimateArenaPosition(const std::vector<cv::Point2f>& corners, float baseLength,float weightLength,
                                std::vector<cv::Vec3d>& rvecs, std::vector<cv::Vec3d>& tvecs);
-        record_data getRobotariumData();
+        ArenaLimits getRobotariumData();
     private:
     cv::Ptr<cv::aruco::Dictionary> dictionary;
     pthread_t  _detectAruco; 
     pthread_cond_t listBlock;
 
-    cv::VideoCapture in_video;
+    cv::VideoCapture in_video,in_video2;
     cv::String videoInput = "0";//se selecciona la entrada de la camara
-    int frame_width ;
-	int frame_height ;
+    cv::String videoInput2 = "0";
+    int frame_width, frame_height;
+	int frame_width_2,frame_height_2;
 
     float marker_length_m=0;
     float baseArenaLength=0;
@@ -63,14 +65,15 @@ class Localization
 
     cv::Mat grayMat;
     cv::Mat rot_mat;
-    cv::Mat image, image_copy;
+    cv::Mat image, image2, image_copy;
     cv::Mat camera_matrix, dist_coeffs;
+    cv::Mat camera_matrix_2, dist_coeffs_2;
      cv::Mat binary_image;//for detect the arena 
      std::vector<cv::Vec3d> rvecs, tvecs;
     std::ostringstream vector_to_marker;
 
     int arenaSize=30;//cm default value
-    record_data RobotariumData;
+    ArenaLimits RobotariumData;
     std::vector<cv::Scalar> cornerColors = {
     cv::Scalar(0, 255, 0),  // Verde para la primera esquina
     cv::Scalar(255, 0, 0),  // Azul para la segunda esquina
@@ -81,4 +84,6 @@ class Localization
     AgentCommunication *agentCommunication;
     ringBuffer *buffer;
     record_data data;
+
+    bool twoCameras=false;
 };
