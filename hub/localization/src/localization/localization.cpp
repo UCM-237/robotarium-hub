@@ -187,7 +187,7 @@ void Localization::FindArena()
                
             
              std::vector<cv::Point> approx;
-            cv::approxPolyDP(contour, approx, 0.02 * cv::arcLength(contour, true), true);
+            cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
 
             if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
                 filteredContours.push_back(approx);
