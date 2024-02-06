@@ -19,6 +19,14 @@ void Localization::initRingBuffer()
 
 int Localization::init(int argc,char **argv)
 {
+
+    cv::Mat R, T, R1, R2, P1, P2, Q;
+    cv::Mat map1x, map1y, map2x, map2y;
+    // Stereo matching
+    cv::Mat rectifiedImage1, rectifiedImage2, disparity;
+
+    
+    this->twoCameras=false;
      //init aruco code----------
     cv::CommandLineParser parser(argc, argv, keys);
     parser.about(about);
@@ -73,13 +81,33 @@ int Localization::init(int argc,char **argv)
             
         }
     } else {
-        this->in_video.open(0);
+        return -1;
     }
-    //in_video.set(cv::CAP_PROP_FRAME_WIDTH,800);
-    // in_video.set(cv::CAP_PROP_FRAME_HEIGHT,600);
+    if(parser.has("vv"))
+    {
+        this->videoInput2 = parser.get<cv::String>("vv");
+        if (this->videoInput.empty()) {
+            parser.printMessage();
+            return -1;
+        }
+        this->twoCameras=true;
+         char* end = nullptr;
+        int source = static_cast<int>(std::strtol(this->videoInput2.c_str(), &end, \
+            10));
+        if (!end || end == this->videoInput2.c_str()) {
+             /*  in_video.open(videoInput); // url
+            in_video.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+			in_video.set(cv::CAP_PROP_FPS,20);*/
+            
+        } else {
+            this->in_video2.open(source); // id
+            
+        } 
+    }
      this->in_video.set(cv::CAP_PROP_FPS,30.0);
      this->in_video.set(cv::CAP_PROP_AUTOFOCUS,0);
      this->in_video.set(cv::CAP_PROP_SETTINGS,1);
+
     if (!parser.check()) {
         parser.printErrors();
         return -1;
@@ -99,6 +127,11 @@ int Localization::init(int argc,char **argv)
 
     this-> frame_width = in_video.get(cv::CAP_PROP_FRAME_WIDTH);
 	this-> frame_height = in_video.get(cv::CAP_PROP_FRAME_HEIGHT);
+    if(this->twoCameras)
+    {
+    
+
+    }
     return 1;
 }
 
@@ -113,12 +146,33 @@ void Localization::FindArena()
 {
     bool ArenaFound=false;
     std::vector<float> reprojectionError;
-    while (this->in_video.grab() && ArenaFound==false)
+    int rows,cols;
+
+    while (this->in_video.grab() &&ArenaFound==false)
     {
+
         this->in_video.retrieve(this->image);
-        
+        cv::Mat bothImages;
+        if(this->twoCameras)
+        {
+            this->in_video2.grab();
+            this->in_video2.retrieve(this->image2);
+            // Check if both images have the same number of rows
+            if (this->image.rows != this->image2.rows) {
+                // Resize 'this->image2' to have the same number of rows as 'this->image'
+                double scale = static_cast<double>(this->image.rows) / this->image2.rows;
+                cv::resize(this->image2, this->image2, cv::Size(), scale, scale);
+            }
+            try{
+                cv::hconcat(this->image,this->image2,bothImages);
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+            }
+        }
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
-        image.copyTo(this->image_copy);
+        this->image.copyTo(this->image_copy);
         //Finding the contours of the arena
         cv::threshold(this->grayMat,this->binary_image,50,255,cv::CHAIN_APPROX_NONE);
 
@@ -126,38 +180,57 @@ void Localization::FindArena()
         cv::findContours(binary_image,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
         cv::Scalar color(0,0,255);
         std::vector<std::vector<cv::Point>> filteredContours;
-        double minContourArea = 10000;
+        double minContourArea = 7000;
         for (const auto& contour : contours) {
             double area = cv::contourArea(contour);
             if (area > minContourArea) {
-                filteredContours.push_back(contour);
+               
+            
+             std::vector<cv::Point> approx;
+            cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
+
+            if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
+                filteredContours.push_back(approx);
+
+                // Optionally, you can draw the rectangles on the image
+                cv::polylines(image_copy, approx, true, color, 2);
             }
+        }
         }
         std::vector<cv::Point2f> approxCurve;
-        if (filteredContours.size()>0){
-            for( long unsigned int i=0;i<filteredContours.size();i++){
-                cv::approxPolyDP(filteredContours[i], approxCurve, 0.04 * cv::arcLength(filteredContours[i], true), true);
-                cv::drawContours(this->image_copy,filteredContours,i,color,2);
-                for (size_t j = 0; j < approxCurve.size(); ++j) {
-                    cv::circle(this->image_copy, approxCurve[j], 5, this->cornerColors[j], -1);
-                }
-            }
-            if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->weightArenaLength, this->rvecs, this->tvecs))
-            {
-                RobotariumData.x = this->tvecs[0][0];
-                RobotariumData.y = this->tvecs[0][1];
-                RobotariumData.z = this->tvecs[0][2];
-                agentCommunication->setRobotariumData(RobotariumData);
-                ArenaFound=true;
-                for (int i = 0; i < rvecs.size(); ++i) {
-                    auto rvec = rvecs[i];
-                    auto tvec = tvecs[i];
-                    cv::drawFrameAxes(this->image_copy,  this->camera_matrix, this->dist_coeffs, rvec, tvec, 0.1);
-                }
+        std::cout<<"filtered"<<std::endl;
+        std::cout<<"filtered size: "<<filteredContours.size()<<std::endl;
+        // if (filteredContours.size()>0){
+        //     for( long unsigned int i=0;i<filteredContours.size();i++){
+        //         cv::approxPolyDP(filteredContours[i], approxCurve, 0.04 * cv::arcLength(filteredContours[i], true), true);
+        //         cv::drawContours(this->image_copy,filteredContours,i,color,2);
+        //         for (size_t j = 0; j < approxCurve.size(); ++j) {
+        //             cv::circle(this->image_copy, approxCurve[j], 5, this->cornerColors[j], -1);
+        //         }
+        //     }
+        //     std::cout<<"Estimating Arena Position"<<std::endl;
+        //     if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->weightArenaLength, this->rvecs, this->tvecs))
+        //     {
+        //         RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+        //         RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+        //         RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+        //         RobotariumData.y.push_back(this->tvecs[0][1]+this->weightArenaLength/2);
+        //         RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
+        //         RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+        //         RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
+        //         RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
+
+        //         agentCommunication->setRobotariumData(RobotariumData);
+        //         ArenaFound=true;
+        //         for (long unsigned int i = 0; i < rvecs.size(); ++i) {
+        //             auto rvec = rvecs[i];
+        //             auto tvec = tvecs[i];
+        //             cv::drawFrameAxes(this->image_copy,  this->camera_matrix, this->dist_coeffs, rvec, tvec, 0.1);
+        //         }
                 
-            }
-        }
-        imshow("Pose estimation", this->image_copy);
+        //     }
+        // }
+        imshow("Pose estimation", image_copy);
                 char key = (char)cv::waitKey(1);
                 if (key == 27)
                     break;
@@ -200,7 +273,7 @@ void Localization::FindRobot()
            
             // // Draw axis for each marker
              
-            for(int i=0; i < ids.size(); i++)
+            for(long unsigned int i=0; i < ids.size(); i++)
             {
                  cv::aruco::drawAxis(this->image_copy, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
@@ -212,12 +285,11 @@ void Localization::FindRobot()
                 //cout<<ids.at(i)<<"datax "<<data.x<<","<<data.y<<endl;
                 this->data.z=this->tvecs[i](2);
                 cv::Rodrigues(this->rvecs[i], this->rot_mat);
-                this->ang_yaw=atan2(this->rot_mat.at<double>(1,0),this->rot_mat.at<double>(0,0));
+                this->ang_yaw=atan2(this->rot_mat.at<double>(1,0),this->rot_mat.at<double>(0,0));//range [-pi,pi]
                 this->data.yaw=this->ang_yaw;
 
                // cout<<"data y "<<data.y<<endl;
                 this->data.id=ids.at(i);
-                this->data.n++;
                 
                 //arucoInfo.at(i)=data;
                 this->buffer->push(data);
@@ -281,6 +353,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
         
         if (corners.size() >= 4 && corners.size() < 5)
         {
+            std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
             cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec);
             std::cout<< "tvec: "<<tvec<<std::endl;
@@ -297,7 +370,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
         }
 }
 
-record_data Localization::getRobotariumData()
+ArenaLimits Localization::getRobotariumData()
 {
     return this->RobotariumData;
 }

@@ -71,7 +71,7 @@ class Agent:
     })
     response = self.control.recv_json()
     self.connected = response['result'] == 'ok'
-    Thread(target=self.listen).start()
+    Thread(target=self.listen).start()#Thread listening to the hub
 
 
   def listen(self) -> None:
