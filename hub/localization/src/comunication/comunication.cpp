@@ -9,7 +9,7 @@ AgentCommunication::~AgentCommunication()
 {
 }
 
-void AgentCommunication::setRobotariumData(record_data RobotariumData)
+void AgentCommunication::setRobotariumData(ArenaLimits RobotariumData)
 {
     this->RobotariumData = RobotariumData;
 }
@@ -33,8 +33,14 @@ void AgentCommunication::registerAgent()
 
     json message;
     json size;
-    size["x"] =this->RobotariumData.x;
-    size["y"] =this->RobotariumData.y;
+    size["x1"] =this->RobotariumData.x.at(0);
+    size["y1"] =this->RobotariumData.y.at(0);
+    size["x2"] =this->RobotariumData.x.at(1);
+    size["y2"] =this->RobotariumData.y.at(1);
+    size["x3"] =this->RobotariumData.x.at(2);
+    size["y3"] =this->RobotariumData.y.at(2);
+    size["x4"] =this->RobotariumData.x.at(3);
+    size["y4"] =this->RobotariumData.y.at(3);
     message["operation"] = "hello";
     message["source_id"] = "Camara_0";
     message["payload"]["url"] = "tcp://127.0.0.1:5557";
@@ -57,9 +63,6 @@ void AgentCommunication::registerAgent()
 void *AgentCommunication::sendArucoPosition(void *arg)
 {
     AgentCommunication *agent = (AgentCommunication *)arg;
-    struct timeval tval_before, tval_after, tval_sample;
-    tval_sample.tv_sec=0;
-    tval_sample.tv_usec=0;
     //const string endpoint = "tcp://127.0.0.1:4242"; //5555
     // initialize the 0MQ context
     zmqpp::context context;
@@ -82,6 +85,7 @@ void *AgentCommunication::sendArucoPosition(void *arg)
     
         record_data data = buffer->pop();
         std::string topic ="data";
+        
         std::string id = std::to_string(data.id);
         std::string x = std::to_string(data.x);
         std::string y = std::to_string(data.y);
@@ -110,7 +114,7 @@ void *AgentCommunication::sendArucoPosition(void *arg)
         
         zmqMessage<<jsonStr;
         
-        publisher.send(topic,0);
+        publisher.send(topic);
         publisher.send(zmqMessage);
         usleep(100*1000);
         message.clear();
@@ -123,7 +127,7 @@ void *AgentCommunication::sendArucoPosition(void *arg)
         jsonStr = message.dump();
         zmqMessage<<jsonStr;
         
-        publisher.send(topic,0);
+        publisher.send(topic);
         publisher.send(zmqMessage);
     }
     
