@@ -61,10 +61,14 @@ using namespace std;
 // -----------------------------------------------------------------------------
 const int LEFT_WHEEL = 0;
 const int RIGHT_WHEEL = 1;
+const int PIN_SHARP = 1;
+
 #define FORWARD LOW
 #define BACKWARD HIGH
 #define MINPWM 100
 #define MAXPWM 255
+
+
 
 void set_wheel_speed(int wheel, int direction, int speed) {
 #ifdef H_BRIDGE_BLACK
@@ -106,6 +110,22 @@ void isr_right_encoder_count() {
 void isr_encoder_count(int pin) {
     encoder_count[pin] ++;
 }
+
+
+// -----------------------------------------------------------------------------
+// Sharp IR sensor
+// -----------------------------------------------------------------------------
+
+float distancia_IR(void)
+{
+  long lectura=0;
+  lectura = analogRead(PIN_SHARP); 
+  float distancia_cm = 17569.7 * pow(lectura, -1.2062);
+  return(distancia_cm);
+}
+
+
+
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -152,6 +172,7 @@ unsigned long last_time_us = 0;
 void loop() {
   unsigned long current_time_us = micros();  
   unsigned long dt_us = current_time_us - last_time_us; 
+  float d;
   if(dt_us >= sampling_time_us) {
     double w_left = encoder_w_estimated[LEFT_WHEEL].AddValue(encoder_count[LEFT_WHEEL]);
     double w_right = encoder_w_estimated[RIGHT_WHEEL].AddValue(encoder_count[RIGHT_WHEEL]);
@@ -159,6 +180,9 @@ void loop() {
     encoder_count[LEFT_WHEEL] = encoder_count[RIGHT_WHEEL] = 0;
     interrupts();
     update_control(w_left, w_right, dt_us*1e-6);
+    d=distancia_IR();
+    Serial.println("Distancia medida: ");
+    Serial.println(d);
     last_time_us = current_time_us;
   }
 }
