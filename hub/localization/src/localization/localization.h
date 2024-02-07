@@ -33,10 +33,11 @@ class Localization
     public:
         Localization();
         ~Localization();
+        void setComunication(std::shared_ptr<AgentCommunication> agentCommunication);
+        void setRingBuffer(std::shared_ptr<ringBuffer> buffer);
         void initRingBuffer();
         int init(int argc,char **argv);
-        void registerAgent();
-        void FindArena();
+        bool FindArena();
         void FindRobot();
         void MyestimatePoseSingleMarkers(const std::vector<std::vector<cv::Point2f> >& corners, float markerLength,
                                const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs,
@@ -45,10 +46,13 @@ class Localization
         bool EstimateArenaPosition(const std::vector<cv::Point2f>& corners, float baseLength,float weightLength,
                                std::vector<cv::Vec3d>& rvecs, std::vector<cv::Vec3d>& tvecs);
         ArenaLimits getRobotariumData();
+
+
     private:
     cv::Ptr<cv::aruco::Dictionary> dictionary;
-    pthread_t  _detectAruco; 
-    pthread_cond_t listBlock;
+    //TODO: delete after test
+    // pthread_t  _detectAruco; 
+    // pthread_cond_t listBlock;
 
     cv::VideoCapture in_video,in_video2;
     cv::String videoInput = "0";//se selecciona la entrada de la camara
@@ -81,8 +85,8 @@ class Localization
     cv::Scalar(255, 255, 0) // Amarillo para la cuarta esquina (ajusta según sea necesario)
     };
 
-    AgentCommunication *agentCommunication;
-    ringBuffer *buffer;
+    std::shared_ptr<AgentCommunication>agentCommunication;
+    std::shared_ptr<ringBuffer> buffer;
     record_data data;
 
     bool twoCameras=false;
