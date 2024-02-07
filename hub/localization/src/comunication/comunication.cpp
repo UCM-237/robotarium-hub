@@ -1,12 +1,37 @@
 #include "comunication.h"
-ringBuffer* AgentCommunication::buffer = nullptr;  // Definition of the static member
+//ringBuffer AgentCommunication::buffer;  // Definition of the static member
 
 AgentCommunication::AgentCommunication()
 {
     
+    
 }
 AgentCommunication::~AgentCommunication()
 {
+    // Esperar a que los hilos terminen
+    //pthread_join(listenThread, NULL);
+    pthread_join(sendThread, NULL);
+}
+
+void AgentCommunication::InitCommunication()
+{
+    //initialize the 0MQ context
+    zmqpp::context context;
+
+    // generate a push socket
+    zmqpp::socket_type type = zmqpp::socket_type::publish;
+    zmqpp::socket newPublisher (context, type);
+    
+    // open the connection
+    std::cout << "Binding to " << PUBLISH_ENDPOINT << "..." << std::endl;
+    newPublisher.bind(PUBLISH_ENDPOINT);
+    this->publisher = &newPublisher;
+
+     // Crear los hilos
+    //pthread_create(&listenThread, NULL, &AgentCommunication::listenSocket, this);
+    pthread_create(&sendThread, NULL, &AgentCommunication::sendArucoPosition, this);
+
+    
 }
 
 void AgentCommunication::setRobotariumData(ArenaLimits RobotariumData)
@@ -14,9 +39,9 @@ void AgentCommunication::setRobotariumData(ArenaLimits RobotariumData)
     this->RobotariumData = RobotariumData;
 }
 
-void AgentCommunication::setRingBuffer(ringBuffer *buff)
+void AgentCommunication::setRingBuffer(std::shared_ptr<ringBuffer> buff)
 {
-    buffer =buff;
+    this->buffer =buff;
 }
 
 void AgentCommunication::registerAgent()
@@ -59,21 +84,25 @@ void AgentCommunication::registerAgent()
     control.close();
 }
 
-
-void *AgentCommunication::sendArucoPosition(void *arg)
+void *AgentCommunication::sendData(zmqpp::message_t zmqMessage, std::string topic)
 {
-    AgentCommunication *agent = (AgentCommunication *)arg;
-    //const string endpoint = "tcp://127.0.0.1:4242"; //5555
-    // initialize the 0MQ context
-    zmqpp::context context;
 
-    // generate a push socket
-    zmqpp::socket_type type = zmqpp::socket_type::publish;
-    zmqpp::socket publisher (context, type);
+}
+
+void *AgentCommunication::sendArucoPosition(void *This)
+{
+    AgentCommunication *agent = (AgentCommunication*)This;
+    //const string endpoint = "tcp://127.0.0.1:4242"; //5555
+    // // initialize the 0MQ context
+    // zmqpp::context context;
+
+    // // generate a push socket
+    // zmqpp::socket_type type = zmqpp::socket_type::publish;
+    // zmqpp::socket publisher (context, type);
    
-    // open the connection
-    std::cout << "Binding to " << PUBLISH_ENDPOINT << "..." << std::endl;
-     publisher.bind(PUBLISH_ENDPOINT);
+    // // open the connection
+    // std::cout << "Binding to " << PUBLISH_ENDPOINT << "..." << std::endl;
+    // publisher.bind(PUBLISH_ENDPOINT);
     
 
     
@@ -83,7 +112,7 @@ void *AgentCommunication::sendArucoPosition(void *arg)
     std::cout<<"hola"<<std::endl;
      while (true) {
     
-        record_data data = buffer->pop();
+        record_data data = agent->buffer->pop();
         std::string topic ="data";
         
         std::string id = std::to_string(data.id);
@@ -114,8 +143,10 @@ void *AgentCommunication::sendArucoPosition(void *arg)
         
         zmqMessage<<jsonStr;
         
-        publisher.send(topic);
-        publisher.send(zmqMessage);
+        agent->publisher->send(topic);
+        agent->publisher->send(zmqMessage);
+        
+        
         usleep(100*1000);
         message.clear();
         position.clear();
@@ -127,12 +158,18 @@ void *AgentCommunication::sendArucoPosition(void *arg)
         jsonStr = message.dump();
         zmqMessage<<jsonStr;
         
-        publisher.send(topic);
-        publisher.send(zmqMessage);
+        agent->publisher->send(topic);
+        agent->publisher->send(zmqMessage);
     }
     
     
-    publisher.close();
+    agent->publisher->close();
     pthread_exit(NULL);
 }
 
+
+void *AgentCommunication::listenSocket(void *This)
+{
+    AgentCommunication *agent = reinterpret_cast<AgentCommunication*>(This);
+    //const string endpoint = "tcp://
+}

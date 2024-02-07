@@ -26,6 +26,7 @@ class ringBuffer
 
     private:
        std::vector<record_data> buffer;
+       
        size_t readPos = 0;
        size_t writePos = 0;
        bool full = false;
