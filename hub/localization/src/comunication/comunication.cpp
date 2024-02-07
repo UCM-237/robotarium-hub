@@ -152,8 +152,16 @@ void *AgentCommunication::sendArucoPosition(void *This)
         position.clear();
         message["topic"]="ArenaSize";
         message["source_id"] = "Camara_0";
-        position["arenaSize"]["x"]=agent->RobotariumData.x;
-        position["arenaSize"]["y"] =agent->RobotariumData.y;
+        // position["arenaSize"]["x"]=agent->RobotariumData.x;
+        // position["arenaSize"]["y"] =agent->RobotariumData.y;
+        position["arenaSize"]["x1"] =this->RobotariumData.x.at(0);
+        position["arenaSize"]["y1"] =this->RobotariumData.y.at(0);
+        position["arenaSize"]["x2"] =this->RobotariumData.x.at(1);
+        position["arenaSize"]["y2"] =this->RobotariumData.y.at(1);
+        position["arenaSize"]["x3"] =this->RobotariumData.x.at(2);
+        position["arenaSize"]["y3"] =this->RobotariumData.y.at(2);
+        position["arenaSize"]["x4"] =this->RobotariumData.x.at(3);
+        position["arenaSize"]["y4"] =this->RobotariumData.y.at(3);
         message["payload"] = position;
         jsonStr = message.dump();
         zmqMessage<<jsonStr;
