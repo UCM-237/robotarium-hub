@@ -82,7 +82,7 @@ class Agent:
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
-    logging.debug('Subscribing to *')
+    logging.debug('Subscribing to control')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')

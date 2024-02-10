@@ -5,8 +5,10 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <pthread.h> 
+#include "common.h"
 using json = nlohmann::json;
 static const std::string PUBLISH_ENDPOINT = "tcp://*:5557";
+static const std::string SUBSCRIBE_ENDPOINT = "tcp://*:5556";
 static const std::string HUB_IP = "127.0.0.1";
 class AgentCommunication
 {
@@ -19,10 +21,12 @@ class AgentCommunication
     void setRingBuffer(std::shared_ptr<ringBuffer> buff);
     void registerAgent();
     
-    static void *sendData(zmqpp::message_t zmqMessage,std::string topic ="data");
+    static void *sendData(void* arg);
+
     std::shared_ptr<ringBuffer> buffer;
     private:
         ArenaLimits RobotariumData;
+        bool requestRobotariumData=false;
         // static ringBuffer *buffer;
         
         pthread_t listenThread;
