@@ -41,10 +41,15 @@ class Algorithm:
 
   def connect(self):
     logging.debug('starting device')
-    #self.thread = Thread(target=self.test).start()
+   
+    self.thread = Thread(target=self.Algorithm).start()
     
   
-
+  def Algorithm(self):
+     #first of all request the Arena limits
+    self.agent.send("localization/RobotariumData","")
+    while(1):
+      pass
   def direction(heading, robot_pos, rect_coords):
       # Supongamos que tienes el "heading" en grados y las coordenadas del rectángulo
       theta = math.radians(heading)
@@ -114,6 +119,7 @@ class Algorithm:
     except:
       print("invalid message")
       return
+    #register the position of the robot in a dictionary
     if topic == "position":
       self.Position[agent]=message
       

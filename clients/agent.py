@@ -43,6 +43,7 @@ class Agent:
     self.device = device_class(agent=self)
     self.device.connect()
     self.register()
+    
 
   def _get_data_url(self):
     return f'tcp://{self.ip}:{self.data_port}'
