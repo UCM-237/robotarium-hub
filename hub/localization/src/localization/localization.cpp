@@ -129,7 +129,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -335,7 +335,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
 
         cv::Mat rvec, tvec;
         
-        if (corners.size() >= 4 && corners.size() < 5)
+        if ((corners.size() >= 4 && corners.size() < 5) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
         {
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
