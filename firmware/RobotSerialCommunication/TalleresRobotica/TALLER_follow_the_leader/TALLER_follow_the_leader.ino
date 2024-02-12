@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <MeanFilterLib.h>
+#include <WiFiNINA.h>
 
+#include <utility/wifi_drv.h>
 using namespace std;
 
 // H-BRIDGE - Uncomment only one option
@@ -69,6 +71,8 @@ const int R=6.5;
 #define BACKWARD HIGH
 #define MINPWM 80
 #define MAXPWM 255
+
+
 
 
 
@@ -128,6 +132,18 @@ float distancia_IR(void)
   return(distancia_cm);
 }
 
+
+// -----------------------------------------------------------------------------
+// Internal RGB LED
+// -----------------------------------------------------------------------------
+void setup_LEDS(void){
+  
+WiFiDrv::pinMode(25, OUTPUT); //define GREEN LED
+WiFiDrv::pinMode(26, OUTPUT); //define RED LED
+WiFiDrv::pinMode(27, OUTPUT); //define BLUE LED
+  
+
+}
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
@@ -135,6 +151,9 @@ void setup() {
   setup_motors();
   setup_encoders();
   setup_comms();
+  setup_LEDS();
+
+  
 }
 
 void setup_motors() {
@@ -290,6 +309,14 @@ void update_control(double count_left_wheel, double count_right_wheel, double dt
   user_d= distancia_IR();
   Serial.print("user_d:\t");
   Serial.print(user_d); 
+
+  if (user_d < d_min) 
+      WiFiDrv::analogWrite(26, 0);   //RED
+  else if (user_d <d_max)
+      WiFiDrv::analogWrite(27, 0);   //BLUE
+  else 
+    WiFiDrv::analogWrite(25, 255); //GREEN
+
 
   /* Usa las funciones pid_rigth_motor y pid_left_motor para calcular la velocidad de cada rueda. Esa velocidad es la que has de pasarle luego 
    *  al método set_wheel_speed 
