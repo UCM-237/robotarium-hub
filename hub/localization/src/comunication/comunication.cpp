@@ -9,7 +9,7 @@ AgentCommunication::AgentCommunication()
 AgentCommunication::~AgentCommunication()
 {
     // Esperar a que los hilos terminen
-    //pthread_join(listenThread, NULL);
+    pthread_join(listenThread, NULL);
     pthread_join(sendThread, NULL);
 }
 
@@ -57,11 +57,21 @@ void AgentCommunication::registerAgent()
     // memcpy(zmqMessage.data(), jsonStr.c_str(), jsonStr.size());
     zmqMessage<<jsonStr;
     control.send(zmqMessage);
-
-
-    zmqpp::message_t response;
+    std::string response;
+    control.receive(response);
+    //pass string to json and find ok
+    json responseJson = json::parse(response);  
+    if(responseJson["result"] == "ok")
+    {
+        std::cout<<"Registered"<<std::endl;
+        control.close();
+    }
+    else
+    {
+        std::cout<<"Error registering"<<std::endl;
+    }
     
-    control.close();
+    
 }
 
 void *AgentCommunication::sendData(void *arg)
@@ -102,7 +112,7 @@ void *AgentCommunication::sendArucoPosition(void *This)
     //main code for read variables
     std::string topic ="data";
 
-    record_data* data;
+    record_data data;
     json message;
     json position;
     zmqpp::message_t ztopic;
@@ -133,11 +143,11 @@ void *AgentCommunication::sendArucoPosition(void *This)
         }
         else
         {
-            *data = agent->buffer->pop();
-            std::string id = std::to_string(data->id);
-            std::string x = std::to_string(data->x);
-            std::string y = std::to_string(data->y);
-            std::string yaw = std::to_string(data->yaw);
+            data = agent->buffer->pop();
+            std::string id = std::to_string(data.id);
+            std::string x = std::to_string(data.x);
+            std::string y = std::to_string(data.y);
+            std::string yaw = std::to_string(data.yaw);
             std::string sep = "/";
             data2=  x+ sep +y+sep+yaw;
             //std::cout<<id+sep+data2<<std::endl;
