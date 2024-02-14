@@ -20,6 +20,7 @@ AGENT_ID = 'LimitsAlgorithm'
 AGENT_IP = '127.0.0.1'
 AGENT_CMD_PORT = 5563
 AGENT_DATA_PORT = 5564
+AGENT_ID_NUM= '0'
 # Where the server is 
 HUB_IP = '127.0.0.1'
 HUB_CMD_PORT = 5555
@@ -38,6 +39,7 @@ class Algorithm:
     self.R = 3.35  # Valor de ejemplo para R
     self.A = [[self.L/(2*self.R), 1/self.R],
         [-self.L/(2*self.R), 1/self.R]]
+    self.ArenaLimits = {}
 
   def connect(self):
     logging.debug('starting device')
@@ -47,18 +49,39 @@ class Algorithm:
   
   def Algorithm(self):
      #first of all request the Arena limits
-    self.agent.send("localization/RobotariumData","")
+   
     while(1):
-      pass
-  def direction(heading, robot_pos, rect_coords):
-      # Supongamos que tienes el "heading" en grados y las coordenadas del rectángulo
-      theta = math.radians(heading)
-      dx = math.cos(theta)
-      dy = math.sin(theta)
+      self.direction()
+  def direction(self):
+     
+      while (AGENT_ID_NUM not in self.Position) or len(self.ArenaLimits)==0:
+        if(len(self.ArenaLimits)==0):
+          self.agent.send("localization/RobotariumData","")
+        time.sleep(1)
+      position=self.Position
+      robotData = json.loads(position[AGENT_ID_NUM])
+      position.pop(AGENT_ID_NUM)
+      robotX = float(robotData["x"])
+      robotY = float(robotData["y"])
+      heading = -float(robotData["yaw"])
+      dx = math.cos(heading)
+      if dx < 0.08 and dx > -0.08:
+          dx = 0
+      dy = math.sin(heading)
+      if dy < 0.08 and dy > -0.08:
+          dy = 0
 
-      # Coordenadas del rectángulo
-      x1, y1, x2, y2 = rect_coords
-      robotX, robotY = robot_pos
+      # coordinates of the rectangle
+      x1=self.ArenaLimits["x1"]
+      y1=self.ArenaLimits["y1"] 
+      x2=self.ArenaLimits["x2"]
+      y2=self.ArenaLimits["y2"]
+      x3=self.ArenaLimits["x3"]
+      y3=self.ArenaLimits["y3"]
+      x4=self.ArenaLimits["x4"]
+      y4=self.ArenaLimits["y4"]
+
+
 
       # Comprobar la dirección
       if dx > 0:
@@ -85,6 +108,16 @@ class Algorithm:
                   print('El robot se dirigirá hacia la esquina superior izquierda del rectángulo.')
           elif dy < 0:
               print('El robot se está moviendo hacia la esquina inferior izquierda.')
+          else:
+              print('El robot se está moviendo hacia la izquierda.')
+          
+      else:
+          if dy > 0:
+              print('El robot se está moviendo hacia arriba.')
+          elif dy < 0:
+              print('El robot se está moviendo hacia abajo.')
+          else:
+              print('El robot no se está moviendo.')
 
 
 
@@ -114,14 +147,17 @@ class Algorithm:
 
     try:
       _, agent, topic = topic.split('/')
-      print(agent)
-      print(message)
+      #print(agent)
+     # print(message)
     except:
       print("invalid message")
       return
     #register the position of the robot in a dictionary
     if topic == "position":
       self.Position[agent]=message
+    elif topic == "ArenaSize":
+      self.ArenaLimits = json.loads(message)
+     # print(self.ArenaLimits)
       
     
  

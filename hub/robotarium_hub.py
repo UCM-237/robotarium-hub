@@ -67,7 +67,7 @@ class RobotariumHub:
         self.data_socket.send_string(msg.payload.decode())
 
     def add_agent(self, id, url):
-        logging.info(f'Agent {id} registered with url {url}')
+        #logging.info(f'Agent {id} registered with url {url}')
         self.agents[id] = {
             'url': url,
             'socket': self.context.socket(zmq.SUB)
@@ -79,8 +79,7 @@ class RobotariumHub:
     def listen(self):
         logging.info(f'Listening to agents')
         while self.running:
-            #sleep(0.01)
-            socks = dict(self.poller.poll())
+            socks = dict(self.poller.poll(100))
             for a in self.agents:
                 s = self.agents[a]['socket']
                 if s in socks and socks[s] == zmq.POLLIN:
@@ -110,7 +109,7 @@ class RobotariumHub:
     def accept(self):
         '''Wait for next request from client'''
         while self.running:
-            # sleep(0.5)
+            sleep(0.5)
             logging.info("Robotarium is waiting for new agents")
             message = self.commands_socket.recv_json()
             logging.info(f'Received request from {message["source_id"]}')
