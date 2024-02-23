@@ -1,140 +1,211 @@
-# -*- coding: UTF-8 -*-
-#!/bin/python3
-import array
-from serial import Serial, SerialException, serial_for_url
-from serial.tools import list_ports
-from threading import Thread
-import logging
+import numpy as np
 import math
-import time
-import json
 
-
-from agent import Agent
-
-# Configure logs
-logging.basicConfig(level=logging.INFO)
-
-# Who I am
-AGENT_ID = 'LimitsAlgorithm'
-AGENT_IP = '127.0.0.1'
-AGENT_CMD_PORT = 5563
-AGENT_DATA_PORT = 5564
-# Where the server is 
-HUB_IP = '127.0.0.1'
-HUB_CMD_PORT = 5555
-HUB_DATA_PORT = 5556
-Position={}
-
-
-class Algorithm:
-  
-  state: dict = {}
-  
-  def __init__(self, agent: Agent) -> None:
-    self.agent = agent
-    self.Position={}
-    self.L = 12.4  # Valor de ejemplo para L
-    self.R = 3.35  # Valor de ejemplo para R
-    self.A = [[self.L/(2*self.R), 1/self.R],
-        [-self.L/(2*self.R), 1/self.R]]
-
-  def connect(self):
-    logging.debug('starting device')
-    #self.thread = Thread(target=self.test).start()
+class segment:
+    def __init__(self,pi,pf):
+        self.pi=np.array(pi)
+        self.pf=np.array(pf)
+class LimitsAlgorithm:
     
-  
+    def __init__(self):
+        self.ArenaLimits = {}
+        self.newHeading = 0
+        self.segmentOfTheRectangle = []
+        self.minimumSafetyDistance = 10
+        self.x=[]
+        self.y=[]
 
-  def direction(heading, robot_pos, rect_coords):
-      # Supongamos que tienes el "heading" en grados y las coordenadas del rectángulo
-      theta = math.radians(heading)
-      dx = math.cos(theta)
-      dy = math.sin(theta)
-
-      # Coordenadas del rectángulo
-      x1, y1, x2, y2 = rect_coords
-      robotX, robotY = robot_pos
-
-      # Comprobar la dirección
-      if dx > 0:
-          if dy > 0:
-              print('El robot se está moviendo hacia la esquina superior derecha.')
-              # Puedes comparar con la esquina superior derecha del rectángulo
-              if x2 > robotX and y2 > robotY:
-                  print('El robot se dirigirá hacia la esquina superior derecha del rectángulo.')
-          elif dy < 0:
-              print('El robot se está moviendo hacia la esquina inferior derecha.')
-              # Puedes comparar con la esquina inferior derecha del rectángulo
-              if x2 > robotX and y1 < robotY:
-                  print('El robot se dirigirá hacia la esquina inferior derecha del rectángulo.')
-          else:
-              print('El robot se está moviendo hacia la derecha.')
-              # Puedes comparar con la pared derecha del rectángulo
-              if x2 > robotX:
-                  print('El robot se dirigirá hacia la pared derecha del rectángulo.')
-      elif dx < 0:
-          if dy > 0:
-              print('El robot se está moviendo hacia la esquina superior izquierda.')
-              # Puedes comparar con la esquina superior izquierda del rectángulo
-              if x1 < robotX and y2 > robotY:
-                  print('El robot se dirigirá hacia la esquina superior izquierda del rectángulo.')
-          elif dy < 0:
-              print('El robot se está moviendo hacia la esquina inferior izquierda.')
-
-
-
-  def angularWheelSpeed(self, w_wheel, velocity_robot):
-    fila = 2
-    columna = 2
-    aux = 0
-
-    for i in range(2):#numwheels
-        w_wheel[i] = 0
-    
-    for i in range(fila):
-        for j in range(columna):
-            aux += (self.A[i][j] * velocity_robot[j])
+    def addLimits(self,limits):
+        self.ArenaLimits = limits
+        self.x[1]=self.ArenaLimits["x1"]
+        self.y[1]=self.ArenaLimits["y1"]
+        self.x[2]=self.ArenaLimits["x2"]
+        self.y[2]=self.ArenaLimits["y2"]
+        self.x[3]=self.ArenaLimits["x3"]
+        self.y[3]=self.ArenaLimits["y3"]
+        self.x[4]=self.ArenaLimits["x4"]
+        self.y[4]=self.ArenaLimits["y4"]
+        self.segmentOfTheRectangle = self.computeSegments()
         
-        w_wheel[i] = aux
-
-        if w_wheel[i] < 0 and w_wheel[i] > -6:
-            w_wheel[i] = 0.0
-        elif w_wheel[i] > 0 and w_wheel[i] < 6:
-            w_wheel[i] = 0.0
+    def computeSegments(self):
+        # coordinates of the rectangle
+        # x1=self.ArenaLimits["x1"]
+        # y1=self.ArenaLimits["y1"] 
+        # x2=self.ArenaLimits["x2"]
+        # y2=self.ArenaLimits["y2"]
+        # x3=self.ArenaLimits["x3"]
+        # y3=self.ArenaLimits["y3"]
+        # x4=self.ArenaLimits["x4"]
+        # y4=self.ArenaLimits["y4"]
         
-        aux = 0 
-
-
-  def on_data(self,topic: str, message: str) ->None:
-
-    try:
-      _, agent, topic = topic.split('/')
-      print(agent)
-      print(message)
-    except:
-      print("invalid message")
-      return
-    if topic == "position":
-      self.Position[agent]=message
-      
-    
- 
-    
-      
-
-
-if __name__ == "__main__":
-  agent = Agent(
-    device_class=Algorithm,
-    id=AGENT_ID,
-    ip=AGENT_IP,
-    cmd_port=AGENT_CMD_PORT,
-    data_port=AGENT_DATA_PORT,
-    hub_ip= HUB_IP,
-    hub_cmd_port=HUB_CMD_PORT,
-    hub_data_port=HUB_DATA_PORT,
-  )
-  
-  
-  
- 
+        segmentOfTheRectangle =[                                  #S1       
+            segment((self.x[1],self.y[1]),(self.x[2],self.y[2])),#segment 1              -------------------
+            segment((self.x[2],self.y[2]),(self.x[3],self.y[3])),#segment 2              |                 |         
+            segment((self.x[3],self.y[3]),(self.x[4],self.y[4])),#segment 3          s4  |                 | #s2
+            segment((self.x[4],self.y[4]),(self.x[1],self.y[1]))  #segment 4             |                 |
+                                                            #------------------- 
+        ]             
+        return segmentOfTheRectangle
+    def distance(self,x, y, seg):
+        # Project the point onto the line that defines the segment (dot product)
+        proy = np.dot(seg.pf - seg.pi, np.array([x, y]) - seg.pi) / np.linalg.norm(seg.pf - seg.pi)
+        
+        # Position of the closest point with respect to pf
+        L = np.linalg.norm(seg.pf - seg.pi)  # Length of the segment
+        pc=0#define pc
+        # There are three cases:
+        if proy <= 0:
+            # A) The projected distance is negative, meaning the closest point to the line
+            # is outside the segment and the closest point on the segment is pi
+            pc = seg.pi
+        elif proy >= L:
+            # B) In this case, the closest point to the line
+            # is outside the segment and the closest point on the segment is pf
+            pc = seg.pf
+        else:
+            # C) The closest point to the line is within the segment (default case). First, find the closest point
+            pc = seg.pi + proy * (seg.pf - seg.pi) / np.linalg.norm(seg.pf - seg.pi)
+        
+        # Now compute the distance
+        d = np.linalg.norm(np.array([x, y]) - pc)
+        
+        # Avoid singularity
+        if d < 5:
+            d = 5
+        
+        return d
+    def checkLimits(self,robotX,robotY,heading):
+        d=0
+        newHeading=0
+        dx = math.cos(heading)
+        if dx < 0.08 and dx > -0.08:
+            dx = 0
+        dy = math.sin(heading)
+        
+        if dy < 0.08 and dy > -0.08:
+            dy = 0
+        if dx > 0:
+            if dy > 0:
+                print('The robot is moving to the upper righ')
+                # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
+                if self.x[2] > robotX and self.y[2] > robotY:
+                    print('The robot will move to the upper right corner of the rectangle.')
+                    # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    #take the minimum distance
+                    d = min(d1, d2)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading=-heading
+                        else:
+                            newHeading = -(math.pi - abs(heading))
+                            
+                else:
+                    #stop the robot
+                    print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the left")          
+            elif dy < 0:
+                print('The robot is moving to the lower right corner.')
+                if self.x[2] > robotX and self.y[1] < robotY:
+                    print('The robot will move to the lower right corner of the rectangle.')
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
+                    #take the minimum distance
+                    d = min(d1, d2)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading = -(math.pi - abs(heading))
+                        else:
+                            newHeading = -heading   
+                else:
+                    #stop the robot
+                    print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the right")
+            else:
+                print('The robot is moving to the right.')
+                if self.x[2] > robotX:
+                    print('The robot will move to the right wall of the rectangle.')
+                    #in this case compare with 3 segments
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    d3 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                    #take the minimum distance
+                    d = min(d1, d2, d3)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading = -heading
+                        elif d == d2:
+                            newHeading = -(math.pi - abs(heading))
+                        else:
+                            newHeading = -heading
+        elif dx < 0:
+            if dy > 0:
+                print('The robot is moving to the upper left corner.')
+                if self.x[1] < robotX and self.y[2] > robotY:
+                    print('The robot will move to the upper left corner of the rectangle.')
+                    #in this case compare with 2 segments
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
+                    #take the minimum distance
+                    d = min(d1, d2)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading = -heading
+                        else:
+                            newHeading = -(math.pi - abs(heading))
+                else:
+                    #stop the robot
+                    print("probably collision with the wall at left.TODO: STOP THE ROBOT and turn it to the right")
+            elif dy < 0:
+                print('The robot is moving to the lower left corner.')
+                if self.x[1] < robotX and self.y[1] < robotY:
+                    print('El robot se dirigirá hacia la esquina inferior izquierda del rectángulo.')
+                    #in this case compare with 2 segments
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                    #take the minimum distance
+                    d = min(d1, d2)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading = -(math.pi - abs(heading))
+                        else:
+                            newHeading = -heading
+                else:
+                    #stop the robot
+                    print("probably collision with the wall at left. TODO: STOP THE ROBOT and turn it to the right")
+            else:
+                print('The robot is moving to the left.')
+                #compare with the left wall of the rectangle and the three segments 
+                if self.x[1] < robotX:
+                    print('The robot will move to the left wall of the rectangle.')
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                    d3 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
+                    #take the minimum distance
+                    d = min(d1, d2, d3)
+                    if d<self.minimumSafetyDistance:
+                        if d == d1:
+                            newHeading = -(math.pi - abs(heading))
+                        elif d == d2:
+                            newHeading = -heading
+                        else:
+                            newHeading = -(math.pi - abs(heading))
+                else:
+                    #stop the robot
+                    print("probably collision with the wall at left. TODO : STOP THE ROBOT and turn it to the right")  
+        else:
+            if dy > 0:
+                print('The robot is moving up.')
+                d = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                if d < self.minimumSafetyDistance:
+                    newHeading = -heading
+            elif dy < 0:
+                print('The robot is moving down.')
+                d = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                if d < self.minimumSafetyDistance:
+                    newHeading = -(math.pi - abs(heading))
+            else:
+                print('El robot no se está moviendo, O no se detecta')
+        return newHeading
+       
+                  
+               

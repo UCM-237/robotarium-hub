@@ -1,12 +1,27 @@
 #include "comunication.h"
-ringBuffer* AgentCommunication::buffer = nullptr;  // Definition of the static member
+//ringBuffer AgentCommunication::buffer;  // Definition of the static member
 
 AgentCommunication::AgentCommunication()
 {
     
+    
 }
 AgentCommunication::~AgentCommunication()
 {
+    // Esperar a que los hilos terminen
+    pthread_join(listenThread, NULL);
+    pthread_join(sendThread, NULL);
+}
+
+void AgentCommunication::InitCommunication()
+{
+
+
+     // Crear los hilos
+    pthread_create(&listenThread, NULL, &AgentCommunication::listenSocket, this);
+    pthread_create(&sendThread, NULL, &AgentCommunication::sendArucoPosition, this);
+
+    
 }
 
 void AgentCommunication::setRobotariumData(ArenaLimits RobotariumData)
@@ -14,9 +29,9 @@ void AgentCommunication::setRobotariumData(ArenaLimits RobotariumData)
     this->RobotariumData = RobotariumData;
 }
 
-void AgentCommunication::setRingBuffer(ringBuffer *buff)
+void AgentCommunication::setRingBuffer(std::shared_ptr<ringBuffer> buff)
 {
-    buffer =buff;
+    this->buffer =buff;
 }
 
 void AgentCommunication::registerAgent()
@@ -32,19 +47,9 @@ void AgentCommunication::registerAgent()
     control.connect("tcp://127.0.0.1:5555");
 
     json message;
-    json size;
-    size["x1"] =this->RobotariumData.x.at(0);
-    size["y1"] =this->RobotariumData.y.at(0);
-    size["x2"] =this->RobotariumData.x.at(1);
-    size["y2"] =this->RobotariumData.y.at(1);
-    size["x3"] =this->RobotariumData.x.at(2);
-    size["y3"] =this->RobotariumData.y.at(2);
-    size["x4"] =this->RobotariumData.x.at(3);
-    size["y4"] =this->RobotariumData.y.at(3);
     message["operation"] = "hello";
     message["source_id"] = "Camara_0";
     message["payload"]["url"] = "tcp://127.0.0.1:5557";
-    message["payload"]["ArenaSize"] = size;
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();
 
@@ -52,87 +57,164 @@ void AgentCommunication::registerAgent()
     // memcpy(zmqMessage.data(), jsonStr.c_str(), jsonStr.size());
     zmqMessage<<jsonStr;
     control.send(zmqMessage);
-
-
-    zmqpp::message_t response;
+    std::string response;
+    control.receive(response);
+    //pass string to json and find ok
+    json responseJson = json::parse(response);  
+    if(responseJson["result"] == "ok")
+    {
+        std::cout<<"Registered"<<std::endl;
+        control.close();
+    }
+    else
+    {
+        std::cout<<"Error registering"<<std::endl;
+    }
     
-    control.close();
+    
 }
 
-
-void *AgentCommunication::sendArucoPosition(void *arg)
+void *AgentCommunication::sendData(void *arg)
 {
-    AgentCommunication *agent = (AgentCommunication *)arg;
-    //const string endpoint = "tcp://127.0.0.1:4242"; //5555
+    AgentCommunication *agent = (AgentCommunication*)arg;
+    //const string endpoint = "tcp://
+
+
+}
+void *AgentCommunication::sendArucoPosition(void *This)
+{
+    AgentCommunication *agent = (AgentCommunication*)This;
+    const std::string endpoint = "tcp://127.0.0.1:5555"; //5555
     // initialize the 0MQ context
+    // zmqpp::context context;
+
+    // // generate a push socket
+    // zmqpp::socket_type type = zmqpp::socket_type::publish;
+    // zmqpp::socket publisher (context, type);
+   
+    // // open the connection
+    // std::cout << "Binding to " << PUBLISH_ENDPOINT << "..." << std::endl;
+    // publisher.bind(PUBLISH_ENDPOINT);
+    
+     //initialize the 0MQ context
     zmqpp::context context;
 
     // generate a push socket
     zmqpp::socket_type type = zmqpp::socket_type::publish;
-    zmqpp::socket publisher (context, type);
-   
+    zmqpp::socket newPublisher (context, type);
+    
     // open the connection
     std::cout << "Binding to " << PUBLISH_ENDPOINT << "..." << std::endl;
-     publisher.bind(PUBLISH_ENDPOINT);
-    
-
+    newPublisher.bind(PUBLISH_ENDPOINT);
     
     //while(arucoInfo.size()<=0);//the thread stop it until an aruco is detected
     std::string data2;
     //main code for read variables
-    std::cout<<"hola"<<std::endl;
+    std::string topic ="data";
+
+    record_data data;
+    json message;
+    json position;
+    zmqpp::message_t ztopic;
+    std::string jsonStr;
+    zmqpp::message_t zmqMessage;
      while (true) {
     
-        record_data data = buffer->pop();
-        std::string topic ="data";
+        if(agent->RobotariumData.x.size()>0 && agent->requestRobotariumData)
+        {
+            message["topic"]="ArenaSize";
+            message["source_id"] = "Camara_0";
+            
+            position["arenaSize"]["x1"] =agent->RobotariumData.x.at(0);
+            position["arenaSize"]["y1"] =agent->RobotariumData.y.at(0);
+            position["arenaSize"]["x2"] =agent->RobotariumData.x.at(1);
+            position["arenaSize"]["y2"] =agent->RobotariumData.y.at(1);
+            position["arenaSize"]["x3"] =agent->RobotariumData.x.at(2);
+            position["arenaSize"]["y3"] =agent->RobotariumData.y.at(2);
+            position["arenaSize"]["x4"] =agent->RobotariumData.x.at(3);
+            position["arenaSize"]["y4"] =agent->RobotariumData.y.at(3);
+            message["payload"] = position;
+            jsonStr = message.dump();
+            zmqMessage<<jsonStr;
+
+            newPublisher.send(topic,0);
+            newPublisher.send(zmqMessage);
+            agent->requestRobotariumData = false;
+        }
+        else
+        {
+            data = agent->buffer->pop();
+            std::string id = std::to_string(data.id);
+            std::string x = std::to_string(data.x);
+            std::string y = std::to_string(data.y);
+            std::string yaw = std::to_string(data.yaw);
+            std::string sep = "/";
+            data2=  x+ sep +y+sep+yaw;
+            //std::cout<<id+sep+data2<<std::endl;
+            
+            position[id]["x"] =x;
+            position[id]["y"] =y;
+            position[id]["yaw"] =yaw;
+            
+            ztopic<<topic;
+            
+            message["topic"]="position";
+            message["source_id"] = "Camara_0";
+            message["payload"] = position;
+            message["timestamp"] = 1000 * time(nullptr);
+            jsonStr = message.dump();
+            zmqMessage;
+            
+            
+            zmqMessage<<jsonStr;
+            
+            newPublisher.send(topic);
+            newPublisher.send(zmqMessage);
         
-        std::string id = std::to_string(data.id);
-        std::string x = std::to_string(data.x);
-        std::string y = std::to_string(data.y);
-        std::string yaw = std::to_string(data.yaw);
-        
-        std::string sep = "/";
-        data2=  x+ sep +y+sep+yaw;
-        std::cout<<id+sep+data2<<std::endl;
-        json message;
-        json position;
-    
-        position[id]["x"] =x;
-        position[id]["y"] =y;
-        position[id]["yaw"] =yaw;
-        zmqpp::message_t ztopic;
-        ztopic<<topic;
-        
-        message["topic"]="position";
-        //message["operation"] = "position";
-        message["source_id"] = "Camara_0";
-        message["payload"] = position;
-        message["timestamp"] = 1000 * time(nullptr);
-        std::string jsonStr = message.dump();
-        zmqpp::message_t zmqMessage;
-        
-        
-        zmqMessage<<jsonStr;
-        
-        publisher.send(topic);
-        publisher.send(zmqMessage);
+        }
         usleep(100*1000);
         message.clear();
         position.clear();
-        message["topic"]="ArenaSize";
-        message["source_id"] = "Camara_0";
-        position["arenaSize"]["x"]=agent->RobotariumData.x;
-        position["arenaSize"]["y"] =agent->RobotariumData.y;
-        message["payload"] = position;
-        jsonStr = message.dump();
-        zmqMessage<<jsonStr;
-        
-        publisher.send(topic);
-        publisher.send(zmqMessage);
     }
     
     
-    publisher.close();
+    agent->publisher->close();
     pthread_exit(NULL);
 }
 
+
+void *AgentCommunication::listenSocket(void *This)
+{
+    AgentCommunication *agent = (AgentCommunication*)This;
+    //generate subscriber socket
+    //initialize the 0MQ context
+    zmqpp::context context;
+    zmqpp::socket_type type2 = zmqpp::socket_type::subscribe;
+    zmqpp::socket newSubscriber (context, type2);
+    newSubscriber.subscribe("");
+    //subscriber connect
+    std::cout << "Connecting to " << SUBSCRIBE_ENDPOINT << "..." << std::endl;
+    newSubscriber.connect(SUBSCRIBE_ENDPOINT);
+    while(true)
+    {
+            // Receive (blocking call)
+        zmqpp::message message;
+        newSubscriber.receive(message);
+        std::string text;
+        message >> text;
+        //split to find localization and RobotariumData
+
+        std::string delimiter = "/";
+        size_t pos = 0;
+        std::string token;
+        while ((pos = text.find(delimiter)) != std::string::npos) {
+            token = text.substr(0, pos);
+            std::cout << token << std::endl;
+            text.erase(0, pos + delimiter.length());
+            if (text == "RobotariumData")
+            {
+                agent->requestRobotariumData = true;
+            }
+        }
+    }
+}

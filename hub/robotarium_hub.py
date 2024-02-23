@@ -67,7 +67,7 @@ class RobotariumHub:
         self.data_socket.send_string(msg.payload.decode())
 
     def add_agent(self, id, url):
-        logging.info(f'Agent {id} registered with url {url}')
+        #logging.info(f'Agent {id} registered with url {url}')
         self.agents[id] = {
             'url': url,
             'socket': self.context.socket(zmq.SUB)
@@ -79,8 +79,7 @@ class RobotariumHub:
     def listen(self):
         logging.info(f'Listening to agents')
         while self.running:
-            #sleep(0.01)
-            socks = dict(self.poller.poll())
+            socks = dict(self.poller.poll(100))
             for a in self.agents:
                 s = self.agents[a]['socket']
                 if s in socks and socks[s] == zmq.POLLIN:
@@ -97,21 +96,12 @@ class RobotariumHub:
                             new_topic = f'{topic}/{k}/{message["topic"]}'
                             self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
                             self.data_socket.send_json(data[k])
-                    # elif topic == "position":
-                    #     # logging.debug(message)
-                    #     data = message['payload']
-                    #     for agent in data:
-                    #         new_topic = f"{agent}/data"
-                    #         #new_messsage = [float(data[agent][k]) for k in ['x', 'y', 'yaw']]
-                    #         self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
-                    #         new_data={"position":data[agent]}
-                    #         print(new_data)
-                    #         self.data_socket.send_json(new_data)
                             
                     else:
                         self.data_socket.send_string(topic, flags=zmq.SNDMORE)
                         self.data_socket.send_json(message)
-                        #print(message)
+                        print(topic)
+                        print(message)
                     
                     #self.mqtt_client.publish(topic, json.dumps(message))
                     
