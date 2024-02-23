@@ -1,12 +1,11 @@
 import math 
 class orientationControl:
-    def __init__(self, orientation):
-        self.orientation = orientation
+    def __init__(self): 
         self.cumError = 0 
         
     def PID(self,heading,newHeading):
         w=0
-        angleError = heading - newHeading
+        angleError = newHeading - heading
         if angleError > math.pi:
             angleError=angleError-2*math.pi
         elif angleError< (-math.pi):
@@ -34,4 +33,5 @@ class orientationControl:
             print(w)
         else:
             w=0
+        return w
             
