@@ -43,6 +43,7 @@ class Agent:
     self.device = device_class(agent=self)
     self.device.connect()
     self.register()
+    
 
   def _get_data_url(self):
     return f'tcp://{self.ip}:{self.data_port}'
@@ -82,7 +83,7 @@ class Agent:
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
-    logging.debug('Subscribing to *')
+    logging.debug('Subscribing to control')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')

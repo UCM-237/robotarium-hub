@@ -1,32 +1,9 @@
 //#include <string>
 #pragma once
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sstream>
-#include <vector>
-#include <sys/wait.h>
-#include <atomic>
-#include <filesystem>
-#include <sys/time.h>
+#include <string>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <errno.h>
-
-#include <pthread.h> 
-#include <time.h> 
-#include <math.h> 
-#include <fstream>
-#include <bits/stdc++.h>
-#include <termios.h>    // POSIX terminal control definitions
+#include <zmqpp/zmqpp.hpp>
+    // POSIX terminal control definitions
 
 
 
@@ -50,3 +27,8 @@ struct appdata{
 
 struct appdata *operation_recv;//message received of operation 
 struct appdata operation_send;//struct for message send
+
+struct dataToSend{
+        std::string topic;
+        zmqpp::message_t zmqMessage;
+};
