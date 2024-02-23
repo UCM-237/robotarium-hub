@@ -10,7 +10,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/build/src/cli",
-            "args": ["-l=0.1","-v=0","-b=0.24","-w=0.34"],
+            "args": ["-l=0.8","-v=0","-b=2.08","-w=1.40"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
