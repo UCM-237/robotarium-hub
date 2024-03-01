@@ -250,6 +250,8 @@ class Algorithm:
   def correctOrientation(self):
     vel=0
     angularWheel = [0.0, 0.0]
+    uniformVelocity = False
+    
     while True:
         if len(self.PostionForControl)>0:
             
@@ -260,6 +262,7 @@ class Algorithm:
             heading = -float(robotData["yaw"])
         #now correct orientation 
             if self.newHeadingRequired == True:
+                uniformVelocity=False
                 w =  orientationControl.PID(heading, self.newHeading)
                 if w !=0:
                     velocity_robot=[w,vel]
@@ -268,10 +271,12 @@ class Algorithm:
                 else :
                     self.newHeadingRequired = False
                     self.Pos
-                    vel=8.2*3.35
-                    velocity_robot=[w,vel]
-                    self.angularWheelSpeed(angularWheel,velocity_robot)
-                    self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+            elif(uniformVelocity==False):
+                vel=8.2*3.35
+                velocity_robot=[w,vel]
+                self.angularWheelSpeed(angularWheel,velocity_robot)
+                self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+                uniformVelocity=True
         self.tval_after=time.time()*1000
         self.tval_sample = self.tval_after-self.tval_before
         if self.tval_sample < 0:
@@ -282,6 +287,7 @@ class Algorithm:
         else:
             #print((self.SAMPLETIME - self.tval_sample) / 1000)
             time.sleep((self.SAMPLETIME - self.tval_sample) / 1000)
+        self.tval_before = time.time()*1000
       
   def distance(self,x, y, seg):
     # Project the point onto the line that defines the segment (dot product)

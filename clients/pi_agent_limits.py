@@ -8,6 +8,7 @@ import logging
 import struct
 import json
 import LimitsAlgorithm
+import OrientationControl
 from agent import Agent
 import time
 
@@ -36,6 +37,8 @@ class Robot:
   thread: Thread = None
   listeners: list = None
   auto_discovery: list = ['Arduino', 'USB2.0-Serial']
+  
+ 
 
   def __init__(self, agent: Agent) -> None:
     self.parsers = {
@@ -45,12 +48,29 @@ class Robot:
       'MOVE': { 'id': self.OP_MOVE_WHEEL, 'method': self.move_wheels },
       'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
     }
-    self.agent = agent
+    self.LimitsAlgorithm = LimitsAlgorithm.LimitsAlgorithm()
     self.Position={}
-    self.LimitsAlgorithm = LimitsAlgorithm()
+    
+    
     self.ArenaLimitsReceived = False
+    self.stopCommand = False
+    
+    
+    self.L = 12.4  # Valor de ejemplo para L
+    self.R = 3.35  # Valor de ejemplo para R
+    self.A = [[self.L/(2*self.R), 1/self.R],
+        [-self.L/(2*self.R), 1/self.R]]
+    self.SAMPLETIME=200
+    self.tval_before = 0
+    self.tval_after= 0
+    self.tval_sample = 0
+    
+    self.orientationControl = OrientationControl.orientationControl(self.SAMPLETIME)
 
 
+
+    self.agent = agent
+    
   def connect(self) -> None:
     '''Open a new connection with an Arduino Board.'''
     ports = list_ports.comports()
@@ -89,6 +109,7 @@ class Robot:
           logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
           data={'data','AGENT_ID'}
           self.agent.send_measurement(measurement)
+          
         #check the arena limits
         robotData = json.loads(self.position[AGENT_ID])
         self.position.pop(AGENT_ID)
@@ -99,6 +120,24 @@ class Robot:
         if newHeading == False:
           pass
         else:
+          #stop command of moving the robot
+          self.move_wheels(0,0)
+          angularWheel = [0.0, 0.0]
+          vel=0
+          w = self.orientationControl.PID(heading,newHeading)
+          velocity_robot=[w,vel]
+          self.angularWheelSpeed(angularWheel,velocity_robot)
+          self.move_wheels(angularWheel[0],angularWheel[1])
+          
+        self.tval_after = time.time()*1000
+        self.tval_sample = self.tval_after - self.tval_before
+        if self.tval_sample < self.SAMPLETIME:
+          time.sleep((self.SAMPLETIME-self.tval_sample)/1000)
+        elif self.tval_sample > self.SAMPLETIME:
+          print("Error: Sample time too long")
+        self.tval_before = time.time()*1000
+          
+          
           
       except (ValueError, TypeError) as e:
         logging.debug('Ignoring invalid data from Arduino')
@@ -143,6 +182,9 @@ class Robot:
 
 
   def exec(self, operation: str, **kwargs) -> None:
+    
+    if self.stopCommand == True:
+      return
     if operation not in self.operations:
       raise ValueError(f'Undefined operation {operation}')
     self.operations[operation]['method'](**kwargs)
@@ -164,7 +206,26 @@ class Robot:
         self.LimitsAlgorithm.setArenaSize(json.loads(message))
                
        
-      
+  def angularWheelSpeed(self, w_wheel, velocity_robot):
+    fila = 2
+    columna = 2
+    aux = 0
+
+    for i in range(2):#numwheels
+        w_wheel[i] = 0
+    
+    for i in range(fila):
+        for j in range(columna):
+            aux += (self.A[i][j] * velocity_robot[j])
+        
+        w_wheel[i] = aux
+
+        if w_wheel[i] < 0 and w_wheel[i] > -6:
+            w_wheel[i] = 0.0
+        elif w_wheel[i] > 0 and w_wheel[i] < 6:
+            w_wheel[i] = 0.0
+        
+        aux = 0    
 
   def ArduinoSerialWrite(self,operation,len,data):
     head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',AGENT_ID) + 
