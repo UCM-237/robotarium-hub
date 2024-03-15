@@ -21,7 +21,7 @@ AGENT_ID = 'LimitsAlgorithm'
 AGENT_IP = '192.168.10.1'
 AGENT_CMD_PORT = 5563
 AGENT_DATA_PORT = 5564
-AGENT_ID_NUM= '2'
+AGENT_ID_NUM= '0'
 # Where the server is 
 HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
@@ -186,7 +186,7 @@ class Algorithm:
       self.direction()
 
   def direction(self):
-    minimumSafetyDistance=0.20
+    minimumSafetyDistance=0.30
     w=0
     vel=0
     angularWheel = [0.0, 0.0]
@@ -239,11 +239,11 @@ class Algorithm:
             if dy > 0:
                 print('The robot is moving to the upper righ')
                 # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
-                if x2 > robotX and y2 > robotY:
+                if x2 < robotX and y3 > robotY:
                     print('The robot will move to the upper right corner of the rectangle.')
                     # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
-                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
-                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
+                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
+                    d2 =-0.15+ self.distance(robotX, robotY, segmentOfTheRectangle[2])
                     #take the minimum distance
                     d = min(d1, d2)
                     if d<minimumSafetyDistance:
@@ -262,10 +262,10 @@ class Algorithm:
                     self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
             elif dy < 0:
                 print('The robot is moving to the lower right corner.')
-                if x2 > robotX and y1 < robotY:
+                if x2 < robotX and y2 < robotY:
                     print('The robot will move to the lower right corner of the rectangle.')
-                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[2])
-                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[3])
+                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
                     #take the minimum distance
                     d = min(d1, d2)
                     if d<minimumSafetyDistance:
@@ -280,12 +280,12 @@ class Algorithm:
                     print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the right")
             else:
                 print('The robot is moving to the right.')
-                if x2 > robotX:
+                if x2 < robotX:
                     print('The robot will move to the right wall of the rectangle.')
                     #in this case compare with 3 segments
                     d1 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
                     d2 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
-                    d3 = self.distance(robotX, robotY, segmentOfTheRectangle[2])
+                    d3 = -0.15+ self.distance(robotX, robotY, segmentOfTheRectangle[2])
                     #take the minimum distance
                     d = min(d1, d2, d3)
                     if d<minimumSafetyDistance:
@@ -300,10 +300,10 @@ class Algorithm:
         elif dx < 0:
             if dy > 0:
                 print('The robot is moving to the upper left corner.')
-                if x1 > robotX and y2 < robotY:
+                if x1 > robotX and y3 > robotY:
                     print('The robot will move to the upper left corner of the rectangle.')
                     #in this case compare with 2 segments
-                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
+                    d1 = -0.15+self.distance(robotX, robotY, segmentOfTheRectangle[2])
                     d2 = self.distance(robotX, robotY, segmentOfTheRectangle[3])
                     #take the minimum distance
                     d = min(d1, d2)
@@ -319,11 +319,11 @@ class Algorithm:
                     print("probably collision with the wall at left.TODO: STOP THE ROBOT and turn it to the right")
             elif dy < 0:
                 print('The robot is moving to the lower left corner.')
-                if x1 < robotX and y1 < robotY:
+                if x1 > robotX and y1 < robotY:
                     print('El robot se dirigirá hacia la esquina inferior izquierda del rectángulo.')
                     #in this case compare with 2 segments
-                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
-                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[2])
+                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[3])
                     #take the minimum distance
                     d = min(d1, d2)
                     if d<minimumSafetyDistance:
@@ -343,11 +343,11 @@ class Algorithm:
             else:
                 print('The robot is moving to the left.')
                 #compare with the left wall of the rectangle and the three segments 
-                if x1 < robotX:
+                if x1 > robotX:
                     print('The robot will move to the left wall of the rectangle.')
-                    d1 = self.distance(robotX, robotY, segmentOfTheRectangle[1])
-                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[2])
-                    d3 = self.distance(robotX, robotY, segmentOfTheRectangle[3])
+                    d1 = -0.15+self.distance(robotX, robotY, segmentOfTheRectangle[2])
+                    d2 = self.distance(robotX, robotY, segmentOfTheRectangle[3])
+                    d3 = self.distance(robotX, robotY, segmentOfTheRectangle[0])
                     #take the minimum distance
                     d = min(d1, d2, d3)
                     if d<minimumSafetyDistance:
@@ -369,14 +369,14 @@ class Algorithm:
         else:
             if dy > 0:
                 print('The robot is moving up.')
-                d = self.distance(robotX, robotY, segmentOfTheRectangle[0])
+                d = -0.15+self.distance(robotX, robotY, segmentOfTheRectangle[2])
                 if d<minimumSafetyDistance:
                     print("robot collision minimumSafetyDistance")
                     
                     self.newHeading = -heading
             elif dy < 0:
                 print('The robot is moving down.')
-                d = self.distance(robotX, robotY, segmentOfTheRectangle[2])
+                d = self.distance(robotX, robotY, segmentOfTheRectangle[0])
                 if d<minimumSafetyDistance:
                     print("robot collision minimumSafetyDistance")
 
@@ -392,7 +392,6 @@ class Algorithm:
             self.angularWheelSpeed(angularWheel,velocity_robot)
             
             self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-            time.sleep(5)
             self.newHeadingRequired=True
            
         
@@ -401,7 +400,7 @@ class Algorithm:
   def correctOrientation(self):
     vel=0
     angularWheel = [0.0, 0.0]
-    uniformVelocity = False
+    uniformVelocity = True
     
     while True:
         if len(self.PostionForControl)>0:
@@ -419,12 +418,15 @@ class Algorithm:
                     uniformVelocity=False
                     w =  self.OrientationControl.PID(heading, self.newHeading)
                     if w !=0.0:
+                        print("correcting")
+                        vel=0.0
                         velocity_robot=[w,vel]
                         self.angularWheelSpeed(angularWheel,velocity_robot)
                         self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
                     else :
                         self.newHeadingRequired = False
-                elif(uniformVelocity==False):
+                        uniformVelocity = True
+                elif(uniformVelocity==True):
                     vel=8.2*3.35
                     velocity_robot=[w,vel]
                     self.angularWheelSpeed(angularWheel,velocity_robot)
