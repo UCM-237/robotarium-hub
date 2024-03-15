@@ -139,7 +139,7 @@ class Robot:
     head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',AGENT_ID) + 
                 struct.pack('H',operation) + struct.pack('H',len))
     message=head + data
-    bytes_written= self.arduino.write(message )
+    bytes_written= self.arduino.write(message)
 		
 
 if __name__ == "__main__":
