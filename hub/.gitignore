@@ -1,0 +1,4 @@
+build/*
+CMakeFiles/cmake.check_cache
+*.vscode
+build/*
