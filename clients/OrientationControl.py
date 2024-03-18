@@ -1,6 +1,6 @@
 import math 
 class orientationControl:
-    def __init__(self, sample_time, kp=0.4, ki=0.1, kd=0.1, windup_limit=14, derivative_filter=False, filter_coeff=0.5): 
+    def __init__(self, sample_time, kp=2, ki=0.9, kd=0.4, windup_limit=14, derivative_filter=False, filter_coeff=0.5): 
         self.cumError = 0
         self.kp=kp
         self.ki=ki

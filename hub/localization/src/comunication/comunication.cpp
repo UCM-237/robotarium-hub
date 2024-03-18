@@ -44,12 +44,12 @@ void AgentCommunication::registerAgent()
     zmqpp::socket_type type = zmqpp::socket_type::request;
     zmqpp::socket control (context, type);
     std::cout << "connecting" << std::endl;
-    control.connect("tcp://127.0.0.1:5555");
+    control.connect("tcp://192.168.10.1:5555");
 
     json message;
     message["operation"] = "hello";
     message["source_id"] = "Camara_0";
-    message["payload"]["url"] = "tcp://127.0.0.1:5557";
+    message["payload"]["url"] = "tcp://192.168.10.1:5557";
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();
 
@@ -84,7 +84,7 @@ void *AgentCommunication::sendData(void *arg)
 void *AgentCommunication::sendArucoPosition(void *This)
 {
     AgentCommunication *agent = (AgentCommunication*)This;
-    const std::string endpoint = "tcp://127.0.0.1:5555"; //5555
+    const std::string endpoint = "tcp://192.168.10.1:5555"; //5555
     // initialize the 0MQ context
     // zmqpp::context context;
 
@@ -172,7 +172,7 @@ void *AgentCommunication::sendArucoPosition(void *This)
             newPublisher.send(zmqMessage);
         
         }
-        usleep(100*1000);
+        usleep(50*1000);
         message.clear();
         position.clear();
     }
@@ -209,10 +209,10 @@ void *AgentCommunication::listenSocket(void *This)
         std::string token;
         while ((pos = text.find(delimiter)) != std::string::npos) {
             token = text.substr(0, pos);
-            std::cout << token << std::endl;
             text.erase(0, pos + delimiter.length());
             if (text == "RobotariumData")
             {
+                std::cout<<"Requested RObotarium Data"<<std::endl;
                 agent->requestRobotariumData = true;
             }
         }
