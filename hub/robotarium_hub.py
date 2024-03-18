@@ -16,7 +16,7 @@ CMD_PORT = 5555
 DATA_PORT = 5556
 
 # MQTT Config
-MQTT_BROKER = '127.0.0.1'
+MQTT_BROKER = '192.168.1.109'
 MQTT_PORT = 1883
 MQTT_TOPIC = "#"
 # Generate a Client ID with the publish prefix.
@@ -32,10 +32,14 @@ class RobotariumHub:
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
-        self.commands_socket.bind(f'tcp://*:{CMD_PORT}')
+        self.commands_socket.bind(f'tcp://192.168.1.109:{CMD_PORT}')
         self.data_socket = self.context.socket(zmq.PUB)
         self.data_socket.bind(f'tcp://*:{DATA_PORT}')
-        self.agents = {}
+        self.
+        
+        
+        
+        = {}
         self.camera = {}
         self.running = True
         self.accepting = Thread(target=self.accept, args=())
@@ -43,23 +47,26 @@ class RobotariumHub:
         self.poller = zmq.Poller()
         self.listening = Thread(target=self.listen, args=())
         self.listening.start()
-        #self.mqtt_client = self.connect_mqtt()
+        self.mqtt_client = self.connect_mqtt()
 
     def connect_mqtt(self):
+        
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
                 print("Connected to MQTT Broker!")
             else:
                 print("Failed to connect, return code %d\n", rc)
 
-            client = mqtt_client.Client(MQTT_CLIENT_ID)
-            # client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-            client.on_connect = on_connect
-            client.connect(MQTT_BROKER, MQTT_PORT)
-            client.loop_start()
-            client.subscribe('#')
-            client.on_message = self.on_mqtt_message
-            return client
+        client = mqtt_client.Client(MQTT_CLIENT_ID)
+        # client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        client.on_connect = on_connect
+        client.connect(MQTT_BROKER, MQTT_PORT,keepalive=60)
+        # 
+        # client.subscribe('#')
+        
+        client.on_message = self.on_mqtt_message
+        client.loop_start()
+        return client
         
 
     def on_mqtt_message(self, client, userdate, msg):
@@ -103,7 +110,7 @@ class RobotariumHub:
                         print(topic)
                         print(message)
                     
-                    #self.mqtt_client.publish(topic, json.dumps(message))
+                    self.mqtt_client.publish(topic, json.dumps(message))
                     
 
     def accept(self):
@@ -117,12 +124,12 @@ class RobotariumHub:
             self.commands_socket.send_json({ 'result': 'ok' })
 
 
-def subscribe(client: mqtt_client):
-  def on_message(client, userdata, msg):
-    print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+    def subscribe(client: mqtt_client):
+        def on_message(client, userdata, msg):
+            print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
 
-  #client.subscribe(topic)
-  client.on_message = on_message
+        #client.subscribe(topic)
+        client.on_message = on_message
 
 
 if __name__ == "__main__":
