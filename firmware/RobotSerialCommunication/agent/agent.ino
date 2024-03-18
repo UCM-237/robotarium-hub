@@ -30,8 +30,8 @@ void moveForward(const int pinMotor[3], int speed);
 void moveBackward(const int pinMotor[3], int speed);
 void fullStop(const int pinMotor[3]);
 void moveWheel(int pwm,double w, const int pinMotor[3],bool back);
-void isrD();
-void isrI();
+void isrRight();
+void isrLeft();
 int pidD(double wD);
 int pidI(double wI);
 double ajusteGyroscope(double z);
@@ -44,10 +44,10 @@ int led = 13;
 void setup() {
   motorSetup();
   // Interrupciones para contar pulsos de encoder
-  pinMode(encoderD, INPUT_PULLUP);
-  pinMode(encoderI, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(encoderI), isrI, RISING);//prepara la entrada del encoder como interrupcion
-  attachInterrupt(digitalPinToInterrupt(encoderD), isrD, RISING);
+  pinMode(encoderRight, INPUT_PULLUP);
+  pinMode(encoderLeft, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(encoderLeft), isrLeft, RISING);//prepara la entrada del encoder como interrupcion
+  attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
   // Se prepara la IMU para poder ser leida
   if (!IMU.begin()) {
     Serial.println("Failed to initialize IMU!");
@@ -241,28 +241,28 @@ void op_vel_robot() {
   //send(ID, OP_VEL_ROBOT, &operation_send.data);
 }
 void op_conf_pid(){
-  P_right= bytesToDouble(&server_operation->data[0]);
-  I_right = bytesToDouble(&server_operation->data[8]);
-  D_right = bytesToDouble(&server_operation->data[16]);
+  kp_right= bytesToDouble(&server_operation->data[0]);
+  ki_right = bytesToDouble(&server_operation->data[8]);
+  kd_right = bytesToDouble(&server_operation->data[16]);
 
-  P_left = bytesToDouble(&server_operation->data[24]);
-  I_left = bytesToDouble(&server_operation->data[32]);
-  D_left = bytesToDouble(&server_operation->data[40]);
+  kp_left = bytesToDouble(&server_operation->data[24]);
+  ki_left = bytesToDouble(&server_operation->data[32]);
+  kd_left = bytesToDouble(&server_operation->data[40]);
 
-  Serial.print(P_right);
+  Serial.print(kp_right);
   Serial.print(",");
   
-  Serial.print(I_right);
+  Serial.print(ki_right);
   Serial.print(",");
   
-  Serial.print(D_right);
+  Serial.print(kd_right);
   Serial.print(",");
 
-  Serial.print(P_left);
+  Serial.print(kp_left);
   Serial.print(",");
-   Serial.print(I_left);
+   Serial.print(ki_left);
   Serial.print(",");
-   Serial.println(D_left);
+   Serial.println(kd_left);
 
 }
 
@@ -307,21 +307,21 @@ void moveWheel(int pwm, double w, const int pinMotor[3], bool back) {
   //no se usa delay opara evitar interferir con las interruociones.
 }
 
-void isrD() {
+void isrRight() {
   timeBeforeDebounceD = millis();//tiempo para evitar rebotes
   deltaDebounceD = timeBeforeDebounceD - timeAfterDebounceD;// tiempo que ha pasdo entre interrupcion e interrupcion
   if(deltaDebounceD > TIMEDEBOUNCE) {//condicion para evitar rebotes
     //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
     startTimeD=micros();
-    encoder_countD++;
+    encoder_countRight++;
       deltaTimeD = startTimeD - timeAfterD;
-      encoder_countD = 0;
+      encoder_countRight = 0;
       timeAfterD = micros();
   }
   timeAfterDebounceD = millis();  
 }
 
-void isrI() {
+void isrLeft() {
   timeBeforeDebounceI = millis();//tiempo para evitar rebotes
   deltaDebounceI = timeBeforeDebounceI - timeAfterDebounceI;// tiempo que ha pasdo entre interrupcion e interrupcion
   if(deltaDebounceI > TIMEDEBOUNCE) {//condicion para evitar rebotes
@@ -351,7 +351,7 @@ int pidD(double wD) {
     }
     constrain(cumErrorD, -MAXCUMERROR, MAXCUMERROR);
     rateErrorD = (errorD - lastErrorD) / elapsedTimeD; // calcular la derivada del error
-    outputD = static_cast<int> (round(P_right*errorD + I_right*cumErrorD + D_right*rateErrorD ));     // calcular la salida del PID    0.1*errorD +0.0065*cumErrorD + 0.0*rateErrorD
+    outputD = static_cast<int> (round(kp_right*errorD + ki_right*cumErrorD + kd_right*rateErrorD ));     // calcular la salida del PID    0.1*errorD +0.0065*cumErrorD + 0.0*rateErrorD
     lastErrorD = errorD;                               // almacenar error anterior
   }
   previousTimeD=currentTimeD;
@@ -377,7 +377,7 @@ int pidI(double wI) {
     }
     constrain(cumErrorI, -MAXCUMERROR, MAXCUMERROR);
     rateErrorI = (errorI - lastErrorI) / elapsedTimeI; // calcular la derivada del error    
-    outputI = static_cast<int> (round(P_left*errorI + I_left*cumErrorI + D_left*rateErrorI));     // calcular la salida del PID 0.42*errorI  + 0.006*cumErrorI + 0.00*rateErrorI
+    outputI = static_cast<int> (round(kp_left*errorI + ki_left*cumErrorI + kd_left*rateErrorI));     // calcular la salida del PID 0.42*errorI  + 0.006*cumErrorI + 0.00*rateErrorI
     lastErrorI = errorI;
   }
   previousTimeI = currentTimeI;
