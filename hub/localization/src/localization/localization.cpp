@@ -328,18 +328,22 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
 
     std::vector<cv::Point3f> objPoints;
     cv::Point3f p;
-    objPoints.push_back(cv::Point3f(-baseLength/2,weightLength/2,0));
-    objPoints.push_back(cv::Point3f(baseLength/2,weightLength/2,0));
-    objPoints.push_back(cv::Point3f(baseLength/2,-weightLength/2,0));
-    objPoints.push_back(cv::Point3f(-baseLength/2,-weightLength/2,0));
+    // objPoints.push_back(cv::Point3f(-baseLength/2,weightLength/2,0));
+    // objPoints.push_back(cv::Point3f(baseLength/2,weightLength/2,0));
+    // objPoints.push_back(cv::Point3f(baseLength/2,-weightLength/2,0));
+    // objPoints.push_back(cv::Point3f(-baseLength/2,-weightLength/2,0));
 
+    objPoints.push_back(cv::Point3f(0,weightLength,0));
+    objPoints.push_back(cv::Point3f(baseLength,weightLength,0));
+    objPoints.push_back(cv::Point3f(baseLength,0,0));
+    objPoints.push_back(cv::Point3f(0,-weightLength,0));
         cv::Mat rvec, tvec;
         
         if ((corners.size() >= 4 && corners.size() < 5) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
         {
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
-            cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec);
+            cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,cv::SOLVEPNP_ITERATIVE);
             std::cout<< "tvec: "<<tvec<<std::endl;
             rvecs.push_back(rvec);
             tvecs.push_back(tvec);

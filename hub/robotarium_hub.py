@@ -32,14 +32,10 @@ class RobotariumHub:
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
-        self.commands_socket.bind(f'tcp://192.168.1.109:{CMD_PORT}')
+        self.commands_socket.bind(f'tcp://192.168.10.1:{CMD_PORT}')
         self.data_socket = self.context.socket(zmq.PUB)
-        self.data_socket.bind(f'tcp://*:{DATA_PORT}')
-        self.
-        
-        
-        
-        = {}
+        self.data_socket.bind(f'tcp://192.168.10.1:{DATA_PORT}')
+        self.agents = {}
         self.camera = {}
         self.running = True
         self.accepting = Thread(target=self.accept, args=())
@@ -116,7 +112,7 @@ class RobotariumHub:
     def accept(self):
         '''Wait for next request from client'''
         while self.running:
-            sleep(0.5)
+            sleep(0.1)
             logging.info("Robotarium is waiting for new agents")
             message = self.commands_socket.recv_json()
             logging.info(f'Received request from {message["source_id"]}')
