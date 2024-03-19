@@ -44,12 +44,12 @@ void AgentCommunication::registerAgent()
     zmqpp::socket_type type = zmqpp::socket_type::request;
     zmqpp::socket control (context, type);
     std::cout << "connecting" << std::endl;
-    control.connect("tcp://192.168.10.1:5555");
+    control.connect("tcp://"+HUB_IP+":5555");
 
     json message;
     message["operation"] = "hello";
     message["source_id"] = "Camara_0";
-    message["payload"]["url"] = "tcp://192.168.10.1:5557";
+    message["payload"]["url"] = PUBLISH_ENDPOINT;
     message["timestamp"] = 1000 * time(nullptr);
     std::string jsonStr = message.dump();
 
@@ -84,7 +84,7 @@ void *AgentCommunication::sendData(void *arg)
 void *AgentCommunication::sendArucoPosition(void *This)
 {
     AgentCommunication *agent = (AgentCommunication*)This;
-    const std::string endpoint = "tcp://192.168.10.1:5555"; //5555
+    const std::string endpoint = "tcp://"+HUB_IP+":5555"; //5555
     // initialize the 0MQ context
     // zmqpp::context context;
 
