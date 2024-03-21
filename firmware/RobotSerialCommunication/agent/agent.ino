@@ -34,7 +34,6 @@ void isrRight();
 void isrLeft();
 int pidD(double wD);
 int pidI(double wI);
-double ajusteGyroscope(double z);
 void feedForwardD();
 void feedForwardI();
 void tokenize(const string s, char c,vector<string>& v);
@@ -166,7 +165,7 @@ void op_saludo() {
 void op_message() { }
 
 void op_moveWheel() {
-  Serial.println("movee");
+  Serial.println("moveWheel");
   digitalWrite(led, LOW);
   setpointWD = bytesToDouble(&server_operation->data[0]);
   setpointWI = bytesToDouble(&server_operation->data[8]);

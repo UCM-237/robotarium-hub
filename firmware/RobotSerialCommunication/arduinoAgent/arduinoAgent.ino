@@ -7,7 +7,17 @@
 #include <SimpleKalmanFilter.h>
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
-#include "arduino_secrets.h" 
+#include "arduino_secrets.h"
+// Define a macro for debug printing
+#define DEBUG_ENABLED  // Comment out this line to disable debug prints
+
+#ifdef DEBUG_ENABLED
+#define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
+#define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...)   // Debug print is empty when DEBUG_ENABLED is not defined
+#define DEBUG_PRINTLN(...) // Debug println is empty when DEBUG_ENABLED is not defined
+#endif
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
@@ -32,15 +42,15 @@ struct appdata *server_operation;
 
 //prototypes//
 //TODO: DO a reuqest manager for the opeartions and handle serial and mqtt communication
-void do_operation(int operation);
+void do_operation(uint8_t operation);
 void op_saludo();
 void op_message();
-void op_moveWheel();
+void op_moveRobot();
 void op_StopRobot();
 void op_vel_robot();
 void isrRight();
 void isrLeft();
-
+void send(uint8_t operation, byte *data);
 void connect();
 
 
@@ -79,14 +89,16 @@ void setup() {
     robot.fullStop();
   
     wheelControlerRight.setControlerParam(0.2, 0.05, 0.009);
+    wheelControlerRight.setFeedForwardParam(0.0825,0.707);
     wheelControlerLeft.setControlerParam(0.2, 0.05, 0.009);
-
+    wheelControlerLeft.setFeedForwardParam(1.656,0.072);
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin
     Serial.begin(9600);
 
-    connect();
+    //connect();
     pinMode(led, OUTPUT); 
+   DEBUG_PRINTLN("setup ok");
 }
 //define common variables
 //TODO: Refactor
@@ -98,7 +110,7 @@ unsigned long currentTime, timeAfter = 0;
 const unsigned long SAMPLINGTIME= 100;//ms
 double wLeft,wRight; // measured angular velocity
 
-const int INIT_FLAG = 112;
+const uint8_t INIT_FLAG = 112;
 
 void loop() {
   currentTime = millis();
@@ -109,12 +121,12 @@ void loop() {
     // Serial.println(server_operation->InitFlag);
     if (server_operation->InitFlag == INIT_FLAG)
     {
-      Serial.print("operationFlag: \t");
-      Serial.println(server_operation->InitFlag);
-      Serial.print("operation: \t");
-      Serial.println(server_operation->op);
+      DEBUG_PRINT("operationFlag: \t");
+     DEBUG_PRINTLN(server_operation->InitFlag);
+      DEBUG_PRINT("operation: \t");
+     DEBUG_PRINTLN(server_operation->op);
 
-      do_operation(server_operation->op);
+      do_operation((operation_t)server_operation->op);
       serialCom = false;
     }
   }
@@ -123,22 +135,22 @@ void loop() {
 
   // avoids being disconnected by the broker
 
-  mqttClient.poll();
+  //mqttClient.poll();
 
-  // TO DO: Refactor
-  if(currentTime - timeAfter >= SAMPLINGTIME) {
-  
+  if(currentTime - timeAfter >= SAMPLINGTIME) 
+  {
+
     int auxPWMD = 0, auxPWMI = 0;
     double fD, fI;
     timeStopD = timeStopI = millis();
     //condition for know when the wheel is stoped
     //se define un contador de tiempo para comprobar que las reudas estan paradas
-    deltaTimeStopD = timeStopD - timeAfterDebounceD;
-    deltaTimeStopI = timeStopI - timeAfterDebounceI;
+    deltaTimeStopD = timeStopD - timeAfterDebounceRight;
+    deltaTimeStopI = timeStopI - timeAfterDebounceLeft;
     meanFilterRight.AddValue(deltaTimeRight);
     meanFilterLeft.AddValue(deltaTimeLeft);
-    fI = deltaTimeStopI >= 200 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * N) * 1000000;
-    fD = deltaTimeStopD >= 200 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * N) * 1000000;
+    fI = deltaTimeStopI >= 200 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000000;
+    fD = deltaTimeStopD >= 200 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) * 1000000;
     //condicion para que no supere linealidad y se sature.
     //es un filtro para que no de valores ridiculos
     if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
@@ -169,23 +181,25 @@ void loop() {
       auxPWMD = PWM_Right;
     }
 
-    if (1) {
-      op_vel_robot();
-    }
+    
+    
+    op_vel_robot();
+    timeAfter = currentTime; 
   }
-  timeAfter = currentTime;
+
+  
 }
 
-void do_operation(int operation) {
+void do_operation(operation_t operation) {
   switch (operation) {
-    case OP_SALUDO:
+    case OP_HELLO:
       op_saludo();
       break;
-    case OP_MOVE_WHEEL:
-      op_moveWheel();
+    case OP_MOVE_ROBOT:
+      op_moveRobot();
       //digitalWrite(led, HIGH);
       break;
-    case OP_STOP_WHEEL:
+    case OP_STOP_ROBOT:
       op_StopRobot();
       break;
     case OP_VEL_ROBOT:
@@ -193,33 +207,35 @@ void do_operation(int operation) {
       break;
     case OP_CONF_PID:
       op_conf_pid();
+    case OP_CONF_FF:
+      op_conf_ff();
     default:
       break;
   }
 }
 
-void send(unsigned int operation, byte *data) {
+void send(uint8_t operation, byte *data) {
   operation_send.op = operation;
   operation_send.len = sizeof(data);
-  Serial1.write((char*)&operation_send.op, 2);
+  Serial1.write((char*)&operation_send.op, 1);
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&data, operation_send.len);
   Serial1.flush();
 }
 
 void op_saludo() {
-  operation_send.op = OP_SALUDO;
+  operation_send.op = (uint8_t)OP_HELLO;
 
   operation_send.len = sizeof (operation_send.data);  /* len */
   Serial1.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
   Serial1.flush();
-//  send(ID, OP_SALUDO, )
+//  send(ID, OP_HELLO, )
 }
 
 void op_message() { }
 
-void op_moveWheel() {
-  Serial.println("move");
+void op_moveRobot() {
+ DEBUG_PRINTLN("move");
   digitalWrite(led, LOW);
   double setpointWRight = bytesToDouble(&server_operation->data[0]);
   double setpointWLeft = bytesToDouble(&server_operation->data[8]);
@@ -265,7 +281,8 @@ void op_moveWheel() {
 }
 
 void op_StopRobot() {
-  
+  DEBUG_PRINT("op stop:");
+  DEBUG_PRINTLN(OP_STOP_ROBOT);
   wheelControlerLeft.setSetPoint(0.0);
   wheelControlerRight.setSetPoint(0.0);
   // fullStop(pinMotorI);
@@ -274,15 +291,19 @@ void op_StopRobot() {
 }
 
 void op_vel_robot() {
-  //Serial.println(OP_VEL_ROBOT);
+  DEBUG_PRINT("op vel:");
+  DEBUG_PRINTLN(OP_VEL_ROBOT);
   operation_send.InitFlag=INIT_FLAG;
   operation_send.id=1;
   operation_send.op = 5;
   short int a=1;
   doubleToBytes(wRight, &operation_send.data[0]);
   doubleToBytes(wLeft, &operation_send.data[8]);
-  //Serial.println(wRight);
-  //Serial.println(wI);
+  DEBUG_PRINT("vel robot--->");
+  DEBUG_PRINT(" wRight:");
+  DEBUG_PRINT(wRight);
+  DEBUG_PRINT(" wLeft:");
+  DEBUG_PRINTLN(wLeft);
   /*if(backD) {
     shortToBytes(a, &operation_send.data[16]);
   }
@@ -304,7 +325,8 @@ void op_vel_robot() {
   //send(ID, OP_VEL_ROBOT, &operation_send.data);
 }
 void op_conf_pid(){
-  Serial.print("conf pid");
+  DEBUG_PRINT("conf pid:");
+  DEBUG_PRINTLN(OP_CONF_PID);
   double kp_right= bytesToDouble(&server_operation->data[0]);
   double ki_right = bytesToDouble(&server_operation->data[8]);
   double kd_right = bytesToDouble(&server_operation->data[16]);
@@ -316,49 +338,84 @@ void op_conf_pid(){
   wheelControlerRight.setControlerParam(kp_right, ki_right, kd_right);
   wheelControlerLeft.setControlerParam(kp_left, ki_left, kd_left);
 
-  Serial.print(kp_right);
-  Serial.print(",");
+ DEBUG_PRINT(kp_right);
+  DEBUG_PRINT(",");
   
-  Serial.print(ki_right);
-  Serial.print(",");
+ DEBUG_PRINT(ki_right);
+  DEBUG_PRINT(",");
   
-  Serial.print(kd_right);
-  Serial.print(",");
+  DEBUG_PRINT(kd_right);
+ DEBUG_PRINT(",");
 
-  Serial.print(kp_left);
-  Serial.print(",");
-   Serial.print(ki_left);
-  Serial.print(",");
-   Serial.println(kd_left);
+  DEBUG_PRINT(kp_left);
+  DEBUG_PRINT(",");
+  DEBUG_PRINT(ki_left);
+ DEBUG_PRINT(",");
+  DEBUG_PRINT(kd_left);
 
 }
 
+void op_conf_ff()
+{
+  DEBUG_PRINT("conf ff:");
+  DEBUG_PRINTLN(OP_CONF_FF);
+  double A_right = bytesToDouble(&server_operation->data[0]);
+  double B_right = bytesToDouble(&server_operation->data[8]);
+
+  double A_left = bytesToDouble(&server_operation->data[16]);
+  double B_left = bytesToDouble(&server_operation->data[24]);
+
+  wheelControlerRight.setFeedForwardParam(A_right, B_right);
+  wheelControlerLeft.setFeedForwardParam(A_left, B_left);
+
+  DEBUG_PRINT(A_right);
+ DEBUG_PRINT(",");
+  
+  DEBUG_PRINT(B_right);
+  DEBUG_PRINT(",");
+  
+  DEBUG_PRINT(A_left);
+  DEBUG_PRINT(",");
+  
+  DEBUG_PRINTLN(B_left);
+
+}
 void isrRight() {
-  timeBeforeDebounceD = millis();//tiempo para evitar rebotes
-  deltaDebounceD = timeBeforeDebounceD - timeAfterDebounceD;// tiempo que ha pasdo entre interrupcion e interrupcion
-  if(deltaDebounceD > TIMEDEBOUNCE) {//condicion para evitar rebotes
+  timeBeforeDebounceRight = millis();//tiempo para evitar rebotes
+  deltaDebounceRight = timeBeforeDebounceRight - timeAfterDebounceRight;// tiempo que ha pasdo entre interrupcion e interrupcion
+  if(deltaDebounceRight > TIMEDEBOUNCE) {//condicion para evitar rebotes
     //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeD=micros();
+    startTimeRight=micros();
     encoder_countRight++;
-      deltaTimeRight = startTimeD - timeAfterD;
+    if(encoder_countRight == MAX_ENCODER_STEPS)
+    {
+      encoder_countRight=0;
+      wheelTurnCounterRight++;
+    }
+    deltaTimeRight = startTimeRight - timeAfterRight;
       
-      timeAfterD = micros();
+    timeAfterRight = micros();
   }
-  timeAfterDebounceD = millis();  
+  timeAfterDebounceRight = millis();  
 }
 
 void isrLeft() {
-  timeBeforeDebounceI = millis();//tiempo para evitar rebotes
-  deltaDebounceI = timeBeforeDebounceI - timeAfterDebounceI;// tiempo que ha pasdo entre interrupcion e interrupcion
-  if(deltaDebounceI > TIMEDEBOUNCE) {//condicion para evitar rebotes
+  timeBeforeDebounceLeft = millis();//tiempo para evitar rebotes
+  deltaDebounceLeft = timeBeforeDebounceLeft - timeAfterDebounceLeft;// tiempo que ha pasdo entre interrupcion e interrupcion
+  if(deltaDebounceLeft > TIMEDEBOUNCE) {//condicion para evitar rebotes
     //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeI = micros();
-    encoder_countI++;//se cuenta los pasos de encoder
-    deltaTimeLeft = startTimeI - timeAfterI;
-    encoder_countI = 0;
-    timeAfterI = micros();
+    startTimeLeft = micros();
+    encoder_countLeft++;//se cuenta los pasos de encoder
+    if(encoder_countLeft == MAX_ENCODER_STEPS)
+    {
+      encoder_countLeft=0;
+      wheelTurnCounterLeft++;
+    
+    }
+    deltaTimeLeft = startTimeLeft - timeAfterLeft;
+    timeAfterLeft = micros();
   }
-  timeAfterDebounceI = millis();
+  timeAfterDebounceLeft = millis();
 }
 
 
@@ -378,7 +435,7 @@ void printWifiData() {
   IPAddress ip = WiFi.localIP();
   Serial.print("IP Address: ");
   Serial.println(ip);
-  Serial.println(ip);
+
 
   // print your MAC address:
   byte mac[6];
