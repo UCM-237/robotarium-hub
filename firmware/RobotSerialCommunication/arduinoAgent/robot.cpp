@@ -100,3 +100,23 @@ void robot::moveLeftWheel(int pwm, double w, bool back)
         }
     }
 }
+
+double robot::getRobotWheelDiameter()
+{
+    return this->RobotWheelDiamter;
+}
+
+double robot::getRobotWheelRadius()
+{
+    return this->RobotWheelRadius;
+}
+
+double robot::getRobotDiameter()
+{
+    return RobotDiameter;
+}
+
+uint8_t robot::getRobotID()
+{
+    return this->robotID;
+}

@@ -48,6 +48,8 @@ void op_message();
 void op_moveRobot();
 void op_StopRobot();
 void op_vel_robot();
+void op_turn_robot();
+void op_error();//unrecognized operation
 void isrRight();
 void isrLeft();
 void send(uint8_t operation, byte *data);
@@ -103,7 +105,7 @@ void setup() {
 //define common variables
 //TODO: Refactor
 int serialOperation = 0;
-bool sendDataSerial = true;
+bool sendDataSerial = false;
 bool serialCom = false;
 unsigned char *read_ptr; 
 unsigned long currentTime, timeAfter = 0;
@@ -182,8 +184,10 @@ void loop() {
     }
 
     
-    
-    op_vel_robot();
+    if(sendDataSerial)
+    {
+      op_vel_robot();
+    }
     timeAfter = currentTime; 
   }
 
@@ -197,7 +201,6 @@ void do_operation(operation_t operation) {
       break;
     case OP_MOVE_ROBOT:
       op_moveRobot();
-      //digitalWrite(led, HIGH);
       break;
     case OP_STOP_ROBOT:
       op_StopRobot();
@@ -205,11 +208,23 @@ void do_operation(operation_t operation) {
     case OP_VEL_ROBOT:
       sendDataSerial = true;
       break;
+    case OP_TURN_ROBOT:
+      op_turn_robot();
+      break;
+    case OP_SILENCE:
+      op_silense();
+      break;
+    case OP_SEND_TELEMETRY:
+      op_send_telemetry();
+      break;
     case OP_CONF_PID:
       op_conf_pid();
+      break;
     case OP_CONF_FF:
       op_conf_ff();
+      break;
     default:
+      op_error();
       break;
   }
 }
@@ -293,9 +308,9 @@ void op_StopRobot() {
 void op_vel_robot() {
   DEBUG_PRINT("op vel:");
   DEBUG_PRINTLN(OP_VEL_ROBOT);
-  operation_send.InitFlag=INIT_FLAG;
-  operation_send.id=1;
-  operation_send.op = 5;
+  operation_send.InitFlag=(uint8_t)INIT_FLAG;
+  operation_send.id=robot.getRobotID();
+  operation_send.op =(uint8_t)OP_VEL_ROBOT;
   short int a=1;
   doubleToBytes(wRight, &operation_send.data[0]);
   doubleToBytes(wLeft, &operation_send.data[8]);
@@ -310,49 +325,91 @@ void op_vel_robot() {
   if(backI) {
     shortToBytes(a, &operation_send.data[18]);
   }*/
-  operation_send.len = sizeof(double)*2;
+  operation_send.len = (uint16_t)sizeof(double)*2;
   /*Serial.println(operation_send.op);
   Serial.println(wRight);
   Serial.print("len \t");F
   Serial.println(operation_send.len);*/
   //Serial.println(operation_send.InitFlag);
-  Serial1.write((char*)&operation_send.InitFlag,4);
-  Serial1.write((char*)&operation_send.id,2);
-  Serial1.write((char*)&operation_send.op, 2);
+  Serial1.write((char*)&operation_send.InitFlag,1);
+  Serial1.write((char*)&operation_send.id,1);
+  Serial1.write((char*)&operation_send.op, 1);
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&operation_send.data, operation_send.len);
   Serial1.flush();
   //send(ID, OP_VEL_ROBOT, &operation_send.data);
 }
-void op_conf_pid(){
-  DEBUG_PRINT("conf pid:");
-  DEBUG_PRINTLN(OP_CONF_PID);
-  double kp_right= bytesToDouble(&server_operation->data[0]);
-  double ki_right = bytesToDouble(&server_operation->data[8]);
-  double kd_right = bytesToDouble(&server_operation->data[16]);
+void op_turn_robot()
+{
+  DEBUG_PRINT("op turn:");
+  DEBUG_PRINTLN(OP_TURN_ROBOT);
+  double circunferenceToTurn = 2*M_PI*(robot.getRobotDiameter());
+  //Reset the encoder count
+  encoder_countRight=0;
+  encoder_countLeft=0;
+  //Set the target encoder count
+  int targetEncoderCount = int(circunferenceToTurn/(2*M_PI*robot.getRobotWheelRadius())*MAX_ENCODER_STEPS);
+  while (encoder_countRight < targetEncoderCount && encoder_countLeft < targetEncoderCount)
+  {
+    robot.moveLeftWheel(MINPWM, 0, false);
+    robot.moveRightWheel(MAXPWM, 0, true);
+  }
+  robot.fullStop();
+}
+inline void op_silense()
+{
+  DEBUG_PRINT("op silense:");
+  DEBUG_PRINTLN(OP_SILENCE);
+  sendDataSerial = false;
 
-  double kp_left = bytesToDouble(&server_operation->data[24]);
-  double ki_left = bytesToDouble(&server_operation->data[32]);
-  double kd_left = bytesToDouble(&server_operation->data[40]);
+}
+void op_send_telemetry()
+{
+  DEBUG_PRINT("op send telemetry:");
+  DEBUG_PRINTLN(OP_SEND_TELEMETRY);
+  sendDataSerial = true;
+}
+inline void op_error()
+{
+  DEBUG_PRINT("op error:");
+  DEBUG_PRINTLN(OP_ERROR);
+  operation_send.op = (uint8_t)OP_ERROR;
+  operation_send.len = sizeof (operation_send.data);  /* len */
 
-  wheelControlerRight.setControlerParam(kp_right, ki_right, kd_right);
-  wheelControlerLeft.setControlerParam(kp_left, ki_left, kd_left);
+  Serial1.write((char*)&operation_send.op, 1);
+  Serial1.write((char*)&operation_send.len, 2);
+  Serial1.write((char*)&operation_send.data, operation_send.len);
+  Serial1.flush();
+}
+void op_conf_pid()
+{
+    DEBUG_PRINT("conf pid:");
+    DEBUG_PRINTLN(OP_CONF_PID);
+    double kp_right = bytesToDouble(&server_operation->data[0]);
+    double ki_right = bytesToDouble(&server_operation->data[8]);
+    double kd_right = bytesToDouble(&server_operation->data[16]);
 
- DEBUG_PRINT(kp_right);
-  DEBUG_PRINT(",");
-  
- DEBUG_PRINT(ki_right);
-  DEBUG_PRINT(",");
-  
-  DEBUG_PRINT(kd_right);
- DEBUG_PRINT(",");
+    double kp_left = bytesToDouble(&server_operation->data[24]);
+    double ki_left = bytesToDouble(&server_operation->data[32]);
+    double kd_left = bytesToDouble(&server_operation->data[40]);
 
-  DEBUG_PRINT(kp_left);
-  DEBUG_PRINT(",");
-  DEBUG_PRINT(ki_left);
- DEBUG_PRINT(",");
-  DEBUG_PRINT(kd_left);
+    wheelControlerRight.setControlerParam(kp_right, ki_right, kd_right);
+    wheelControlerLeft.setControlerParam(kp_left, ki_left, kd_left);
 
+    DEBUG_PRINT(kp_right);
+    DEBUG_PRINT(",");
+
+    DEBUG_PRINT(ki_right);
+    DEBUG_PRINT(",");
+
+    DEBUG_PRINT(kd_right);
+    DEBUG_PRINT(",");
+
+    DEBUG_PRINT(kp_left);
+    DEBUG_PRINT(",");
+    DEBUG_PRINT(ki_left);
+    DEBUG_PRINT(",");
+    DEBUG_PRINT(kd_left);
 }
 
 void op_conf_ff()
@@ -389,7 +446,6 @@ void isrRight() {
     encoder_countRight++;
     if(encoder_countRight == MAX_ENCODER_STEPS)
     {
-      encoder_countRight=0;
       wheelTurnCounterRight++;
     }
     deltaTimeRight = startTimeRight - timeAfterRight;
@@ -408,7 +464,6 @@ void isrLeft() {
     encoder_countLeft++;//se cuenta los pasos de encoder
     if(encoder_countLeft == MAX_ENCODER_STEPS)
     {
-      encoder_countLeft=0;
       wheelTurnCounterLeft++;
     
     }
@@ -419,16 +474,37 @@ void isrLeft() {
 }
 
 
+// void serialEvent() {
+//   read_ptr = (unsigned char*)&packetBuffer;
+//   while (Serial1.available()) {
+//     *(read_ptr++) = Serial1.read();
+//     server_operation = (struct appdata *)&packetBuffer;
+//     serialCom = true;
+//   }
+// }
 void serialEvent() {
-  read_ptr = (unsigned char*)&packetBuffer;
+  static unsigned char* read_ptr = (unsigned char*)&packetBuffer;
+  static bool start_of_data = false;
+
   while (Serial1.available()) {
-    *(read_ptr++) = Serial1.read();
-    //Serial.readBytes(packetBuffer, MAXDATASIZE);
-    server_operation = (struct appdata *)&packetBuffer;
-    serialCom = true;
+    char c = Serial1.read();
+    
+    if (c == '\n') {  // Si se encuentra un carácter de nueva línea
+      *read_ptr = '\0';  // Agrega un terminador nulo para indicar el final de los datos
+      server_operation = (struct appdata *)&packetBuffer;
+      serialCom = true;
+      read_ptr = (unsigned char*)&packetBuffer;  // Reinicia el puntero de lectura
+      start_of_data = false;  // Reinicia el marcador del inicio de los datos
+    } else {
+      if (!start_of_data) {  // Si no se ha empezado a recibir datos, marca el inicio
+        start_of_data = true;
+        read_ptr = (unsigned char*)&packetBuffer;
+      }
+      
+      *read_ptr++ = c;  // Almacena el byte en el buffer y avanza el puntero
+    }
   }
 }
-
 
 void printWifiData() {
   // print your board's IP address:
