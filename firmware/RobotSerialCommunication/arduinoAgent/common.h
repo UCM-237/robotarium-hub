@@ -9,17 +9,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "operation.h"
-const int MAXDATASIZE=255;
-const int HEADER_LEN (sizeof(unsigned short)*3);
+const int MAXDATASIZE=255; // bytes
+const int HEADER_LEN =5; //bytes
 
 
 struct appdata {
-  unsigned short InitFlag;
-  unsigned short id;
-  unsigned short op; //codigo de operacion
-  unsigned short len;                       /* longitud de datos */
-  unsigned char data [MAXDATASIZE-HEADER_LEN];//datos
+  uint8_t InitFlag;
+  uint8_t id;
+  uint8_t op; //codigo de operacion
+  uint16_t len;                       /* longitud de datos */
+  uint8_t data [MAXDATASIZE-HEADER_LEN];//datos
 };
+
+//Utilities
 typedef union { unsigned char b[8]; double i; } mdouble;
 typedef union { unsigned char b[4]; float  i; } mfloat;
 typedef union { unsigned char b[4]; long   i; } mlong;
@@ -83,18 +85,17 @@ short bytesToShort(unsigned char *b)
 }
 
 //-----------------contador encoder------------------------------------------------------------------------------------
-const int             N=                  20;//Resolucion encoder       
-const int             encoderLeft =          2;//pin de entrada de encoder derecha
-const int             encoderRight=           15;//pin de entrada de encoder izquierda
+const int             MAX_ENCODER_STEPS =                      20;//Resolucion encoder       
+const int             encoderLeft =             2;//pin de entrada de encoder derecha
+const int             encoderRight=             15;//pin de entrada de encoder izquierda
 
 int                   encoder_countRight_after=0;
 int                   encoder_countLeft_after=0;
 int                   dif_encoderD=0;
 int                   dif_encoderI=0;
 
-volatile int          vueltaD=             0;//cuenta las vueltas que ha dado la rueda derecha
-volatile int          vueltaI=             0;//cuenta las vueltas que ha dado la rueda izquierda
-int                   valorD=              0;//media de tiempo
+volatile long long int          wheelTurnCounterRight=             0;//cuenta las vueltas que ha dado la rueda derecha
+volatile long long int          wheelTurnCounterLeft=             0;//cuenta las vueltas que ha dado la rueda izquierda
 
 
 
@@ -117,21 +118,21 @@ bool backD=false,backI=false;
 //------------------------debounce-----------------------------------------------------------------------------------
 //Se usara para evitar que cuenten pulsos debido a rebotes o ruido del sistema.
 unsigned long              TIMEDEBOUNCE        =15; //(ms) es el tiempo minimo entre pulsos
-volatile unsigned long timeAfterDebounceD= 0;
-volatile unsigned long timeBeforeDebounceD=0;
-volatile unsigned long deltaDebounceD=     0;
+volatile unsigned long timeAfterDebounceRight= 0;
+volatile unsigned long timeBeforeDebounceRight=0;
+volatile unsigned long deltaDebounceRight=     0;
 
-volatile unsigned long timeAfterDebounceI= 0;
-volatile unsigned long timeBeforeDebounceI=0;
-volatile unsigned long deltaDebounceI=     0;
+volatile unsigned long timeAfterDebounceLeft= 0;
+volatile unsigned long timeBeforeDebounceLeft=0;
+volatile unsigned long deltaDebounceLeft=     0;
 //----------T-------IEMPO ENTRE INTERRUPCIONES-----------------------------------------------------------------------//
-volatile unsigned long startTimeI=         0;
-volatile unsigned long timeAfterI=         0;
+volatile unsigned long startTimeLeft=         0;
+volatile unsigned long timeAfterLeft=         0;
 volatile unsigned      deltaTimeLeft;//diferencia de tiempo entre una interrupcion y otra
 
-volatile unsigned long startTimeD=         0;
-volatile unsigned long timeAfterD=         0;
+volatile unsigned long startTimeRight=         0;
+volatile unsigned long timeAfterRight=         0;
 volatile unsigned      deltaTimeRight;//diferencia de tiempo entre una interrupcion y otra
 
 volatile unsigned     encoder_countRight=      0;//cuenta los pulsos de encoder derecha
-volatile unsigned     encoder_countI=      0;//cuenta los pulsos de encoder izquierda
+volatile unsigned     encoder_countLeft=      0;//cuenta los pulsos de encoder izquierda
