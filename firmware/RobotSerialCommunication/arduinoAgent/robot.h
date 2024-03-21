@@ -13,6 +13,10 @@ class robot
         void fullStopLeftWheel();
         void moveRightWheel(int pwm, double w,bool back);
         void moveLeftWheel(int pwm, double w,bool back);
+        double getRobotWheelDiameter();
+        double getRobotWheelRadius();
+        double getRobotDiameter();
+        uint8_t getRobotID();
        
     private:
         int pinIN1;
@@ -27,6 +31,7 @@ class robot
         double RobotWheelDiamter = 6.7;
         double RobotWheelRadius = 3.35;
         double RobotDiameter = 9.5;
+        uint8_t robotID;
 
 
 

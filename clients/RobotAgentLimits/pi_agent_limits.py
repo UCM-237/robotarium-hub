@@ -28,9 +28,16 @@ HUB_DATA_PORT = 5556
 
 class Robot:
   '''Encapsulates the communication with Arduino'''
-  OP_MOVE_WHEEL: int = 2
-  OP_VEL_ROBOT: int = 5
-  OP_CONF_PID: int = 9
+  OP_MOVE_ROBOT = 2
+  OP_STOP_ROBOT = 3
+  OP_VEL_ROBOT = 4
+  OP_TURN_ROBOT = 5
+  OP_SILENCE = 6
+  OP_SEND_TELEMETRY = 7
+  OP_POSITION = 8
+  OP_CONF_PID = 9
+  OP_CONF_FF = 10
+  OP_DONE = 11
   INIT_FLAG = 112
   connected: bool = False
   arduino: Serial = None
@@ -45,11 +52,13 @@ class Robot:
       self.OP_VEL_ROBOT: self.speed,
     }
     self.operations = {
-      'MOVE': { 'id': self.OP_MOVE_WHEEL, 'method': self.move_wheels },
+      'MOVE': { 'id': self.OP_MOVE_ROBOT, 'method': self.move_robot },
+      'STOP': { 'id': self.OP_STOP_ROBOT, 'method': self.stop_robot },
       'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
     }
     self.LimitsAlgorithm = LimitsAlgorithm.LimitsAlgorithm()
     self.Position={}
+    self.id = 2
     
     
     self.ArenaLimitsReceived = False
@@ -65,7 +74,7 @@ class Robot:
     self.tval_after= 0
     self.tval_sample = 0
     
-    self.orientationControl = OrientationControl.orientationControl(self.SAMPLETIME)
+    #self.orientationControl = OrientationControl.orientationControl(self.SAMPLETIME)
 
 
 
@@ -92,9 +101,9 @@ class Robot:
     '''Parse data received from the robot'''
     logging.info('Starting Arduino update thread')
     #take the arenaLimits
-    while(AGENT_ID not in self.Position or self.ArenaLimitsReceived == False):
-      self.agent.send("localization/RobotariumData","")
-      time.sleep(1)
+    # while(AGENT_ID not in self.Position or self.ArenaLimitsReceived == False):
+    #   self.agent.send("localization/RobotariumData","")
+    #   time.sleep(1)
       
     while True:
       try:
@@ -110,32 +119,19 @@ class Robot:
           data={'data','AGENT_ID'}
           self.agent.send_measurement(measurement)
           
-        #check the arena limits
-        robotData = json.loads(self.position[AGENT_ID])
-        self.position.pop(AGENT_ID)
-        robotX = float(robotData["x"])
-        robotY = float(robotData["y"])
-        heading = -float(robotData["yaw"])
-        newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
-        if newHeading == False:
-          pass
-        else:
-          #stop command of moving the robot
-          self.move_wheels(0,0)
-          angularWheel = [0.0, 0.0]
-          vel=0
-          w = self.orientationControl.PID(heading,newHeading)
-          velocity_robot=[w,vel]
-          self.angularWheelSpeed(angularWheel,velocity_robot)
-          self.move_wheels(angularWheel[0],angularWheel[1])
-          
-        self.tval_after = time.time()*1000
-        self.tval_sample = self.tval_after - self.tval_before
-        if self.tval_sample < self.SAMPLETIME:
-          time.sleep((self.SAMPLETIME-self.tval_sample)/1000)
-        elif self.tval_sample > self.SAMPLETIME:
-          print("Error: Sample time too long")
-        self.tval_before = time.time()*1000
+        # #check the arena limits
+        # robotData = json.loads(self.position[AGENT_ID])
+        # self.position.pop(AGENT_ID)
+        # robotX = float(robotData["x"])
+        # robotY = float(robotData["y"])
+        # heading = -float(robotData["yaw"])
+        # newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
+        # if newHeading == False:
+        #   pass
+        # else:
+        #   #stop command of moving the robot
+        #   self.move_robot(0,0)
+
           
           
           
@@ -147,12 +143,18 @@ class Robot:
         print(e)
 
 
-  def move_wheels(self, v_left, v_right) -> None:
+  def move_robot(self, v_left, v_right) -> None:
     '''Set the wheels' speed setpoint'''
     lent=16#bytes
     data=( struct.pack('d', v_left) + struct.pack('d', v_right))
-    self.ArduinoSerialWrite(self.OP_MOVE_WHEEL,lent,data)
+    self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,lent,data)
 
+  
+  def stop_robot(self) -> None:
+    '''Stop the robot'''
+    lent=0
+    data=()
+    self.ArduinoSerialWrite(self.OP_STOP_ROBOT,lent,data)
 
   def speed(self, data) -> dict:
     '''Parse speed from binary data'''
@@ -228,10 +230,14 @@ class Robot:
         aux = 0    
 
   def ArduinoSerialWrite(self,operation,len,data):
-    head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',AGENT_ID) + 
-                struct.pack('H',operation) + struct.pack('H',len))
+    #in arduino initFlag is uint8_t, agent_id is uint8_t, operation is uint8_t, len is uint16_t
+    
+    # head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',self.id) + 
+    #             struct.pack('H',operation) + struct.pack('H',len))
+    head = struct.pack('BBB', self.INIT_FLAG, self.id, operation) + struct.pack('H',len)
     message=head + data
-    bytes_written= self.arduino.write(message )
+    message += b'\n'
+    bytes_written= self.arduino.write(message)
 		
 
 if __name__ == "__main__":
@@ -245,5 +251,6 @@ if __name__ == "__main__":
     hub_cmd_port=HUB_CMD_PORT,
     hub_data_port=HUB_DATA_PORT,
   )
+  agent.device.on_data('control/2/move', '{"v_left": 1, "v_right": 1}')
   
   
