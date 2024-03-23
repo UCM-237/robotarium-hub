@@ -47,7 +47,7 @@ void op_saludo();
 void op_message();
 void op_moveRobot();
 void op_StopRobot();
-void op_vel_robot();
+void op_telemtry();
 void op_turn_robot();
 void op_error();//unrecognized operation
 void isrRight();
@@ -186,7 +186,7 @@ void loop() {
     
     if(sendDataSerial)
     {
-      op_vel_robot();
+      op_telemtry();
     }
     timeAfter = currentTime; 
   }
@@ -205,7 +205,7 @@ void do_operation(operation_t operation) {
     case OP_STOP_ROBOT:
       op_StopRobot();
       break;
-    case OP_VEL_ROBOT:
+    case OP_TELEMETRY:
       sendDataSerial = true;
       break;
     case OP_TURN_ROBOT:
@@ -305,12 +305,12 @@ void op_StopRobot() {
   robot.fullStop();
 }
 
-void op_vel_robot() {
-  DEBUG_PRINT("op vel:");
-  DEBUG_PRINTLN(OP_VEL_ROBOT);
+void op_telemtry() {
+  DEBUG_PRINT("op telemetry:");
+  DEBUG_PRINTLN(OP_TELEMETRY);
   operation_send.InitFlag=(uint8_t)INIT_FLAG;
   operation_send.id=robot.getRobotID();
-  operation_send.op =(uint8_t)OP_VEL_ROBOT;
+  operation_send.op =(uint8_t)OP_TELEMETRY;
   short int a=1;
   doubleToBytes(wRight, &operation_send.data[0]);
   doubleToBytes(wLeft, &operation_send.data[8]);
@@ -337,7 +337,7 @@ void op_vel_robot() {
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&operation_send.data, operation_send.len);
   Serial1.flush();
-  //send(ID, OP_VEL_ROBOT, &operation_send.data);
+  //send(ID, OP_TELEMETRY, &operation_send.data);
 }
 void op_turn_robot()
 {
@@ -363,12 +363,7 @@ inline void op_silense()
   sendDataSerial = false;
 
 }
-void op_send_telemetry()
-{
-  DEBUG_PRINT("op send telemetry:");
-  DEBUG_PRINTLN(OP_SEND_TELEMETRY);
-  sendDataSerial = true;
-}
+
 inline void op_error()
 {
   DEBUG_PRINT("op error:");
