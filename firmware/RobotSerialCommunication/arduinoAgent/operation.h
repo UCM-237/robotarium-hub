@@ -7,14 +7,13 @@ typedef enum Operation{
   OP_HELLO = 1,
   OP_MOVE_ROBOT = 2,
   OP_STOP_ROBOT = 3,
-  OP_VEL_ROBOT  = 4,
+  OP_TELEMETRY  = 4,
   OP_TURN_ROBOT = 5,
   OP_SILENCE    = 6,
-  OP_SEND_TELEMETRY = 7,
-  OP_POSITION   = 8,
-  OP_CONF_PID   = 9,
-  OP_CONF_FF    = 10,//FeedForward
-  OP_DONE       = 11,
+  OP_POSITION   = 7,
+  OP_CONF_PID   = 8,
+  OP_CONF_FF    =9,//FeedForward
+  OP_DONE       = 10,
 }operation_t;
 
 

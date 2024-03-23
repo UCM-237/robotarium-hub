@@ -30,14 +30,13 @@ class Robot:
   '''Encapsulates the communication with Arduino'''
   OP_MOVE_ROBOT = 2
   OP_STOP_ROBOT = 3
-  OP_VEL_ROBOT = 4
+  OP_TELEMETRY = 4
   OP_TURN_ROBOT = 5
   OP_SILENCE = 6
-  OP_SEND_TELEMETRY = 7
-  OP_POSITION = 8
-  OP_CONF_PID = 9
-  OP_CONF_FF = 10
-  OP_DONE = 11
+  OP_POSITION = 7
+  OP_CONF_PID = 8
+  OP_CONF_FF = 9
+  OP_DONE = 10
   INIT_FLAG = 112
   connected: bool = False
   arduino: Serial = None
@@ -54,8 +53,13 @@ class Robot:
     self.operations = {
       'MOVE': { 'id': self.OP_MOVE_ROBOT, 'method': self.move_robot },
       'STOP': { 'id': self.OP_STOP_ROBOT, 'method': self.stop_robot },
+      'TELEMTRY': { 'id': self.OP_TELEMETRY, 'method': self.request_telemetry },
+      'TURN': { 'id': self.OP_TURN_ROBOT, 'method': self.turn_robot },
+      'SILENCE': { 'id': self.OP_SILENCE, 'method': self.silenceCommunication },
+      'POSITION': { 'id': self.OP_POSITION, 'method': self.RequestPosition },
       'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
-    }
+      'FF' : { 'id': self.OP_CONF_FF,  'method' : self.conf_FF }
+      }
     self.LimitsAlgorithm = LimitsAlgorithm.LimitsAlgorithm()
     self.Position={}
     self.id = 2
@@ -119,7 +123,7 @@ class Robot:
           data={'data','AGENT_ID'}
           self.agent.send_measurement(measurement)
           
-        # #check the arena limits
+        #check the arena limits
         # robotData = json.loads(self.position[AGENT_ID])
         # self.position.pop(AGENT_ID)
         # robotX = float(robotData["x"])
@@ -155,16 +159,25 @@ class Robot:
     lent=0
     data=()
     self.ArduinoSerialWrite(self.OP_STOP_ROBOT,lent,data)
-
-  def speed(self, data) -> dict:
-    '''Parse speed from binary data'''
-    v_left, v_right = array.array('d', data[0:16])
-    return {
-      'v_left': v_left,
-      'v_right': v_right
-    }
-  def batteryStatus(self, data) -> dict:
-    pass
+  def request_telemetry(self) -> None:
+    '''Request telemetry data'''
+    lent=0
+    data=()
+    self.ArduinoSerialWrite(self.OP_TELEMETRY,lent,data)
+    
+  def turn_robot(self, angle) -> None:
+    '''Turn the robot a given angle'''
+    
+  def silenceCommunication(self) -> None:
+    '''Stop the communication with the robot'''
+    lent=0
+    data=()
+    self.ArduinoSerialWrite(self.OP_SILENCE,lent,data)
+  def RequestPosition(self) -> None:
+    '''Request the position of the robot'''
+    lent=0
+    data=()
+    self.ArduinoSerialWrite(self.OP_POSITION,lent,data)
   def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
     len=48#bytes
@@ -176,6 +189,21 @@ class Robot:
       struct.pack('d', D_left))
     
     self.ArduinoSerialWrite(self.OP_CONF_PID,len,data)
+  def conf_FF(self,FF_right, FF_left) -> None:
+    len=16
+    data=(struct.pack('d', FF_right) + struct.pack('d', FF_left))
+    self.ArduinoSerialWrite(self.OP_CONF_FF,len,data)
+    
+  def speed(self, data) -> dict:
+    '''Parse speed from binary data'''
+    v_left, v_right = array.array('d', data[0:16])
+    return {
+      'v_left': v_left,
+      'v_right': v_right
+    }
+  def batteryStatus(self, data) -> dict:
+    pass
+  
 
   def parse(self, operation: int, data: bytes) -> dict:
     if operation not in self.parsers:
