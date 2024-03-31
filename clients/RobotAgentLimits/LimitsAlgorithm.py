@@ -70,6 +70,7 @@ class LimitsAlgorithm:
     
     def checkLimits(self,robotX,robotY,heading):
         d=0
+        self.newHeading = 0
         dx = math.cos(heading)
         if dx < 0.08 and dx > -0.08:
             dx = 0
@@ -197,7 +198,7 @@ class LimitsAlgorithm:
                 if d < self.minimumSafetyDistance:
                     self.newHeading = -(math.pi - abs(heading))
             else:
-                print('El robot no se está moviendo, O no se detecta')
+                print('The robot is not moving. or it is not detected')
         return self.newHeading
        
                   
