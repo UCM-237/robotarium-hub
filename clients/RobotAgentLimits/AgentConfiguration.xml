@@ -1,0 +1,27 @@
+<AgentConfiguration>
+    <AgentParameters>
+        <AgentId>1</AgentId>
+        <AgentName>RobotAgent1</AgentName>
+        <AgentType>Robot</AgentType>
+        <DeviceName>USB2.0-Serial</DeviceName>
+    </AgentParameters>
+    <CommunicationConfiguration>
+        <HubIp>192.168.1.109</HubIp>
+        <HubCmdPort>5555</HubCmdPort>
+        <HubDataPort>5556</HubDataPort>
+        <AgentIp>192.168.1.109</AgentIp>
+        <AgentCmdPort>5570</AgentCmdPort>
+        <AgentDataPort>5571</AgentDataPort>
+    </CommunicationConfiguration>
+    <RobotOperations>
+        <OP_MOVE_ROBOT>2</OP_MOVE_ROBOT>
+        <OP_STOP_ROBOT>3</OP_STOP_ROBOT>
+        <OP_TELEMETRY>4</OP_TELEMETRY>
+        <OP_TURN_ROBOT>5</OP_TURN_ROBOT>
+        <OP_SILENCE>6</OP_SILENCE>
+        <OP_POSITION>7</OP_POSITION>
+        <OP_CONF_PID>8</OP_CONF_PID>
+        <OP_CONF_FF>9</OP_CONF_FF>
+        <OP_DONE>10</OP_DONE>
+    </RobotOperations>
+</AgentConfiguration>

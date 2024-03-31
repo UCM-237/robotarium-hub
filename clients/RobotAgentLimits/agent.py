@@ -36,13 +36,13 @@ class Agent:
     self.hub_cmd_port = hub_cmd_port
     self.hub_data_port = hub_data_port
     context = zmq.Context()
-    # self.control = context.socket(zmq.REQ)
-    # self.data = context.socket(zmq.PUB)
-    # self.data.bind(f'tcp://*:{data_port}')
-    # self.hub_data = context.socket(zmq.SUB)
+    self.control = context.socket(zmq.REQ)
+    self.data = context.socket(zmq.PUB)
+    self.data.bind(f'tcp://*:{data_port}')
+    self.hub_data = context.socket(zmq.SUB)
     self.device = device_class(agent=self)
     self.device.connect()
-    # self.register()
+    self.register()
     
 
   def _get_data_url(self):
@@ -84,7 +84,7 @@ class Agent:
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
     logging.debug('Subscribing to control')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/RobotAgent1')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:

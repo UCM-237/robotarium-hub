@@ -10,15 +10,15 @@
 #include <unistd.h>
 #include "operation.h"
 const int MAXDATASIZE=255; // bytes
-const int HEADER_LEN =5; //bytes
+const int HEADER_LEN =sizeof(int)*5; //bytes
 
 
 struct appdata {
-  uint8_t InitFlag;
-  uint8_t id;
-  uint8_t op; //codigo de operacion
-  uint16_t len;                       /* longitud de datos */
-  uint8_t data [MAXDATASIZE-HEADER_LEN];//datos
+  int InitFlag;
+  int id;
+  int op; //codigo de operacion
+  int len;                       /* longitud de datos */
+  unsigned char data [MAXDATASIZE-HEADER_LEN];//datos
 };
 
 //Utilities
@@ -66,6 +66,14 @@ void longToBytes(long n, unsigned char *b)
 
     x.i = n;
     for(i=0 ; i<4 ; i++) b[i] = x.b[i];
+}
+int bytesToLong(unsigned char *b)
+{
+    int i;
+    mlong x;
+
+    for(i=0 ; i<4 ; i++) x.b[i] = b[i];
+    return(x.i);
 }
 void shortToBytes(short n, unsigned char *b)
 {

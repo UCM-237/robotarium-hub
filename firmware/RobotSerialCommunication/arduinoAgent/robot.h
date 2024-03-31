@@ -30,7 +30,7 @@ class robot
 
         double RobotWheelDiamter = 6.7;
         double RobotWheelRadius = 3.35;
-        double RobotDiameter = 9.5;
+        double RobotDiameter = 14.5;
         uint8_t robotID;
 
 
