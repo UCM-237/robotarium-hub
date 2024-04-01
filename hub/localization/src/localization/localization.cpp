@@ -112,9 +112,11 @@ int Localization::init(int argc,char **argv)
             
         } 
     }
-     this->in_video.set(cv::CAP_PROP_FPS,30.0);
-     this->in_video.set(cv::CAP_PROP_AUTOFOCUS,0);
-     this->in_video.set(cv::CAP_PROP_SETTINGS,1);
+    this->in_video.set(cv::CAP_PROP_FPS,30);
+    
+
+
+
 
     if (!parser.check()) {
         parser.printErrors();
@@ -129,7 +131,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -228,8 +230,25 @@ void Localization::FindRobot()
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f> > corners;
     std::vector<float> reprojectionError;
-   // pthread_create(&_detectAruco,NULL,AgentCommunication::sendArucoPosition,static_cast<void*>(this->agentCommunication));
+    cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
+// parameters->adaptiveThreshWinSizeMin = 3;
+// parameters->adaptiveThreshWinSizeMax = 23;
+// parameters->adaptiveThreshWinSizeStep = 10;
+// parameters->adaptiveThreshConstant = 7;
+// parameters->minMarkerPerimeterRate = 0.03;
+// parameters->maxMarkerPerimeterRate = 4.0;
+// parameters->polygonalApproxAccuracyRate = 0.03;
+// parameters->minCornerDistanceRate = 0.05;
+// parameters->minDistanceToBorder = 3;
+// parameters->cornerRefinementMethod = cv::aruco::CORNER_REFINE_CONTOUR;
+// parameters->minMarkerDistanceRate = 1; // Puede ajustarse según la distancia de los marcadores a la cámara
+// parameters->cornerRefinementWinSize = 5; // Tamaño de la ventana de refinamiento de esquinas
+// parameters->cornerRefinementMaxIterations = 30; // Número máximo de iteraciones de refinamiento de esquinas
+// parameters->cornerRefinementMinAccuracy = 0.01; // Precisión mínima de refinamiento de esquinas
+// parameters->detectInvertedMarker = true; // Permitir la detección de marcadores invertidos si es necesario
 
+    cv::Mat smoothed_image;
+    std::vector<std::vector<cv::Point2f>> rejected;
     while (this->in_video.grab())
     {
         this->rvecs.clear();
@@ -237,21 +256,26 @@ void Localization::FindRobot()
         this->in_video.retrieve(this->image);
         
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
+        cv::threshold(this->grayMat, this->binary_image, 100, 255, cv::THRESH_BINARY);
+
+        cv::GaussianBlur(this->binary_image, smoothed_image, cv::Size(5,5), 1.0); // Tamaño del kernel y desviación estándar
         this->image.copyTo(this->image_copy);
         
         //falta estimar la posicion de la camara con respecto a la arena
 
         
         
-        cv::aruco::detectMarkers(this->grayMat, this->dictionary, corners, ids);
+        //cv::aruco::detectMarkers(this->binary_image, this->dictionary, corners, ids);
+        cv::aruco::detectMarkers(smoothed_image, this->dictionary, corners, ids, parameters, rejected);
        
         // if at least one marker detected
         if (ids.size() > 0)
         {
-            cv::aruco::drawDetectedMarkers(this->image_copy, corners, ids);
+            cv::aruco::drawDetectedMarkers(smoothed_image, corners, ids);
             
-            MyestimatePoseSingleMarkers(corners, marker_length_m,
-                    camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+            // MyestimatePoseSingleMarkers(corners, marker_length_m,
+            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+            cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            
@@ -259,7 +283,7 @@ void Localization::FindRobot()
              
             for(long unsigned int i=0; i < ids.size(); i++)
             {
-                 cv::aruco::drawAxis(this->image_copy, this->camera_matrix, this->dist_coeffs,
+                 cv::aruco::drawAxis(smoothed_image, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
                 
                         
@@ -274,7 +298,8 @@ void Localization::FindRobot()
 
                // cout<<"data y "<<data.y<<endl;
                 this->data.id=ids.at(i);
-                
+                std::cout<<"data id "<<this->data.id<<std::endl;  
+                std::cout<<"data x "<<this->data.x<<std::endl;  
                 //arucoInfo.at(i)=data;
                 this->buffer->push(data);
                 // pthread_cond_signal(&listBlock);
@@ -284,8 +309,8 @@ void Localization::FindRobot()
             
         }
 
-      
-         imshow("Pose estimation", image_copy);
+         
+         imshow("Pose estimation", smoothed_image);
             char key = (char)cv::waitKey(1);
             if (key == 27)
                 break;

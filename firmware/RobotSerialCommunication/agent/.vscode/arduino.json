@@ -1,0 +1,4 @@
+{
+    "board": "arduino:samd:nano_33_iot",
+    "sketch": "agent_copy/agent_copy.ino"
+}

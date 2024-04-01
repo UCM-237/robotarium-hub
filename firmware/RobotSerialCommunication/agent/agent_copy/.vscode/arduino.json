@@ -1,0 +1,5 @@
+{
+    "board": "arduino:samd:nano_33_iot",
+    "sketch": "agent_copy.ino",
+    "port": "/dev/ttyACM0"
+}

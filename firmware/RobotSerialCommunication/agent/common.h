@@ -1,3 +1,4 @@
+#pragma once
 #include <math.h>
 #include <MeanFilterLib.h>
 #include <Arduino_LSM6DS3.h>
@@ -117,11 +118,11 @@ const int pinMotorD[3] = { pinENB, pinIN3, pinIN4 };
 
 //-----------------contador encoder------------------------------------------------------------------------------------
 const int             N=                  20;//Resolucion encoder       
-const int             encoderI =          2;//pin de entrada de encoder derecha
-const int             encoderD=           15;//pin de entrada de encoder izquierda
-volatile unsigned     encoder_countD=      0;//cuenta los pulsos de encoder derecha
-int                   encoder_countD_after=0;
-int                   encoder_countI_after=0;
+const int             encoderLeft =          2;//pin de entrada de encoder derecha
+const int             encoderRight=           15;//pin de entrada de encoder izquierda
+volatile unsigned     encoder_countRight=      0;//cuenta los pulsos de encoder derecha
+int                   encoder_countRight_after=0;
+int                   encoder_countLeft_after=0;
 int                   dif_encoderD=0;
 int                   dif_encoderI=0;
 volatile unsigned     encoder_countI=      0;//cuenta los pulsos de encoder izquierda
@@ -169,8 +170,8 @@ unsigned long         currentTimeI, previousTimeI=0;;
 double                elapsedTimeI;
 double                errorI=0, lastErrorI=0, cumErrorI=0, rateErrorI;
 // +++++++++++++++  ++++Constantes del controlador+++++++++++++++
-double                P_right=0.2, I_right=0.05, D_right = 0;/*KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;*/
-double                P_left=0.2, I_left=0.05, D_left=0;/*KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;*/
+double                kp_right=0.2, ki_right=0.05, kd_right = 0;/*KD_p=0.2, KD_i=0.05, KD_d=0;//    KD_p=0.1, KD_i=0.05, KD_d=0;*/
+double                kp_left=0.2, ki_left=0.05, kd_left=0;/*KI_p=0.2, KI_i=0.05, KI_d=0;//     KI_p=0.1, KI_i=0.05, KI_d=0;*/
 double                MAXCUMERROR = 5;
 //-------------------------GIROSCOPIO------------------------------------------------------------------------------------------------//
 float x, y, z;

@@ -69,7 +69,7 @@ class Robot:
     logging.info('Starting Arduino update thread')
     while True:
       try:
-        initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
+        initFlag = int.from_bytes(self.arduino.read(size=2), byteorder='little')
         if initFlag == self.INIT_FLAG:
 
             id = int.from_bytes(self.arduino.read(size=2), byteorder='little')
@@ -136,7 +136,7 @@ class Robot:
       self.exec(cmd, **params)
 
   def ArduinoSerialWrite(self,operation,len,data):
-    head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',AGENT_ID) + 
+    head = (struct.pack('H',self.INIT_FLAG) + struct.pack('H',int(AGENT_ID)) + 
                 struct.pack('H',operation) + struct.pack('H',len))
     message=head + data
     bytes_written= self.arduino.write(message)
@@ -153,6 +153,8 @@ if __name__ == "__main__":
     hub_cmd_port=HUB_CMD_PORT,
     hub_data_port=HUB_DATA_PORT,
   )
+  agent.device.on_data('control/2/move', '{"v_left": 1, "v_right": 1}')
+
   
   
   
