@@ -5,6 +5,7 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/core.hpp> //PREDEFINED_DICTIONARY
 #include <opencv2/highgui/highgui.hpp>  // Video write
+#include <opencv2/videoio/videoio_c.h> // Incluir el archivo de encabezado para las constantes de captura de video
 #include <zmqpp/zmqpp.hpp>
 #include <nlohmann/json.hpp>
 #include <memory>
@@ -75,7 +76,7 @@ class Localization
      cv::Mat binary_image;//for detect the arena 
      std::vector<cv::Vec3d> rvecs, tvecs;
     std::ostringstream vector_to_marker;
-
+    
     int arenaSize=30;//cm default value
     ArenaLimits RobotariumData;
     std::vector<cv::Scalar> cornerColors = {

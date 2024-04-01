@@ -17,11 +17,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '127.0.0.1'
-AGENT_CMD_PORT = 5563
-AGENT_DATA_PORT = 5564
+AGENT_IP = '192.168.1.109'
+AGENT_CMD_PORT = 5561
+AGENT_DATA_PORT = 5562
 # Where the server is 
-HUB_IP = '127.0.0.1'
+HUB_IP = '192.168.1.109'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -48,13 +48,12 @@ class rendevouz:
 
   def test(self):
     while(1):
-      self.agent.send('control/2/move',{'v_left':8.0,'v_right':8.0})
+      self.agent.send('control/RobotAgent1/turn', {'angle': 90})
       time.sleep(2)
-      self.agent.send('control/2/move',{'v_left':-1.0,'v_right':-1.0})
-      time.sleep(2)
+      
   def connect(self):
     logging.debug('starting device')
-    #self.thread = Thread(target=self.test).start()
+    self.thread = Thread(target=self.test).start()
     
   
   def rendevouz(self,agent)-> None:
@@ -180,11 +179,11 @@ class rendevouz:
     # if agent not in self.state:
     #   self.state[agent]={}
     # self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in self.Position and '2' in self.Position:
-      self.tval_before=time.time()*1000 
-      self.orientation('2')
-    if topic == "position":
-      self.Position[agent]=message
+    # if self.Meta in self.Position and '2' in self.Position:
+    #   self.tval_before=time.time()*1000 
+    #   self.orientation('2')
+    # if topic == "position":
+    #   self.Position[agent]=message
       
     
  

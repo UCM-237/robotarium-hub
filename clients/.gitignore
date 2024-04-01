@@ -1,4 +1,6 @@
 build/*
 CMakeFiles/cmake.check_cache
-*.vscode
+.vscode/*
 build/*
+*.json
+*.pyc
