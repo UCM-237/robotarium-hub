@@ -30,9 +30,9 @@ unsigned char packetBuffer[256]; //buffer to hold incoming packet
 
 //--------------------------------------------filtro de media movil simple para estabilizar la lectura de rad/s---------------------------------------
 
-MeanFilter<long> meanFilterRight(5);
-MeanFilter<long> meanFilterLeft(5);
-const double MAX_OPTIMAL_VEL=15;//rad/S
+MeanFilter<long> meanFilterRight(10);
+MeanFilter<long> meanFilterLeft(10);
+const double MAX_OPTIMAL_VEL=25;//rad/S
 
 
 
@@ -99,7 +99,6 @@ void setup() {
     Serial.begin(9600);
 
     //connect();
-    pinMode(led, OUTPUT); 
    DEBUG_PRINTLN("setup ok");
 }
 //define common variables
@@ -107,6 +106,7 @@ void setup() {
 int serialOperation = 0;
 bool sendDataSerial = false;
 bool serialCom = false;
+bool control = false;
 unsigned char *read_ptr; 
 unsigned long currentTime, timeAfter = 0;
 const unsigned long SAMPLINGTIME= 100;//ms
@@ -138,39 +138,45 @@ void loop() {
   // avoids being disconnected by the broker
 
   //mqttClient.poll();
+  int auxPWMD = 0, auxPWMI = 0;
+  double fD, fI;
+  timeStopD = timeStopI = millis();
+  //condition for know when the wheel is stoped
+  //se define un contador de tiempo para comprobar que las reudas estan paradas
+  deltaTimeStopD = timeStopD - timeAfterDebounceRight;
+  deltaTimeStopI = timeStopI - timeAfterDebounceLeft;
+  meanFilterRight.AddValue(deltaTimeRight);
+  meanFilterLeft.AddValue(deltaTimeLeft);
+  fI = deltaTimeStopI >= 100 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000;
+  fD = deltaTimeStopD >= 100 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) *1000;
+  DEBUG_PRINT("fI:");
+  DEBUG_PRINT(fI);
+  DEBUG_PRINT(" fD:");
+  DEBUG_PRINTLN(fD);
+  //condicion para que no supere linealidad y se sature.
+  //es un filtro para que no de valores ridiculos
+  if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
+  { 
+    wRight = 2*M_PI*fD; 
+  }
+  if(fI < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
+  { 
+    wLeft = 2*M_PI*fI; 
+  }
 
   if(currentTime - timeAfter >= SAMPLINGTIME) 
   {
-
-    int auxPWMD = 0, auxPWMI = 0;
-    double fD, fI;
-    timeStopD = timeStopI = millis();
-    //condition for know when the wheel is stoped
-    //se define un contador de tiempo para comprobar que las reudas estan paradas
-    deltaTimeStopD = timeStopD - timeAfterDebounceRight;
-    deltaTimeStopI = timeStopI - timeAfterDebounceLeft;
-    meanFilterRight.AddValue(deltaTimeRight);
-    meanFilterLeft.AddValue(deltaTimeLeft);
-    fI = deltaTimeStopI >= 200 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000000;
-    fD = deltaTimeStopD >= 200 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) * 1000000;
-    //condicion para que no supere linealidad y se sature.
-    //es un filtro para que no de valores ridiculos
-    if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
-    { 
-      wRight = 2*M_PI*fD; 
-    }
-    if(fI < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
-    { 
-      wLeft = 2*M_PI*fI; 
-    }
     //fin filtro
-
-    if(wRight !=0.0 && wheelControlerRight.getSetPoint() !=0.0) {   
-      PWM_Right = constrain(PWM_Right + wheelControlerRight.pid(wRight), MINPWM, MAXPWM);
+    if(control)
+    { 
+      if(wRight !=0.0 && wheelControlerRight.getSetPoint() !=0.0) {   
+        PWM_Right = constrain(PWM_Right + wheelControlerRight.pid(wRight), MINPWM, MAXPWM);
+      }
+      if(wLeft !=0.0 && wheelControlerLeft.getSetPoint() !=0.0) {
+        PWM_Left = constrain(PWM_Left + wheelControlerLeft.pid(wLeft), MINPWM, MAXPWM);
+      }
     }
-    if(wLeft !=0.0 && wheelControlerLeft.getSetPoint() !=0.0) {
-      PWM_Left = constrain(PWM_Left + wheelControlerLeft.pid(wLeft), MINPWM, MAXPWM);
-    }
+   
     //avoid send the same instruction
     if(auxPWMI != PWM_Left){
       // moveWheel(PWM_Left, setpointWLeft, pinMotorI, backI);
@@ -220,6 +226,9 @@ void do_operation(operation_t operation) {
     case OP_CONF_FF:
       op_conf_ff();
       break;
+    case OP_MOVE_WHEELS:
+      op_moveWheels();
+      break;
     default:
       op_error();
       break;
@@ -245,10 +254,21 @@ void op_saludo() {
 }
 
 void op_message() { }
-
+void op_moveWheels()
+{
+  DEBUG_PRINTLN("move Wheels");
+  int PWMRight = bytesToLong(&server_operation->data[0]);
+  int PWMLeft = bytesToLong(&server_operation->data[4]);
+  robot.moveLeftWheel(PWMLeft, 1, false);
+  robot.moveRightWheel(PWMRight, 1, false);
+  for(int i=0; i<10; i++)
+  {
+    meanFilterRight.AddValue(deltaTimeRight);
+    meanFilterLeft.AddValue(deltaTimeLeft);
+  }
+}
 void op_moveRobot() {
  DEBUG_PRINTLN("move");
-  digitalWrite(led, LOW);
   double setpointWRight = bytesToDouble(&server_operation->data[0]);
   double setpointWLeft = bytesToDouble(&server_operation->data[8]);
   DEBUG_PRINT("setpointWRight:");
@@ -292,7 +312,7 @@ void op_moveRobot() {
   robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
-  for(int i=0; i<5; i++)
+  for(int i=0; i<10; i++)
   {
     meanFilterRight.AddValue(deltaTimeRight);
     meanFilterLeft.AddValue(deltaTimeLeft);
@@ -323,18 +343,7 @@ void op_telemtry() {
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
   DEBUG_PRINTLN(wLeft);
-  /*if(backD) {
-    shortToBytes(a, &operation_send.data[16]);
-  }
-  if(backI) {
-    shortToBytes(a, &operation_send.data[18]);
-  }*/
   operation_send.len = (int)sizeof(double)*2;
-  /*Serial.println(operation_send.op);
-  Serial.println(wRight);
-  Serial.print("len \t");F
-  Serial.println(operation_send.len);*/
-  //Serial.println(operation_send.InitFlag);
   Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,4);
   Serial1.write((char*)&operation_send.op, 4);
@@ -467,7 +476,7 @@ void isrRight() {
   deltaDebounceRight = timeBeforeDebounceRight - timeAfterDebounceRight;// tiempo que ha pasdo entre interrupcion e interrupcion
   if(deltaDebounceRight > TIMEDEBOUNCE) {//condicion para evitar rebotes
     //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeRight=micros();
+    startTimeRight=millis();
     encoder_countRight++;
     if(encoder_countRight == MAX_ENCODER_STEPS)
     {
@@ -475,9 +484,9 @@ void isrRight() {
     }
     deltaTimeRight = startTimeRight - timeAfterRight;
       
-    timeAfterRight = micros();
+    timeAfterRight = startTimeRight;
   }
-  timeAfterDebounceRight = millis();  
+  timeAfterDebounceRight = timeBeforeDebounceRight;  
 }
 
 void isrLeft() {
@@ -485,7 +494,7 @@ void isrLeft() {
   deltaDebounceLeft = timeBeforeDebounceLeft - timeAfterDebounceLeft;// tiempo que ha pasdo entre interrupcion e interrupcion
   if(deltaDebounceLeft > TIMEDEBOUNCE) {//condicion para evitar rebotes
     //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeLeft = micros();
+    startTimeLeft = millis();
     encoder_countLeft++;//se cuenta los pasos de encoder
     if(encoder_countLeft == MAX_ENCODER_STEPS)
     {
@@ -493,9 +502,9 @@ void isrLeft() {
     
     }
     deltaTimeLeft = startTimeLeft - timeAfterLeft;
-    timeAfterLeft = micros();
+    timeAfterLeft = startTimeLeft;
   }
-  timeAfterDebounceLeft = millis();
+  timeAfterDebounceLeft = timeBeforeDebounceLeft;
 }
 
 
