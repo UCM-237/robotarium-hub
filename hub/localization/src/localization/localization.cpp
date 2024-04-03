@@ -273,9 +273,9 @@ void Localization::FindRobot()
         {
             cv::aruco::drawDetectedMarkers(smoothed_image, corners, ids);
             
-            // MyestimatePoseSingleMarkers(corners, marker_length_m,
-            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
-            cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
+            MyestimatePoseSingleMarkers(corners, marker_length_m,
+                    camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+            //cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            

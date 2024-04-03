@@ -212,7 +212,7 @@ void *AgentCommunication::listenSocket(void *This)
             text.erase(0, pos + delimiter.length());
             if (text == "RobotariumData")
             {
-                std::cout<<"Requested RObotarium Data"<<std::endl;
+                std::cout<<"Requested Robotarium Data"<<std::endl;
                 agent->requestRobotariumData = true;
             }
         }
