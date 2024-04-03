@@ -14,6 +14,7 @@ typedef enum Operation{
   OP_CONF_PID   = 8,
   OP_CONF_FF    =9,//FeedForward
   OP_DONE       = 10,
+  OP_MOVE_WHEELS = 11
 }operation_t;
 
 
