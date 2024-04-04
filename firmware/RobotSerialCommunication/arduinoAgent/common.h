@@ -125,7 +125,7 @@ bool backD=false,backI=false;
 
 //------------------------debounce-----------------------------------------------------------------------------------
 //Se usara para evitar que cuenten pulsos debido a rebotes o ruido del sistema.
-unsigned long              TIMEDEBOUNCE        =15; //(ms) es el tiempo minimo entre pulsos
+unsigned long              TIMEDEBOUNCE        =10; //(ms) es el tiempo minimo entre pulsos
 volatile unsigned long timeAfterDebounceRight= 0;
 volatile unsigned long timeBeforeDebounceRight=0;
 volatile unsigned long deltaDebounceRight=     0;

@@ -39,6 +39,7 @@ class Robot:
   OP_CONF_PID = 8
   OP_CONF_FF = 9
   OP_DONE = 10
+  OP_MOVE_WHEELS = 11
   INIT_FLAG = 112
   connected: bool = False
   arduino: Serial = None
@@ -63,7 +64,8 @@ class Robot:
       'SILENCE': { 'id': self.OP_SILENCE, 'method': self.silenceCommunication },
       'POSITION': { 'id': self.OP_POSITION, 'method': self.RequestPosition },
       'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
-      'FF' : { 'id': self.OP_CONF_FF,  'method' : self.conf_FF }
+      'FF' : { 'id': self.OP_CONF_FF,  'method' : self.conf_FF },
+      'MOVE_WHEELS' : { 'id': self.OP_MOVE_WHEELS,  'method' : self.move_wheels }
       }
     self.LimitsAlgorithm = LimitsAlgorithm.LimitsAlgorithm()
     self.Position={}
@@ -141,8 +143,9 @@ class Robot:
           else:
             measurement = self.parse(operation, data)
             logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-            data={'data','AGENT_ID'}
-            self.agent.send_measurement(measurement)
+            data={'telemetry','AGENT_ID'}
+            topic = 'telemetry'
+            self.agent.send_measurement(topic,measurement)
           
       except (ValueError, TypeError) as e:
         
@@ -159,7 +162,7 @@ class Robot:
     
     #take the arenaLimits
     while(self.agentParameters['AgentId'] not in self.Position or self.ArenaLimitsReceived == False):
-      self.agent.send("localization/RobotariumData","")
+     # self.agent.send("localization/RobotariumData","")
       time.sleep(1)
     #First check the arena limits
     while(True):
@@ -190,40 +193,45 @@ class Robot:
           
   def move_robot(self, v_left, v_right) -> None:
     '''Set the wheels' speed setpoint'''
-    lent=16#bytes
+    len=16#bytes
     data=( struct.pack('<dd', v_left,v_right))
-    self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,lent,data)
+    self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,len,data)
 
-  
-  def stop_robot(self) -> None:
+  def move_wheels(self,pwm_left, pwm_right) -> None:
+    '''Set the wheels' speed setpoint'''
+    len=8
+    data=(struct.pack('i', pwm_left) + struct.pack('i', pwm_right))
+    self.ArduinoSerialWrite(self.OP_MOVE_WHEELS,len,data)
+    
+  def stop_robot(self,op) -> None:
     '''Stop the robot'''
-    lent=0
+    len=0
     data=(struct.pack('i', 0) + struct.pack('i', 0))
-    self.ArduinoSerialWrite(self.OP_STOP_ROBOT,lent,data)
-  def request_telemetry(self) -> None:
+    self.ArduinoSerialWrite(self.OP_STOP_ROBOT,len,data)
+  def request_telemetry(self,op) -> None:
     '''Request telemetry data'''
-    lent=0
+    len=0
     data=(struct.pack('i', 0))
-    self.ArduinoSerialWrite(self.OP_TELEMETRY,lent,data)
+    self.ArduinoSerialWrite(self.OP_TELEMETRY,len,data)
     
   def turn_robot(self, angle) -> None:
     '''Turn the robot a given angle'''
     #for easy implementation, the angle can be only 90, 180, 270, 360
-    lent=4
+    len=4
     data=(struct.pack('i', angle))
-    self.ArduinoSerialWrite(self.OP_TURN_ROBOT,lent,data)
+    self.ArduinoSerialWrite(self.OP_TURN_ROBOT,len,data)
     
     
-  def silenceCommunication(self) -> None:
+  def silenceCommunication(self,op) -> None:
     '''Stop the communication with the robot'''
-    lent=0
+    len=0
     data=()
-    self.ArduinoSerialWrite(self.OP_SILENCE,lent,data)
-  def RequestPosition(self) -> None:
+    self.ArduinoSerialWrite(self.OP_SILENCE,len,data)
+  def RequestPosition(self,op) -> None:
     '''Request the position of the robot'''
-    lent=0
+    len=0
     data=()
-    self.ArduinoSerialWrite(self.OP_POSITION,lent,data)
+    self.ArduinoSerialWrite(self.OP_POSITION,len,data)
   def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
     len=48#bytes
@@ -244,8 +252,8 @@ class Robot:
     '''Parse speed from binary data'''
     v_left, v_right = array.array('d', data[0:16])
     return {
-      'v_left': v_left,
-      'v_right': v_right
+      'w_left': v_left,
+      'w_right': v_right
     }
   def batteryStatus(self, data) -> dict:
     pass
@@ -325,6 +333,8 @@ if __name__ == "__main__":
     hub_cmd_port = robot.communicationParameters['HubCmdPort'],
     hub_data_port = robot.communicationParameters['HubDataPort'],
   )
+  #agent.device.on_data('control/RobotAgent1/telemetry', '{}')
+  
   # agent = Agent(
   #   device_class=robot,
   #   id=AGENT_ID,
@@ -335,6 +345,5 @@ if __name__ == "__main__":
   #   hub_cmd_port=HUB_CMD_PORT,
   #   hub_data_port=HUB_DATA_PORT,
   # )
-  #agent.device.on_data('control/RobotAgent1/telemetry', '{}')
   
   
