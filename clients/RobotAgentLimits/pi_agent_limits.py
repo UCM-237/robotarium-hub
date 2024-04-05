@@ -107,6 +107,8 @@ class Robot:
     
   def connect(self) -> None:
     '''Open a new connection with an Arduino Board.'''
+    self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
+        
     ports = list_ports.comports()
     for p in ports:
       try:
@@ -115,7 +117,6 @@ class Robot:
         self.arduino = serial_for_url(p.device, baudrate=9600, timeout=5, write_timeout=5)
         self.Arduinothread = Thread(target=self.update).start()
         self.connected = True
-        self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
         
         break
       except:
@@ -162,29 +163,30 @@ class Robot:
     
     #take the arenaLimits
     while(self.agentParameters['AgentId'] not in self.Position or self.ArenaLimitsReceived == False):
-     # self.agent.send("localization/RobotariumData","")
+      self.agent.send("localization/RobotariumData","")
       time.sleep(1)
     #First check the arena limits
     while(True):
-      robotData = json.loads(self.position[self.agentParameters['AgentId']])
-      self.position.pop(self.agentParameters['AgentId'])
-      robotX = float(robotData["x"])
-      robotY = float(robotData["y"])
-      heading = -float(robotData["yaw"])
-      newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
-      if newHeading != 0:
-        #stop control communications
-        self.IgnoreControlCommunication = True
-        #stop command of moving the robot
-        self.move_robot(0,0)
-        self.operationFromRobotDone.wait(timeout=0.3)
-        if self.operationFromRobotDone.is_set():
-          self.operationFromRobotDone.clear()
-        #wait for op_done
-        self.turn_robot(newHeading)
-        self.operationFromRobotDone.wait()
-      else:
-        self.IgnoreControlCommunication = False
+      if len(self.Position)>0:
+        robotData = json.loads(self.Position[self.agentParameters['AgentId']])
+        self.Position.pop(self.agentParameters['AgentId'])
+        robotX = float(robotData["x"])
+        robotY = float(robotData["y"])
+        heading = -float(robotData["yaw"])
+        newHeading = round(self.LimitsAlgorithm.checkLimits(robotX,robotY,heading))
+        if newHeading != 0:
+          #stop control communications
+          self.IgnoreControlCommunication = True
+          #stop command of moving the robot
+          self.move_robot(0,0)
+          self.operationFromRobotDone.wait(timeout=0.3)
+          if self.operationFromRobotDone.is_set():
+            self.operationFromRobotDone.clear()
+          #wait for op_done
+          self.turn_robot(180)
+          self.operationFromRobotDone.wait()
+        else:
+          self.IgnoreControlCommunication = False
         
       
 
@@ -274,7 +276,7 @@ class Robot:
 
 
   def on_data(self, topic: str, message: str) -> None:
-    print(f'{topic} {message}')
+    #print(f'{topic} {message}')
     if topic.startswith('control/') and self.IgnoreControlCommunication == False:
       cmd = topic[len(f'control/{self.AgentName}')+1:].upper()
       params = json.loads(message)
@@ -282,11 +284,11 @@ class Robot:
     else:
       _, agent, topic = topic.split('/')
       if topic== "position":
-        if int(agent)==int(self.AgentName):
+        if int(agent)==int(self.agentParameters["AgentId"]):
           self.Position[agent]= message
       elif topic == "ArenaSize":
         self.ArenaLimitsReceived = True
-        self.LimitsAlgorithm.setArenaSize(json.loads(message))
+        self.LimitsAlgorithm.addLimits(json.loads(message))
                
        
   def angularWheelSpeed(self, w_wheel, velocity_robot):
