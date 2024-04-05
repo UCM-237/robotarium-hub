@@ -131,7 +131,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -159,7 +159,7 @@ bool Localization::FindArena()
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
         this->image.copyTo(this->image_copy);
         //Finding the contours of the arena
-        cv::threshold(this->grayMat,this->binary_image,200,255,cv::CHAIN_APPROX_NONE);
+        cv::threshold(this->grayMat,this->binary_image,110,255,cv::CHAIN_APPROX_NONE);
 
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(binary_image,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
@@ -205,8 +205,9 @@ bool Localization::FindArena()
                 this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
                 this->RobotariumData.y.push_back(this->tvecs[0][1]-this->weightArenaLength/2);
 
-               // agentCommunication->setRobotariumData(RobotariumData);
+                //agentCommunication->setRobotariumData(RobotariumData);
                 ArenaFound=true;
+                std::cout<<"ARENA FOUND"<<std::endl;
                 for (long unsigned int i = 0; i < rvecs.size(); ++i) {
                     auto rvec = rvecs[i];
                     auto tvec = tvecs[i];
@@ -256,9 +257,9 @@ void Localization::FindRobot()
         this->in_video.retrieve(this->image);
         
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
-        cv::threshold(this->grayMat, this->binary_image, 100, 255, cv::THRESH_BINARY);
+        cv::threshold(this->grayMat, this->binary_image, 50, 255, cv::THRESH_BINARY);
 
-        cv::GaussianBlur(this->binary_image, smoothed_image, cv::Size(5,5), 1.0); // Tamaño del kernel y desviación estándar
+        cv::GaussianBlur(this->grayMat, smoothed_image, cv::Size(5,5), 0.8); // Tamaño del kernel y desviación estándar
         this->image.copyTo(this->image_copy);
         
         //falta estimar la posicion de la camara con respecto a la arena
@@ -364,7 +365,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
     objPoints.push_back(cv::Point3f(0,-weightLength,0));
         cv::Mat rvec, tvec;
         
-        if ((corners.size() >= 4 && corners.size() < 5) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
+        if ((corners.size() == 4) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
         {
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
