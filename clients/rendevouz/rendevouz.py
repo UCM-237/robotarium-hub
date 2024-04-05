@@ -18,11 +18,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '192.168.1.109'
-AGENT_CMD_PORT = 5561
-AGENT_DATA_PORT = 5562
+AGENT_IP = '192.168.10.1'
+AGENT_CMD_PORT = 5581
+AGENT_DATA_PORT = 5582
 # Where the server is 
-HUB_IP = '192.168.1.109'
+HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -48,9 +48,15 @@ class rendevouz:
         [-self.L/(2*self.R), 1/self.R]]
 
   def test(self):
+    w=0
+    vel=8*3.35
+    velocity_robot=[w,vel]
+    angularWheel = [0.0, 0.0]
     while(1):
-      self.agent.send('control/RobotAgent1/turn', {'angle': 90})
-      time.sleep(2)
+      
+      self.angularWheelSpeed(angularWheel,velocity_robot)
+      self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+      time.sleep(1)
       
   def connect(self):
     logging.debug('starting device')
@@ -177,14 +183,14 @@ class rendevouz:
     except:
       print("invalid message")
       return
-    if agent not in self.state:
-      self.state[agent]={}
-    self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in self.Position and '2' in self.Position:
-      self.tval_before=time.time()*1000 
-      self.orientation('2')
-    if topic == "position":
-      self.Position[agent]=message
+    # if agent not in self.state:
+    #   self.state[agent]={}
+    # self.state[agent][topic] = ast.literal_eval(message)
+    # if self.Meta in self.Position and '2' in self.Position:
+    #   self.tval_before=time.time()*1000 
+    #   self.orientation('2')
+    # if topic == "position":
+    #   self.Position[agent]=message
       
     
  

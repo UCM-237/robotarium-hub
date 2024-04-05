@@ -1,15 +1,15 @@
 <AgentConfiguration>
     <AgentParameters>
-        <AgentId>1</AgentId>
+        <AgentId>0</AgentId>
         <AgentName>RobotAgent1</AgentName>
         <AgentType>Robot</AgentType>
         <DeviceName>USB2.0-Serial</DeviceName>
     </AgentParameters>
     <CommunicationConfiguration>
-        <HubIp>192.168.1.109</HubIp>
+        <HubIp>192.168.10.1</HubIp>
         <HubCmdPort>5555</HubCmdPort>
         <HubDataPort>5556</HubDataPort>
-        <AgentIp>192.168.1.109</AgentIp>
+        <AgentIp>192.168.10.1</AgentIp>
         <AgentCmdPort>5570</AgentCmdPort>
         <AgentDataPort>5571</AgentDataPort>
     </CommunicationConfiguration>
