@@ -11,12 +11,12 @@ int main(int argc,char **argv)
     localization->setRingBuffer(buffer);
     if(localization->init(argc,argv))
     {
-        // // if(localization->FindArena())
-        // // {
-        //     agentCommunication->setRobotariumData(localization->getRobotariumData());
-        //     agentCommunication->registerAgent();
+        if(localization->FindArena())
+        {
+            agentCommunication->setRobotariumData(localization->getRobotariumData());
+            agentCommunication->registerAgent();
 
-        // //}
+        }
         localization->FindRobot();
     }
 

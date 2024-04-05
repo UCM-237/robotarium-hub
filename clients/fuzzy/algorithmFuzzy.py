@@ -48,9 +48,9 @@ class Algorithm:
 
     self.AngleError = ctrl.Antecedent(np.arange(-self.PI/2, self.PI/2, 0.1), 'AngleError')
     self.AngleError['bigNegative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/2,-self.PI/4])
-    self.AngleError['negative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/4,-0.65])
+    self.AngleError['negative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/4,-0.2])
     self.AngleError['zero'] = fuzz.trimf(self.AngleError.universe, [-0.65,0,0.65,])
-    self.AngleError['positive'] = fuzz.trimf(self.AngleError.universe, [0.65, self.PI/4, self.PI/2])
+    self.AngleError['positive'] = fuzz.trimf(self.AngleError.universe, [0.2, self.PI/4, self.PI/2])
     self.AngleError['bigPositive'] = fuzz.trimf(self.AngleError.universe, [self.PI/4, self.PI/2, self.PI/2])
 
     self.W = ctrl.Consequent(np.arange(-self.PI, self.PI, 0.01), 'W')
@@ -70,12 +70,7 @@ class Algorithm:
 
     self.W_ctrl = ctrl.ControlSystem([self.rule1, self.rule2, self.rule3,self.rule4,self.rule5])
     self.heading=ctrl.ControlSystemSimulation(self.W_ctrl)
-  def test(self):
-    while(1):
-      self.agent.send('control/2/move',{'v_left':8.0,'v_right':8.0})
-      time.sleep(2)
-      self.agent.send('control/2/move',{'v_left':-1.0,'v_right':-1.0})
-      time.sleep(2)
+
   def connect(self):
     logging.debug('starting device')
     #self.thread = Thread(target=self.test).start()
@@ -177,12 +172,6 @@ class Algorithm:
 
 
 if __name__ == "__main__":
-  # algortihm=Algorithm()
-  # w=0
-  # velocity_robot=[w,6*3.35]
-  # angularWheel=[0,0]
-  # algortihm.angularWheelSpeed(angularWheel,velocity_robot)
-  # print(angularWheel)
   agent = Agent(
     device_class=Algorithm,
     id=AGENT_ID,

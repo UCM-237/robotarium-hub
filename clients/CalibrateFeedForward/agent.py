@@ -98,12 +98,12 @@ class Agent:
     self.data.send_json(data)
 
 
-  def send_measurement(self, topic,data) -> None:
+  def send_measurement(self, data) -> None:
     '''Send a new measurement'''
     payload ={self.id:data}
     self.data.send_string('data', flags=zmq.SNDMORE)
     self.data.send_json({
-      'topic': 'telemetry',
+      'topic': 'measurement',
        'payload':payload,
       'timestamp': 1000*time.time(),
     })
