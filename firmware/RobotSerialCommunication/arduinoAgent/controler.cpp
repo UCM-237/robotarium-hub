@@ -19,7 +19,7 @@ int controler::pid(double w)
 {   
     int output;
     this->currentTime= millis();
-    this->elapsedTime = (double)(currentTime - previousTime);
+    this->elapsedTime = (double)(100);
     this->error = this->setPoint - w;
     double aux = abs(this->error);
     if(aux>=0.3)
@@ -50,7 +50,7 @@ void controler::setFeedForwardParam(double A, double B)
 
 int controler::feedForward()
 {
-    this->PWM = (this->setPoint !=0.0)? constrain(round((this->setPoint - feedForwardParam_A)/feedForwardParam_B), MINPWM, MAXPWM) : 0;
+    this->PWM = (this->setPoint !=0.0)? constrain(round((this->setPoint-this->feedForwardParam_B)/this->feedForwardParam_A), MINPWM, MAXPWM) : 0;
     return this->PWM;
 }
 

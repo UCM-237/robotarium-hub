@@ -250,7 +250,7 @@ class Robot:
     
   def speed(self, data) -> dict:
     '''Parse speed from binary data'''
-    v_left, v_right = array.array('d', data[0:16])
+    v_left, v_right,pwm_left,pwm_right = array.array('di', data[0:24])
     return {
       'w_left': v_left,
       'w_right': v_right
