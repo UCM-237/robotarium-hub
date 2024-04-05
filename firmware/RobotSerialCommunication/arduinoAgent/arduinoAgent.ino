@@ -90,10 +90,10 @@ void setup() {
     // Se empieza con los motores parados
     robot.fullStop();
   
-    wheelControlerRight.setControlerParam(0.2, 0.05, 0.009);
-    wheelControlerRight.setFeedForwardParam(0.0825,0.707);
-    wheelControlerLeft.setControlerParam(0.2, 0.05, 0.009);
-    wheelControlerLeft.setFeedForwardParam(1.656,0.072);
+    wheelControlerRight.setControlerParam(0.009, 0.002, 0.0001);
+    wheelControlerRight.setFeedForwardParam(0.0895,-5.424);
+    wheelControlerLeft.setControlerParam(0.009, 0.002, 0.0001);
+    wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin
     Serial.begin(9600);
@@ -106,7 +106,7 @@ void setup() {
 int serialOperation = 0;
 bool sendDataSerial = false;
 bool serialCom = false;
-bool control = false;
+bool control = true;
 unsigned char *read_ptr; 
 unsigned long currentTime, timeAfter = 0;
 const unsigned long SAMPLINGTIME= 100;//ms
@@ -149,10 +149,10 @@ void loop() {
   meanFilterLeft.AddValue(deltaTimeLeft);
   fI = deltaTimeStopI >= 100 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000;
   fD = deltaTimeStopD >= 100 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) *1000;
-  DEBUG_PRINT("fI:");
-  DEBUG_PRINT(fI);
-  DEBUG_PRINT(" fD:");
-  DEBUG_PRINTLN(fD);
+  // DEBUG_PRINT("fI:");
+  // DEBUG_PRINT(fI);
+  // DEBUG_PRINT(" fD:");
+  // DEBUG_PRINTLN(fD);
   //condicion para que no supere linealidad y se sature.
   //es un filtro para que no de valores ridiculos
   if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
@@ -175,6 +175,14 @@ void loop() {
       if(wLeft !=0.0 && wheelControlerLeft.getSetPoint() !=0.0) {
         PWM_Left = constrain(PWM_Left + wheelControlerLeft.pid(wLeft), MINPWM, MAXPWM);
       }
+      DEBUG_PRINT("PWM_Left:");
+      DEBUG_PRINT(PWM_Left);
+      DEBUG_PRINT(" PWM_Right:");
+      DEBUG_PRINTLN(PWM_Right);
+      DEBUG_PRINT("wRight:");
+      DEBUG_PRINT(wRight);
+      DEBUG_PRINT(" wLeft:");
+      DEBUG_PRINTLN(wLeft);
     }
    
     //avoid send the same instruction
@@ -336,14 +344,16 @@ void op_telemtry() {
   operation_send.id=robot.getRobotID();
   operation_send.op =(int)OP_TELEMETRY;
   short int a=1;
-  doubleToBytes(wRight, &operation_send.data[0]);
-  doubleToBytes(wLeft, &operation_send.data[8]);
+  doubleToBytes(wLeft, &operation_send.data[0]);
+  doubleToBytes(wRight, &operation_send.data[8]);
+  longToBytes(PWM_Left, &operation_send.data[16]);
+  longToBytes(PWM_Right, &operation_send.data[20]);
   DEBUG_PRINT("vel robot--->");
   DEBUG_PRINT(" wRight:");
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
   DEBUG_PRINTLN(wLeft);
-  operation_send.len = (int)sizeof(double)*2;
+  operation_send.len = (int)sizeof(double)*2+sizeof(int)*2;  /* len */
   Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,4);
   Serial1.write((char*)&operation_send.op, 4);

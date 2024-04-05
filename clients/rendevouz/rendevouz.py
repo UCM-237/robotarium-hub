@@ -48,9 +48,16 @@ class rendevouz:
         [-self.L/(2*self.R), 1/self.R]]
 
   def test(self):
+    vel=10*3.35
+    angularWheel = [0.0, 0.0]
+    w=0
+    self.agent.send('control/RobotAgent1/telemetry', {'op': 11})
+    
     while(1):
-      self.agent.send('control/RobotAgent1/turn', {'angle': 90})
-      time.sleep(2)
+      velocity_robot=[w,vel]
+      self.angularWheelSpeed(angularWheel,velocity_robot)
+      self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+      time.sleep(20)
       
   def connect(self):
     logging.debug('starting device')
