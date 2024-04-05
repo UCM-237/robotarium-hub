@@ -11,6 +11,7 @@ import json
 
 
 from agent import Agent
+import ast
 
 # Configure logs
 logging.basicConfig(level=logging.INFO)
@@ -176,14 +177,14 @@ class rendevouz:
     except:
       print("invalid message")
       return
-    # if agent not in self.state:
-    #   self.state[agent]={}
-    # self.state[agent][topic] = ast.literal_eval(message)
-    # if self.Meta in self.Position and '2' in self.Position:
-    #   self.tval_before=time.time()*1000 
-    #   self.orientation('2')
-    # if topic == "position":
-    #   self.Position[agent]=message
+    if agent not in self.state:
+      self.state[agent]={}
+    self.state[agent][topic] = ast.literal_eval(message)
+    if self.Meta in self.Position and '2' in self.Position:
+      self.tval_before=time.time()*1000 
+      self.orientation('2')
+    if topic == "position":
+      self.Position[agent]=message
       
     
  
