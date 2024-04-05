@@ -117,9 +117,9 @@ class CalibrateFeedForward:
       self.linearRegressionLeft.addData(pwmLeft, velocityData["w_left"])
       
 
-      pwmLeft += 2
-      pwmRight += 2
-      if pwmLeft > 160 or pwmRight > 160:
+      pwmLeft += 5
+      pwmRight += 5
+      if pwmLeft > 255 or pwmRight > 255:
         self.move_wheels(0, 0)
         break
       

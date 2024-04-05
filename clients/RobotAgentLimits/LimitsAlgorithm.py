@@ -12,8 +12,8 @@ class LimitsAlgorithm:
         self.newHeading = 0
         self.segmentOfTheRectangle = []
         self.minimumSafetyDistance = 10
-        self.x=[]
-        self.y=[]
+        self.x=[None]*5
+        self.y=[None]*5
 
     def addLimits(self,limits):
         
