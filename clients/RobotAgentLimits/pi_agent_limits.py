@@ -107,7 +107,7 @@ class Robot:
     
   def connect(self) -> None:
     '''Open a new connection with an Arduino Board.'''
-    self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
+    #self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
         
     ports = list_ports.comports()
     for p in ports:
@@ -227,13 +227,14 @@ class Robot:
   def silenceCommunication(self,op) -> None:
     '''Stop the communication with the robot'''
     len=0
-    data=()
+    data=(struct.pack('i', 0))
     self.ArduinoSerialWrite(self.OP_SILENCE,len,data)
   def RequestPosition(self,op) -> None:
     '''Request the position of the robot'''
     len=0
     data=()
     self.ArduinoSerialWrite(self.OP_POSITION,len,data)
+    
   def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
     len=48#bytes
@@ -252,10 +253,16 @@ class Robot:
     
   def speed(self, data) -> dict:
     '''Parse speed from binary data'''
-    v_left, v_right,pwm_left,pwm_right = array.array('di', data[0:24])
+     # Definir el formato de deserialización
+    fmt = 'ddii'  # dos valores double (d), seguidos de dos enteros (i)
+
+    # Deserializar los datos usando struct.unpack
+    v_left, v_right, pwm_left, pwm_right = struct.unpack(fmt, data)
     return {
       'w_left': v_left,
-      'w_right': v_right
+      'w_right': v_right,
+      'pwm_left': pwm_left,
+      'pwm_right': pwm_right
     }
   def batteryStatus(self, data) -> dict:
     pass

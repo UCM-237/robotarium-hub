@@ -22,7 +22,7 @@ int controler::pid(double w)
     this->elapsedTime = (double)(100);
     this->error = this->setPoint - w;
     double aux = abs(this->error);
-    if(aux>=0.3)
+    if(aux>=0.5)
     {
         this->cumError +=this->error*this->elapsedTime;
         if(this->lastError>0 && this->error<0)
