@@ -18,11 +18,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '192.168.10.1'
+AGENT_IP = '192.168.1.109'
 AGENT_CMD_PORT = 5581
 AGENT_DATA_PORT = 5582
 # Where the server is 
-HUB_IP = '192.168.10.1'
+HUB_IP = '192.168.1.109'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -54,11 +54,17 @@ class rendevouz:
     self.agent.send('control/RobotAgent1/telemetry', {'op': 11})
     
     while(1):
+      vel=10*3.35
       velocity_robot=[w,vel]
       self.angularWheelSpeed(angularWheel,velocity_robot)
       self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-      time.sleep(20)
-      
+      time.sleep(5)
+      vel=0
+      velocity_robot=[w,vel]
+      self.angularWheelSpeed(angularWheel,velocity_robot)
+      self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+      self.agent.send('control/RobotAgent1/silence', {'op': 6})
+      time.sleep(100)
   def connect(self):
     logging.debug('starting device')
     self.thread = Thread(target=self.test).start()

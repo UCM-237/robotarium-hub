@@ -90,9 +90,9 @@ void setup() {
     // Se empieza con los motores parados
     robot.fullStop();
   
-    wheelControlerRight.setControlerParam(0.009, 0.002, 0.0001);
+    wheelControlerRight.setControlerParam(0.1, 0.0, 0.0);
     wheelControlerRight.setFeedForwardParam(0.0895,-5.424);
-    wheelControlerLeft.setControlerParam(0.009, 0.002, 0.0001);
+    wheelControlerLeft.setControlerParam(0.1, 0.0, 0.0);
     wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin
@@ -104,7 +104,7 @@ void setup() {
 //define common variables
 //TODO: Refactor
 int serialOperation = 0;
-bool sendDataSerial = false;
+static bool sendDataSerial = false;
 bool serialCom = false;
 bool control = true;
 unsigned char *read_ptr; 
@@ -226,7 +226,7 @@ void do_operation(operation_t operation) {
       op_turn_robot();
       break;
     case OP_SILENCE:
-      op_silense();
+      op_silence();
       break;
     case OP_CONF_PID:
       op_conf_pid();
@@ -382,7 +382,7 @@ void op_turn_robot()
   robot.fullStop();
   op_done();
 }
-inline void op_silense()
+inline void op_silence()
 {
   DEBUG_PRINT("op silense:");
   DEBUG_PRINTLN(OP_SILENCE);
