@@ -60,10 +60,10 @@ class Localization
     cv::String videoInput2 = "0";
     int frame_width, frame_height;
 	int frame_width_2,frame_height_2;
-
+    std::vector<std::vector<cv::Point>> filteredContours;
     float marker_length_m=0;
     float baseArenaLength=0;
-    float weightArenaLength=0;
+    float heightArenaLength=0;
     double ang_roll = 0;
 	double ang_pitch = 0;
 	double ang_yaw = 0;

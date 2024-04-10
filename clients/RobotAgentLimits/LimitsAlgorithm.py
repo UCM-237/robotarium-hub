@@ -11,7 +11,7 @@ class LimitsAlgorithm:
         self.ArenaLimits = {}
         self.newHeading = 0
         self.segmentOfTheRectangle = []
-        self.minimumSafetyDistance = 10
+        self.minimumSafetyDistance = 0.2
         self.x=[None]*5
         self.y=[None]*5
 
@@ -30,13 +30,13 @@ class LimitsAlgorithm:
         
     def computeSegments(self):
 
-        segmentOfTheRectangle =[                                  #S1       
+        segmentOfTheRectangle =[                                                                #S1       
             segment([self.x[1],self.y[1]],[self.x[2],self.y[2]]),#segment 1              -------------------
             segment((self.x[2],self.y[2]),[self.x[3],self.y[3]]),#segment 2              |                 |         
             segment([self.x[3],self.y[3]],[self.x[4],self.y[4]]),#segment 3          s4  |                 | #s2
             segment([self.x[4],self.y[4]],[self.x[1],self.y[1]])  #segment 4             |                 |
-                                                            #------------------- 
-        ]             
+                                                                                         #------------------- 
+]                                                                                               #s3
         return segmentOfTheRectangle
     
     def distance(self,x, y, seg):
@@ -100,10 +100,10 @@ class LimitsAlgorithm:
                     print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the left")          
             elif dy < 0:
                 print('The robot is moving to the lower right corner.')
-                if self.x[2] < robotX and self.y[2] < robotY:
+                if self.x[3] < robotX and self.y[3] < robotY:
                     print('The robot will move to the lower right corner of the rectangle.')
-                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
-                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
                     #take the minimum distance
                     d = min(d1, d2)
                     if d<self.minimumSafetyDistance:
@@ -134,7 +134,7 @@ class LimitsAlgorithm:
         elif dx < 0:
             if dy > 0:
                 print('The robot is moving to the upper left corner.')
-                if self.x[1] > robotX and self.y[2] > robotY:
+                if self.x[1] > robotX and self.y[1] > robotY:
                     print('The robot will move to the upper left corner of the rectangle.')
                     #in this case compare with 2 segments
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
@@ -151,10 +151,10 @@ class LimitsAlgorithm:
                     print("probably collision with the wall at left.TODO: STOP THE ROBOT and turn it to the right")
             elif dy < 0:
                 print('The robot is moving to the lower left corner.')
-                if self.x[1] > robotX and self.y[1] < robotY:
+                if self.x[4] > robotX and self.y[4] < robotY:
                     print('El robot se dirigirá hacia la esquina inferior izquierda del rectángulo.')
                     #in this case compare with 2 segments
-                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
                     #take the minimum distance
                     d = min(d1, d2)
