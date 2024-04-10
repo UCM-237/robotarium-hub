@@ -40,34 +40,66 @@ class LimitsAlgorithm:
         return segmentOfTheRectangle
     
     def distance(self,x, y, seg):
-        # Project the point onto the line that defines the segment (dot product)
-        proy = np.dot(seg.pf - seg.pi, np.array([x, y]) - seg.pi) / np.linalg.norm(seg.pf - seg.pi)
-        
-        # Position of the closest point with respect to pf
-        L = np.linalg.norm(seg.pf - seg.pi)  # Length of the segment
-        pc=0#define pc
-        # There are three cases:
-        if proy <= 0:
-            # A) The projected distance is negative, meaning the closest point to the line
-            # is outside the segment and the closest point on the segment is pi
-            pc = seg.pi
-        elif proy >= L:
-            # B) In this case, the closest point to the line
-            # is outside the segment and the closest point on the segment is pf
-            pc = seg.pf
-        else:
-            # C) The closest point to the line is within the segment (default case). First, find the closest point
-            pc = seg.pi + proy * (seg.pf - seg.pi) / np.linalg.norm(seg.pf - seg.pi)
-        
-        # Now compute the distance
-        d = np.linalg.norm(np.array([x, y]) - pc)
-        
-        # Avoid singularity
-        if d < 5:
-            d = 5
-        
-        return d
     
+        if x==seg.pi[0] and y == seg.pi[1]:
+            return 0
+        elif x == seg.pf[0] and y == seg.pi[1]:
+            return 0
+        P=np.array([x,y])
+        line = [seg.pi, seg.pf]
+        d=self.point_to_line_dist(P,line)
+        return d
+    def point_to_line_dist(self,point, line):
+        """Calculate the distance between a point and a line segment.
+
+        To calculate the closest distance to a line segment, we first need to check
+        if the point projects onto the line segment.  If it does, then we calculate
+        the orthogonal distance from the point to the line.
+        If the point does not project to the line segment, we calculate the 
+        distance to both endpoints and take the shortest distance.
+
+        :param point: Numpy array of form [x,y], describing the point.
+        :type point: numpy.core.multiarray.ndarray
+        :param line: list of endpoint arrays of form [P1, P2]
+        :type line: list of numpy.core.multiarray.ndarray
+        :return: The minimum distance to a point.
+        :rtype: float
+        """
+        # unit vector
+        unit_line = line[1] - line[0]
+        norm_unit_line = unit_line / np.linalg.norm(unit_line)
+
+        # compute the perpendicular distance to the theoretical infinite line
+        segment_dist = (
+            np.linalg.norm(np.cross(line[1] - line[0], line[0] - point)) /
+            np.linalg.norm(unit_line)
+        )
+
+        diff = (
+            (norm_unit_line[0] * (point[0] - line[0][0])) + 
+            (norm_unit_line[1] * (point[1] - line[0][1]))
+        )
+
+        x_seg = (norm_unit_line[0] * diff) + line[0][0]
+        y_seg = (norm_unit_line[1] * diff) + line[0][1]
+
+        endpoint_dist = min(
+            np.linalg.norm(line[0] - point),
+            np.linalg.norm(line[1] - point)
+        )
+
+        # decide if the intersection point falls on the line segment
+        lp1_x = line[0][0]  # line point 1 x
+        lp1_y = line[0][1]  # line point 1 y
+        lp2_x = line[1][0]  # line point 2 x
+        lp2_y = line[1][1]  # line point 2 y
+        is_betw_x = lp1_x <= x_seg <= lp2_x or lp2_x <= x_seg <= lp1_x
+        is_betw_y = lp1_y <= y_seg <= lp2_y or lp2_y <= y_seg <= lp1_y
+        if is_betw_x and is_betw_y:
+            return segment_dist
+        else:
+            # if not, then return the minimum distance to the segment endpoints
+            return endpoint_dist
     def checkLimits(self,robotX,robotY,heading):
         d=0
         self.newHeading = 0
