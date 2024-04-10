@@ -7,9 +7,9 @@
 #include <pthread.h>
 #include "common.h"
 using json = nlohmann::json;
-static const std::string PUBLISH_ENDPOINT = "tcp://192.168.10.1:5557";
-static const std::string SUBSCRIBE_ENDPOINT = "tcp://192.168.10.1:5556";
-static const std::string HUB_IP = "192.168.10.1";//"127.0.0.1";
+static const std::string PUBLISH_ENDPOINT = "tcp://192.168.1.109:5557";
+static const std::string SUBSCRIBE_ENDPOINT = "tcp://192.168.1.109:5556";
+static const std::string HUB_IP = "192.168.1.109";//"127.0.0.1";
 class AgentCommunication
 {
     public:

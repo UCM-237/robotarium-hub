@@ -107,7 +107,7 @@ class Robot:
     
   def connect(self) -> None:
     '''Open a new connection with an Arduino Board.'''
-    #self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
+    self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
         
     ports = list_ports.comports()
     for p in ports:
@@ -170,8 +170,8 @@ class Robot:
       if len(self.Position)>0:
         robotData = json.loads(self.Position[self.agentParameters['AgentId']])
         self.Position.pop(self.agentParameters['AgentId'])
-        robotX = float(robotData["x"])
-        robotY = float(robotData["y"])
+        robotX = -float(robotData["x"])
+        robotY = -float(robotData["y"])
         heading = -float(robotData["yaw"])
         newHeading = round(self.LimitsAlgorithm.checkLimits(robotX,robotY,heading))
         if newHeading != 0:
