@@ -23,7 +23,7 @@ class controler
         int            PWM;
         double feedForwardParam_A;
         double feedForwardParam_B;
-        const double maxIntegralError=5;
+        double maxIntegralError=14;
         
 
 };

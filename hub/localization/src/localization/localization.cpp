@@ -151,7 +151,7 @@ bool Localization::FindArena()
     bool ArenaFound=false;
     std::vector<float> reprojectionError;
     cv::Scalar color(0,0,255);
-    while (this->in_video.grab()&& ArenaFound==false)
+    while (this->in_video.grab())//&& ArenaFound==false)
     {
         this->filteredContours.clear();
         this->rvecs.clear();
@@ -165,7 +165,7 @@ bool Localization::FindArena()
         // Aplicar un desenfoque para reducir el ruido
         GaussianBlur(this->grayMat, this->grayMat, cv::Size(5, 5), 0);
         // Detectar bordes usando el algoritmo de Canny
-        cv::Canny(this->grayMat, this->grayMat, 100, 250);
+        cv::Canny(this->grayMat, this->grayMat, 50, 255);
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
         
@@ -177,7 +177,7 @@ bool Localization::FindArena()
                
             
              std::vector<cv::Point> approx;
-            cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
+            cv::approxPolyDP(contour, approx, 0.03 * cv::arcLength(contour, true), true);
 
             if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
                 this->filteredContours.push_back(approx);
@@ -317,6 +317,7 @@ cv::Scalar color(0,0,255);
                 std::cout<<"data id "<<this->data.id<<std::endl;  
                 std::cout<<"data x "<<this->data.x<<std::endl;  
                 std::cout<<"data y "<<this->data.y<<std::endl;
+                std::cout<<"data yaw "<<this->data.yaw<<std::endl;
                 //arucoInfo.at(i)=data;
                 this->buffer->push(data);
                 // pthread_cond_signal(&listBlock);

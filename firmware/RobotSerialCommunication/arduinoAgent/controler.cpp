@@ -2,6 +2,7 @@
 
 controler::controler()
 {
+    maxIntegralError = 14;
 }
 
 controler::~controler()
@@ -17,14 +18,15 @@ void controler::setControlerParam(double kp, double ki, double kd)
 
 int controler::pid(double w)
 {   
-    int output;
+    int output=0;
     this->currentTime= millis();
-    this->elapsedTime = (double)(100);
+    this->elapsedTime = (double)(0.01);
     this->error = this->setPoint - w;
     double aux = abs(this->error);
-    if(aux>=0.5)
+    if(aux>=0.3)
     {
         this->cumError +=this->error*this->elapsedTime;
+        
         if(this->lastError>0 && this->error<0)
         {
             this->cumError = this->error*this->elapsedTime;
@@ -35,10 +37,15 @@ int controler::pid(double w)
         }
         constrain(this->cumError, -maxIntegralError,maxIntegralError);
         this->rateError = (this->error - this->lastError)/this->elapsedTime;
-        output = static_cast<int>(round(this->kp*this->error + this->ki*this->cumError + this->kd*this->rateError));
+        output = (int)(round(this->kp*this->error + this->ki*this->cumError)); //+ this->kd*this->rateError));
         this->lastError = this->error;
     }
     this->previousTime = this->currentTime;
+    Serial.print("error: ");
+    Serial.println(this->error);
+    Serial.print("cumError: ");
+    Serial.println(this->cumError);
+    Serial.println(output);
     return output;
 }
 
