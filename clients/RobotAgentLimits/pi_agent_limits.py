@@ -13,6 +13,8 @@ import OrientationControl
 from agent import Agent
 import time
 import xml.etree.ElementTree as ET
+PI = 3.14159
+
 
 # Configure logs
 logging.basicConfig(level=logging.INFO)
@@ -166,6 +168,7 @@ class Robot:
       self.agent.send("localization/RobotariumData","")
       time.sleep(1)
     #First check the arena limits
+    negativeAngle = False
     while(True):
       if len(self.Position)>0:
         robotData = json.loads(self.Position[self.agentParameters['AgentId']])
@@ -173,7 +176,17 @@ class Robot:
         robotX = -float(robotData["x"])
         robotY = -float(robotData["y"])
         heading = -float(robotData["yaw"])
-        newHeading = round(self.LimitsAlgorithm.checkLimits(robotX,robotY,heading))
+        if heading < 0:
+          heading = 2*PI + heading
+        newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
+        angleError = round((newHeading - heading)*180/PI)
+        if abs(angleError) > 180:
+          angleError = 360 - abs(angleError) # turn shorter way
+          
+        if heading > 3*PI/2 and newHeading < PI/2:
+          angleError = -angleError#turn right
+        if heading < PI/2 and newHeading > 3*PI/2:
+          angleError = -angleError
         if newHeading != 0:
           #stop control communications
           self.IgnoreControlCommunication = True
@@ -183,7 +196,7 @@ class Robot:
           if self.operationFromRobotDone.is_set():
             self.operationFromRobotDone.clear()
           #wait for op_done
-          self.turn_robot(180)
+          self.turn_robot(angleError)
           self.operationFromRobotDone.wait()
         else:
           self.IgnoreControlCommunication = False

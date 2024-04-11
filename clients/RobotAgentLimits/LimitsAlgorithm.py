@@ -11,7 +11,7 @@ class LimitsAlgorithm:
         self.ArenaLimits = {}
         self.newHeading = 0
         self.segmentOfTheRectangle = []
-        self.minimumSafetyDistance = 0.2
+        self.minimumSafetyDistance = 0.25
         self.x=[None]*5
         self.y=[None]*5
 
@@ -117,15 +117,15 @@ class LimitsAlgorithm:
                 if self.x[2] < robotX and self.y[2] > robotY:
                     print('The robot will move to the upper right corner of the rectangle.')
                     # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
-                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
-                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
+                    d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
+                    d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
                     #take the minimum distance
                     d = min(d1, d2)
                     if d<self.minimumSafetyDistance:
                         if d == d1:
-                            self.newHeading=-heading
+                            self.newHeading= 2*math.pi - heading
                         else:
-                            self.newHeading = -(math.pi - abs(heading))
+                            self.newHeading = 2*math.pi - heading 
                             
                 else:
                     #stop the robot
@@ -140,9 +140,9 @@ class LimitsAlgorithm:
                     d = min(d1, d2)
                     if d<self.minimumSafetyDistance:
                         if d == d1:
-                            self.newHeading = -(math.pi - abs(heading))
+                            self.newHeading = 2*math.pi - heading 
                         else:
-                            self.newHeading = -heading   
+                            self.newHeading = 6*math.pi - math.pi - 2*heading 
                 else:
                     #stop the robot
                     print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the right")
@@ -175,9 +175,9 @@ class LimitsAlgorithm:
                     d = min(d1, d2)
                     if d<self.minimumSafetyDistance:
                         if d == d1:
-                            self.newHeading = -heading
+                            self.newHeading = 2*math.pi - heading
                         else:
-                            self.newHeading = -(math.pi - abs(heading))
+                            self.newHeading = math.pi - heading
                 else:
                     #stop the robot
                     print("probably collision with the wall at left.TODO: STOP THE ROBOT and turn it to the right")
@@ -194,7 +194,9 @@ class LimitsAlgorithm:
                         if d == d1:
                             self.newHeading = -(math.pi - abs(heading))
                         else:
-                            self.newHeading = -heading
+                            beta2 = 3*math.pi/2 -heading
+                            theta2 = math.pi/2 - beta2
+                            self.newHeading = 2*math.pi - theta2
                 else:
                     #stop the robot
                     print("probably collision with the wall at left. TODO: STOP THE ROBOT and turn it to the right")
@@ -212,7 +214,7 @@ class LimitsAlgorithm:
                         if d == d1:
                             self.newHeading = -(math.pi - abs(heading))
                         elif d == d2:
-                            self.newHeading = -heading
+                            self.newHeading = 0
                         else:
                             self.newHeading = -(math.pi - abs(heading))
                 else:
