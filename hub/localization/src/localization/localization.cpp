@@ -151,7 +151,7 @@ bool Localization::FindArena()
     bool ArenaFound=false;
     std::vector<float> reprojectionError;
     cv::Scalar color(0,0,255);
-    while (this->in_video.grab())//&& ArenaFound==false)
+    while (this->in_video.grab()&& ArenaFound==false)
     {
         this->filteredContours.clear();
         this->rvecs.clear();
@@ -196,9 +196,11 @@ bool Localization::FindArena()
             for( long unsigned int i=0;i<this->filteredContours.size();i++){
                 cv::approxPolyDP(this->filteredContours[i], approxCurve, 0.04 * cv::arcLength(this->filteredContours[i], true), true);
                 cv::drawContours(this->image,this->filteredContours,i,color,2);
-                for (size_t j = 0; j < approxCurve.size(); ++j) {
-                    cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
-                }
+                //draw first corner
+                cv::circle(this->image, approxCurve[2], 5, this->cornerColors[3], -1);
+                // for (size_t j = 0; j < approxCurve.size(); ++j) {
+                //     cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
+                // }
             }
             std::cout<<"Estimating Arena Position"<<std::endl;
             if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->heightArenaLength, this->rvecs, this->tvecs))
@@ -213,14 +215,14 @@ bool Localization::FindArena()
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
                 // this->RobotariumData.y.push_back(this->tvecs[0][1]-this->heightArenaLength/2);
                
-                this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]);
                 this->RobotariumData.x.push_back(this->tvecs[0][0]);
                 this->RobotariumData.y.push_back(this->tvecs[0][1]);
+                this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength);
+                this->RobotariumData.y.push_back(this->tvecs[0][1]);
+                this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength);
+                this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength);
                 this->RobotariumData.x.push_back(this->tvecs[0][0]);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]-this->heightArenaLength);
-                this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]-this->heightArenaLength);
+                this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength);
                 //agentCommunication->setRobotariumData(RobotariumData);
                 ArenaFound=true;
                 std::cout<<"ARENA FOUND"<<std::endl;
@@ -382,17 +384,22 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
     // objPoints.push_back(cv::Point3f(baseLength/2,-heightLength/2,0));
     // objPoints.push_back(cv::Point3f(-baseLength/2,-heightLength/2,0));
 
-    objPoints.push_back(cv::Point3f(0,-heightLength,0));
-    objPoints.push_back(cv::Point3f(0,0,0));
+     objPoints.push_back(cv::Point3f(0,0,0));
     objPoints.push_back(cv::Point3f(baseLength,0,0));
-    objPoints.push_back(cv::Point3f(baseLength,-heightLength,0));
+    objPoints.push_back(cv::Point3f(baseLength,heightLength,0));
+    objPoints.push_back(cv::Point3f(0,heightLength,0));
         
         
         if ((corners.size() == 4) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
         {
+            std::vector<cv::Point2f> cornersNuevo;
+            cornersNuevo.push_back(corners[1]);
+            cornersNuevo.push_back(corners[0]);
+            cornersNuevo.push_back(corners[3]);
+            cornersNuevo.push_back(corners[2]);
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
-            cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_ITERATIVE );
+            cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_DLS);
             //cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
             std::cout<< "tvec: "<<tvec<<std::endl;
             rvecs.push_back(rvec);
