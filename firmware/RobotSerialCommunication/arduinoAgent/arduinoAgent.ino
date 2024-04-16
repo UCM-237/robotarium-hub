@@ -9,7 +9,7 @@
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
 // Define a macro for debug printing
-#define DEBUG_ENABLED  // Comment out this line to disable debug prints
+//#define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
 #ifdef DEBUG_ENABLED
 #define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
@@ -32,7 +32,7 @@ unsigned char packetBuffer[256]; //buffer to hold incoming packet
 
 MeanFilter<long> meanFilterRight(10);
 MeanFilter<long> meanFilterLeft(10);
-const double MAX_OPTIMAL_VEL=25;//rad/S
+const double MAX_OPTIMAL_VEL=20;//rad/S
 
 
 
@@ -90,10 +90,10 @@ void setup() {
     // Se empieza con los motores parados
     robot.fullStop();
   
-    wheelControlerRight.setControlerParam(0.2, 0.05, 0.009);
-    wheelControlerRight.setFeedForwardParam(0.0825,0.707);
-    wheelControlerLeft.setControlerParam(0.2, 0.05, 0.009);
-    wheelControlerLeft.setFeedForwardParam(1.656,0.072);
+    wheelControlerRight.setControlerParam(0.15, 0.01, 0.0);
+    wheelControlerRight.setFeedForwardParam(0.0895,-5.424);
+    wheelControlerLeft.setControlerParam(0.15, 0.01, 0.0);
+    wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin
     Serial.begin(9600);
@@ -104,12 +104,12 @@ void setup() {
 //define common variables
 //TODO: Refactor
 int serialOperation = 0;
-bool sendDataSerial = false;
+static bool sendDataSerial = false;
 bool serialCom = false;
-bool control = false;
+bool control = true;
 unsigned char *read_ptr; 
 unsigned long currentTime, timeAfter = 0;
-const unsigned long SAMPLINGTIME= 100;//ms
+const unsigned long SAMPLINGTIME= 10;//ms
 double wLeft,wRight; // measured angular velocity
 
 const int INIT_FLAG = 112;
@@ -123,9 +123,9 @@ void loop() {
     // Serial.println(server_operation->InitFlag);
     if (server_operation->InitFlag == INIT_FLAG)
     {
-      DEBUG_PRINT("operationFlag: \t");
+     DEBUG_PRINT("operationFlag: \t");
      DEBUG_PRINTLN(server_operation->InitFlag);
-      DEBUG_PRINT("operation: \t");
+     DEBUG_PRINT("operation: \t");
      DEBUG_PRINTLN(server_operation->op);
 
       do_operation((operation_t)server_operation->op);
@@ -147,33 +147,52 @@ void loop() {
   deltaTimeStopI = timeStopI - timeAfterDebounceLeft;
   meanFilterRight.AddValue(deltaTimeRight);
   meanFilterLeft.AddValue(deltaTimeLeft);
-  fI = deltaTimeStopI >= 100 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000;
-  fD = deltaTimeStopD >= 100 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) *1000;
-  DEBUG_PRINT("fI:");
-  DEBUG_PRINT(fI);
-  DEBUG_PRINT(" fD:");
-  DEBUG_PRINTLN(fD);
-  //condicion para que no supere linealidad y se sature.
-  //es un filtro para que no de valores ridiculos
-  if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
-  { 
-    wRight = 2*M_PI*fD; 
-  }
-  if(fI < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
-  { 
-    wLeft = 2*M_PI*fI; 
-  }
+  
 
   if(currentTime - timeAfter >= SAMPLINGTIME) 
   {
+    fI = deltaTimeStopI >= 100 ? 0 : (double)1 / (meanFilterLeft.GetFiltered() * MAX_ENCODER_STEPS) * 1000;
+    fD = deltaTimeStopD >= 100 ? 0 : (double)1 / (meanFilterRight.GetFiltered() * MAX_ENCODER_STEPS) *1000;
+    // DEBUG_PRINT("fI:");
+    // DEBUG_PRINT(fI);
+    // DEBUG_PRINT(" fD:");
+    // DEBUG_PRINTLN(fD);
+    //condicion para que no supere linealidad y se sature.
+    //es un filtro para que no de valores ridiculos
+    if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
+    { 
+      wRight = 2*M_PI*fD; 
+    }
+    if(fI < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
+    { 
+      wLeft = 2*M_PI*fI; 
+    }
     //fin filtro
     if(control)
     { 
+      
       if(wRight !=0.0 && wheelControlerRight.getSetPoint() !=0.0) {   
-        PWM_Right = constrain(PWM_Right + wheelControlerRight.pid(wRight), MINPWM, MAXPWM);
+        int controllerValue =  wheelControlerRight.pid(wRight);
+        PWM_Right = constrain(PWM_Right +controllerValue, MINPWM, MAXPWM);
       }
       if(wLeft !=0.0 && wheelControlerLeft.getSetPoint() !=0.0) {
-        PWM_Left = constrain(PWM_Left + wheelControlerLeft.pid(wLeft), MINPWM, MAXPWM);
+        int controllerValue = wheelControlerLeft.pid(wLeft);
+        PWM_Left = constrain(PWM_Left +controllerValue , MINPWM, MAXPWM);
+      }
+      // DEBUG_PRINT("PWM_Left:");
+      // DEBUG_PRINT(PWM_Left);
+      // DEBUG_PRINT(" PWM_Right:");
+      // DEBUG_PRINTLN(PWM_Right);
+      if(wRight >0){
+      DEBUG_PRINT("wRight:");
+      DEBUG_PRINT(wRight);
+      DEBUG_PRINT(" wLeft:");
+      DEBUG_PRINTLN(wLeft);
+      
+      Serial.print("wRight:");
+      Serial.print(wRight);
+      Serial.print(" wLeft:");
+      Serial.println(wLeft);
       }
     }
    
@@ -218,7 +237,7 @@ void do_operation(operation_t operation) {
       op_turn_robot();
       break;
     case OP_SILENCE:
-      op_silense();
+      op_silence();
       break;
     case OP_CONF_PID:
       op_conf_pid();
@@ -336,14 +355,16 @@ void op_telemtry() {
   operation_send.id=robot.getRobotID();
   operation_send.op =(int)OP_TELEMETRY;
   short int a=1;
-  doubleToBytes(wRight, &operation_send.data[0]);
-  doubleToBytes(wLeft, &operation_send.data[8]);
+  doubleToBytes(wLeft, &operation_send.data[0]);
+  doubleToBytes(wRight, &operation_send.data[8]);
+  longToBytes(PWM_Left, &operation_send.data[16]);
+  longToBytes(PWM_Right, &operation_send.data[20]);
   DEBUG_PRINT("vel robot--->");
   DEBUG_PRINT(" wRight:");
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
   DEBUG_PRINTLN(wLeft);
-  operation_send.len = (int)sizeof(double)*2;
+  operation_send.len = (int)sizeof(double)*2+sizeof(int)*2;  /* len */
   Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,4);
   Serial1.write((char*)&operation_send.op, 4);
@@ -356,7 +377,9 @@ void op_turn_robot()
 {
   DEBUG_PRINT("op turn:");
   DEBUG_PRINTLN(OP_TURN_ROBOT);
+  bool turnRight;
   int angle = bytesToLong(&server_operation->data[0]);
+  //If angle is negative, turn right else turn left
   double angleInRad = ((double)angle)*M_PI/180;
   double angleToTurn = angleInRad*(robot.getRobotDiameter())/2;
   //Reset the encoder count
@@ -366,13 +389,21 @@ void op_turn_robot()
   int targetEncoderCount = int(angleToTurn/(2*M_PI*robot.getRobotWheelRadius())*MAX_ENCODER_STEPS);
   while (encoder_countRight < targetEncoderCount && encoder_countLeft < targetEncoderCount)
   {
-    robot.moveLeftWheel(MINPWM, 1, false);
-    robot.moveRightWheel(MINPWM, -1, true);
+    if(angle<0)
+    {
+      robot.moveLeftWheel(MINPWM, 1, false);
+      robot.moveRightWheel(MINPWM, 1, true);
+    }
+    else
+    {
+      robot.moveLeftWheel(MINPWM, 1, true);
+      robot.moveRightWheel(MINPWM, 1, false);
+    }
   }
   robot.fullStop();
   op_done();
 }
-inline void op_silense()
+inline void op_silence()
 {
   DEBUG_PRINT("op silense:");
   DEBUG_PRINTLN(OP_SILENCE);
