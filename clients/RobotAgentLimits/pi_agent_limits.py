@@ -13,6 +13,8 @@ import OrientationControl
 from agent import Agent
 import time
 import xml.etree.ElementTree as ET
+PI = 3.14159
+
 
 # Configure logs
 logging.basicConfig(level=logging.INFO)
@@ -166,14 +168,25 @@ class Robot:
       self.agent.send("localization/RobotariumData","")
       time.sleep(1)
     #First check the arena limits
+    negativeAngle = False
     while(True):
       if len(self.Position)>0:
         robotData = json.loads(self.Position[self.agentParameters['AgentId']])
         self.Position.pop(self.agentParameters['AgentId'])
-        robotX = float(robotData["x"])
-        robotY = float(robotData["y"])
+        robotX = -float(robotData["x"])
+        robotY = -float(robotData["y"])
         heading = -float(robotData["yaw"])
-        newHeading = round(self.LimitsAlgorithm.checkLimits(robotX,robotY,heading))
+        if heading < 0:
+          heading = 2*PI + heading
+        newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
+        angleError = round((newHeading - heading)*180/PI)
+        if abs(angleError) > 180:
+          angleError = 360 - abs(angleError) # turn shorter way
+          
+        if heading > 3*PI/2 and newHeading < PI/2:
+          angleError = -angleError#turn right
+        if heading < PI/2 and newHeading > 3*PI/2:
+          angleError = -angleError
         if newHeading != 0:
           #stop control communications
           self.IgnoreControlCommunication = True
@@ -183,7 +196,7 @@ class Robot:
           if self.operationFromRobotDone.is_set():
             self.operationFromRobotDone.clear()
           #wait for op_done
-          self.turn_robot(180)
+          self.turn_robot(angleError)
           self.operationFromRobotDone.wait()
         else:
           self.IgnoreControlCommunication = False
@@ -227,13 +240,14 @@ class Robot:
   def silenceCommunication(self,op) -> None:
     '''Stop the communication with the robot'''
     len=0
-    data=()
+    data=(struct.pack('i', 0))
     self.ArduinoSerialWrite(self.OP_SILENCE,len,data)
   def RequestPosition(self,op) -> None:
     '''Request the position of the robot'''
     len=0
     data=()
     self.ArduinoSerialWrite(self.OP_POSITION,len,data)
+    
   def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
 
     len=48#bytes
@@ -252,10 +266,16 @@ class Robot:
     
   def speed(self, data) -> dict:
     '''Parse speed from binary data'''
-    v_left, v_right = array.array('d', data[0:16])
+     # Definir el formato de deserialización
+    fmt = 'ddii'  # dos valores double (d), seguidos de dos enteros (i)
+
+    # Deserializar los datos usando struct.unpack
+    v_left, v_right, pwm_left, pwm_right = struct.unpack(fmt, data)
     return {
       'w_left': v_left,
-      'w_right': v_right
+      'w_right': v_right,
+      'pwm_left': pwm_left,
+      'pwm_right': pwm_right
     }
   def batteryStatus(self, data) -> dict:
     pass
