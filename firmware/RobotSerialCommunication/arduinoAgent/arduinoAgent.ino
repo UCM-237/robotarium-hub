@@ -9,7 +9,7 @@
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
 // Define a macro for debug printing
-//#define DEBUG_ENABLED  // Comment out this line to disable debug prints
+#define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
 #ifdef DEBUG_ENABLED
 #define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
@@ -379,6 +379,17 @@ void op_turn_robot()
   DEBUG_PRINTLN(OP_TURN_ROBOT);
   bool turnRight;
   int angle = bytesToLong(&server_operation->data[0]);
+  DEBUG_PRINT("angle:");
+  DEBUG_PRINTLN(angle);
+  if(angle<0)
+  {
+    turnRight = true;
+    angle = angle*(-1);
+  }
+  else
+  {
+    turnRight = false;
+  }
   //If angle is negative, turn right else turn left
   double angleInRad = ((double)angle)*M_PI/180;
   double angleToTurn = angleInRad*(robot.getRobotDiameter())/2;
@@ -389,7 +400,7 @@ void op_turn_robot()
   int targetEncoderCount = int(angleToTurn/(2*M_PI*robot.getRobotWheelRadius())*MAX_ENCODER_STEPS);
   while (encoder_countRight < targetEncoderCount && encoder_countLeft < targetEncoderCount)
   {
-    if(angle<0)
+    if(turnRight<0)
     {
       robot.moveLeftWheel(MINPWM, 1, false);
       robot.moveRightWheel(MINPWM, 1, true);
