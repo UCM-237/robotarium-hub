@@ -36,11 +36,17 @@ class RealTimePlotter:
     self.hub_data = context.socket(zmq.SUB)
     #for plot 
     self.robotData = {}
+    self.positions = {}
+    self.robot_positions ={}
     self.plot_thread = threading.Thread(target=self.listen)
     self.exit_event = threading.Event()
     # Crear la figura y los ejes una vez al inicio
     self.fig, self.axs = plt.subplots(2, figsize=(8, 6))
-
+    # Crear la figura y los ejes para los gráficos de las ruedas
+    self.fig_wheel, self.axs_wheel = plt.subplots(2, figsize=(8, 6))
+    
+    # Crear la figura y los ejes para las posiciones de los robots
+    self.fig_positions, self.axs_positions = plt.subplots(figsize=(8, 6))
   def _get_data_url(self):
     return f'tcp://{self.ip}:{self.data_port}'
 
@@ -101,23 +107,53 @@ class RealTimePlotter:
     
     for i, (robot_name, data) in enumerate(self.robotData.items(), start=1):
       
-      self.axs[0].scatter(data['times'], data['w_left_values'], label='w_left')
+      self.axs_wheel[0].scatter(data['times'], data['w_left_values'], label='w_left')
       #self.axs[0].scatter(data['times'], data['pwm_left_values'], label='pwm_left')
-      self.axs[0].set_xlabel('Tiempo')
-      self.axs[0].set_ylabel('Valor')
-      self.axs[0].set_title(robot_name + " - Left Wheel")
-      self.axs[0].legend()
-      self.axs[0].grid()
+      self.axs_wheel[0].set_xlabel('Tiempo')
+      self.axs_wheel[0].set_ylabel('Valor')
+      self.axs_wheel[0].set_title(robot_name + " - Left Wheel")
+      self.axs_wheel[0].legend()
+      self.axs_wheel[0].grid()
 
-      self.axs[1].scatter(data['times'], data['w_right_values'], label='w_right')
+      self.axs_wheel[1].scatter(data['times'], data['w_right_values'], label='w_right')
       #self.axs[1].scatter(data['times'], data['pwm_right_values'], label='pwm_right')
-      self.axs[1].set_xlabel('Tiempo')
-      self.axs[1].set_ylabel('Valor')
-      self.axs[1].set_title(robot_name + " - Right wheel")
-      self.axs[1].legend()
-      self.axs[1].grid()
+      self.axs_wheel[1].set_xlabel('Tiempo')
+      self.axs_wheel[1].set_ylabel('Valor')
+      self.axs_wheel[1].set_title(robot_name + " - Right wheel")
+      self.axs_wheel[1].legend()
+      self.axs_wheel[1].grid()
       plt.tight_layout()
       plt.pause(0.01)  # Pausa para actualizar la gráfica
+      
+    for robot_id, position_data in self.positions.items():
+      # Convertir las coordenadas x e y a números flotantes
+      x_position = float(position_data['x'])
+      y_position = float(position_data['y'])
+      
+      # Agregar la posición a la lista correspondiente en el diccionario de posiciones
+      if robot_id not in self.robot_positions:
+          self.robot_positions[robot_id] = {'x': [], 'y': []}
+      self.robot_positions[robot_id]['x'].append(x_position)
+      self.robot_positions[robot_id]['y'].append(y_position)
+        
+    # Limpiar los ejes de las posiciones de los robots antes de actualizar los datos
+    self.axs_positions.cla()
+    
+    # Actualizar los datos de las posiciones de los robots
+    for robot_id, position_data in self.robot_positions.items():
+        x_positions = position_data['x']
+        y_positions = position_data['y']
+        self.axs_positions.scatter(x_positions, y_positions, label=robot_id)
+    
+    # Configurar etiquetas y título
+    self.axs_positions.set_xlabel('X')
+    self.axs_positions.set_ylabel('Y')
+    self.axs_positions.set_title('Posiciones de los Robots')
+    self.axs_positions.legend()
+    
+    # Ajustar el diseño y mostrar la gráfica actualizada de las posiciones de los robots
+    plt.tight_layout()
+    plt.pause(0.01)  # Pausa para actualizar la gráfica
 
   def save_data(self):
     with open('robot_data.csv', 'w', newline='') as f:
@@ -128,6 +164,12 @@ class RealTimePlotter:
           writer.writerow([robot_name, data['times'][i], data['w_left_values'][i], 
                             data['w_right_values'][i], data['pwm_left_values'][i], 
                             data['pwm_right_values'][i]])
+    with open('robot_positions.csv', 'w', newline='') as f:
+      writer = csv.writer(f)
+      writer.writerow(['Robot', 'X', 'Y'])
+      for robot_id, position_data in self.robot_positions.items():
+        for i in range(len(position_data['x'])):
+          writer.writerow([robot_id, position_data['x'][i], position_data['y'][i]])
   
   def start(self):
     while True:
@@ -155,15 +197,18 @@ class RealTimePlotter:
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
       _, agent, topic = topic.split('/')
-      if agent not in self.robotData:
-        self.robotData[agent] = {'times': [], 'w_left_values': [], 'w_right_values': [], 'pwm_left_values': [], 'pwm_right_values': []}
-      
-      current_time = self.robotData[agent]['times'][-1] if self.robotData[agent]['times'] else 0
-      self.robotData[agent]['times'].append(current_time + 100)
-      self.robotData[agent]['w_left_values'].append(json.loads(message)['w_left'])
-      self.robotData[agent]['w_right_values'].append(json.loads(message)['w_right'])
-      self.robotData[agent]['pwm_left_values'].append(json.loads(message)['pwm_left'])
-      self.robotData[agent]['pwm_right_values'].append(json.loads(message)['pwm_right'])
+      if topic == 'telemetry':
+        if agent not in self.robotData:
+          self.robotData[agent] = {'times': [], 'w_left_values': [], 'w_right_values': [], 'pwm_left_values': [], 'pwm_right_values': []}
+        
+        current_time = self.robotData[agent]['times'][-1] if self.robotData[agent]['times'] else 0
+        self.robotData[agent]['times'].append(current_time + 100)
+        self.robotData[agent]['w_left_values'].append(json.loads(message)['w_left'])
+        self.robotData[agent]['w_right_values'].append(json.loads(message)['w_right'])
+        self.robotData[agent]['pwm_left_values'].append(json.loads(message)['pwm_left'])
+        self.robotData[agent]['pwm_right_values'].append(json.loads(message)['pwm_right'])
+      if topic == 'position':
+        self.positions[agent] = json.loads(message)
       self.update_plot()
       
      

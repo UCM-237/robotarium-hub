@@ -151,7 +151,7 @@ bool Localization::FindArena()
     bool ArenaFound=false;
     std::vector<float> reprojectionError;
     cv::Scalar color(0,0,255);
-    while (this->in_video.grab())//&& ArenaFound==false)
+    while (this->in_video.grab()&& ArenaFound==false)
     {
         this->filteredContours.clear();
         this->rvecs.clear();
@@ -170,7 +170,7 @@ bool Localization::FindArena()
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
         
         
-        double minContourArea = 5000;
+        double minContourArea = 10000;
         for (const auto& contour : contours) {
             double area = cv::contourArea(contour);
             if (area > minContourArea) {
@@ -229,6 +229,8 @@ bool Localization::FindArena()
                 for (long unsigned int i = 0; i < rvecs.size(); ++i) {
                     
                     cv::drawFrameAxes(this->image,  this->camera_matrix, this->dist_coeffs, this->rvecs[i], this->tvecs[i], 0.1);
+                    this->robotarioTvecs.push_back(this->tvecs[i]);
+                    this->robotarioRvecs.push_back(this->rvecs[i]);
                 }
                 
             }
@@ -289,11 +291,11 @@ cv::Scalar color(0,0,255);
         // if at least one marker detected
         if (ids.size() > 0)
         {
-            cv::aruco::drawDetectedMarkers(this->grayMat, corners, ids);
+            cv::aruco::drawDetectedMarkers(this->image, corners, ids);
             
-            // MyestimatePoseSingleMarkers(corners, this->marker_length_m,
-            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
-        cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
+            MyestimatePoseSingleMarkers(corners, this->marker_length_m,
+                    camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+        //cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            
@@ -335,7 +337,7 @@ cv::Scalar color(0,0,255);
             }
         }
 
-         
+         drawFrameAxes(this->image, this->camera_matrix, this->dist_coeffs, this->robotarioRvecs[0], this->robotarioTvecs[0], 0.1);
          imshow("Pose estimation", this->image);
             char key = (char)cv::waitKey(1);
             if (key == 27)

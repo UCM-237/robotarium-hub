@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-#define MINPWM 100
+#define MINPWM 110
 #define MAXPWM 255
 class controler
 {
