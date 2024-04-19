@@ -55,7 +55,7 @@ class rendevouz:
     self.agent.send('control/RobotAgent1/telemetry', {'op': 11})
     
     while(1):
-      vel=-9.5*3.35
+      vel=9.5*3.35
       velocity_robot=[w,vel]
       self.angularWheelSpeed(angularWheel,velocity_robot)
       self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
@@ -65,7 +65,8 @@ class rendevouz:
       self.angularWheelSpeed(angularWheel,velocity_robot)
       self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
       #self.agent.send('control/RobotAgent1/silence', {'op': 6})
-      time.sleep(100)
+      time.sleep(5)
+      
   def connect(self):
     logging.debug('starting device')
     self.thread = Thread(target=self.test).start()

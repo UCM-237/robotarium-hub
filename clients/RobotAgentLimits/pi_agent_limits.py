@@ -192,7 +192,7 @@ class Robot:
           self.IgnoreControlCommunication = True
           #stop command of moving the robot
           self.move_robot(0,0)
-          self.operationFromRobotDone.wait(timeout=0.3)
+          self.operationFromRobotDone.wait(timeout=0.1)
           if self.operationFromRobotDone.is_set():
             self.operationFromRobotDone.clear()
           #wait for op_done
@@ -308,6 +308,7 @@ class Robot:
           self.Position[agent]= message
       elif topic == "ArenaSize":
         self.ArenaLimitsReceived = True
+
         self.LimitsAlgorithm.addLimits(json.loads(message))
                
        

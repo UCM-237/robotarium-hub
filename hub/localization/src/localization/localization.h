@@ -74,7 +74,7 @@ class Localization
     cv::Mat camera_matrix, dist_coeffs;
     cv::Mat camera_matrix_2, dist_coeffs_2;
      cv::Mat binary_image;//for detect the arena 
-     std::vector<cv::Vec3d> rvecs, tvecs;
+     std::vector<cv::Vec3d> rvecs, tvecs, robotarioTvecs, robotarioRvecs;
     std::ostringstream vector_to_marker;
     
     int arenaSize=30;//cm default value

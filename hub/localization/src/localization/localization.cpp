@@ -63,7 +63,7 @@ int Localization::init(int argc,char **argv)
                   << std::endl;
         return -1;
     }
-    this->heightArenaLength = parser.get<float>("h");
+    this->heightArenaLength = parser.get<float>("w");
     if (heightArenaLength<= 0) {
         std::cerr << "height arena length must be a positive value in meter" 
                   << std::endl;
@@ -170,7 +170,7 @@ bool Localization::FindArena()
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
         
         
-        double minContourArea = 5000;
+        double minContourArea = 10000;
         for (const auto& contour : contours) {
             double area = cv::contourArea(contour);
             if (area > minContourArea) {
@@ -197,7 +197,7 @@ bool Localization::FindArena()
                 cv::approxPolyDP(this->filteredContours[i], approxCurve, 0.04 * cv::arcLength(this->filteredContours[i], true), true);
                 cv::drawContours(this->image,this->filteredContours,i,color,2);
                 //draw first corner
-                cv::circle(this->image, approxCurve[2], 5, this->cornerColors[3], -1);
+                
                 // for (size_t j = 0; j < approxCurve.size(); ++j) {
                 //     cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
                 // }
@@ -205,7 +205,7 @@ bool Localization::FindArena()
             std::cout<<"Estimating Arena Position"<<std::endl;
             if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->heightArenaLength, this->rvecs, this->tvecs))
             {
-               
+               cv::circle(this->image, approxCurve[1], 5, this->cornerColors[3], -1);
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
                 // this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength/2);
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
@@ -229,6 +229,8 @@ bool Localization::FindArena()
                 for (long unsigned int i = 0; i < rvecs.size(); ++i) {
                     
                     cv::drawFrameAxes(this->image,  this->camera_matrix, this->dist_coeffs, this->rvecs[i], this->tvecs[i], 0.1);
+                    this->robotarioTvecs.push_back(this->tvecs[i]);
+                    this->robotarioRvecs.push_back(this->rvecs[i]);
                 }
                 
             }
@@ -289,11 +291,11 @@ cv::Scalar color(0,0,255);
         // if at least one marker detected
         if (ids.size() > 0)
         {
-            cv::aruco::drawDetectedMarkers(this->grayMat, corners, ids);
+            cv::aruco::drawDetectedMarkers(this->image, corners, ids);
             
-            // MyestimatePoseSingleMarkers(corners, this->marker_length_m,
-            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
-        cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
+            MyestimatePoseSingleMarkers(corners, this->marker_length_m,
+                    camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+        //cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            
@@ -330,13 +332,13 @@ cv::Scalar color(0,0,255);
                 cv::approxPolyDP(this->filteredContours[i], approxCurve, 0.04 * cv::arcLength(this->filteredContours[i], true), true);
                 cv::drawContours(this->image,this->filteredContours,i,color,2);
                 for (size_t j = 0; j < approxCurve.size(); ++j) {
-                    cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
+                    cv::circle(this->image, approxCurve[j], 5, this->cornerColors[j], -1);
                 }
             }
         }
 
-         
-         imshow("Pose estimation", this->grayMat);
+         drawFrameAxes(this->image, this->camera_matrix, this->dist_coeffs, this->robotarioRvecs[0], this->robotarioTvecs[0], 0.1);
+         imshow("Pose estimation", this->image);
             char key = (char)cv::waitKey(1);
             if (key == 27)
                 break;
@@ -384,7 +386,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
     // objPoints.push_back(cv::Point3f(baseLength/2,-heightLength/2,0));
     // objPoints.push_back(cv::Point3f(-baseLength/2,-heightLength/2,0));
 
-     objPoints.push_back(cv::Point3f(0,0,0));
+    objPoints.push_back(cv::Point3f(0,0,0));
     objPoints.push_back(cv::Point3f(baseLength,0,0));
     objPoints.push_back(cv::Point3f(baseLength,heightLength,0));
     objPoints.push_back(cv::Point3f(0,heightLength,0));
@@ -399,7 +401,7 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
             cornersNuevo.push_back(corners[2]);
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
-            cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_DLS);
+            cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);
             //cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
             std::cout<< "tvec: "<<tvec<<std::endl;
             rvecs.push_back(rvec);
