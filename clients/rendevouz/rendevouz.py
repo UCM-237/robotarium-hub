@@ -18,11 +18,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '192.168.1.109'
+AGENT_IP = '192.168.10.1'
 AGENT_CMD_PORT = 5581
 AGENT_DATA_PORT = 5582
 # Where the server is 
-HUB_IP = '192.168.1.109'
+HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -35,7 +35,7 @@ class rendevouz:
   def __init__(self, agent: Agent) -> None:
     self.agent = agent
     self.Position={}
-    self.Meta = '1'
+    self.Meta = '5'
     self.SAMPLETIME=150
     self.tval_before = 0
     self.tval_after= 0
@@ -48,7 +48,7 @@ class rendevouz:
         [-self.L/(2*self.R), 1/self.R]]
 
   def test(self):
-    vel=16*3.35
+    vel=9*3.35
     angularWheel = [0.0, 0.0]
     w=0
 
@@ -59,17 +59,17 @@ class rendevouz:
       velocity_robot=[w,vel]
       self.angularWheelSpeed(angularWheel,velocity_robot)
       self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-      time.sleep(3)
-      vel=0
-      velocity_robot=[w,vel]
-      self.angularWheelSpeed(angularWheel,velocity_robot)
-      self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-      #self.agent.send('control/RobotAgent1/silence', {'op': 6})
-      time.sleep(5)
+      time.sleep(4)
+      # vel=0
+      # velocity_robot=[w,vel]
+      # self.angularWheelSpeed(angularWheel,velocity_robot)
+      # self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+      # #self.agent.send('control/RobotAgent1/silence', {'op': 6})
+      # time.sleep(5)
       
   def connect(self):
     logging.debug('starting device')
-    self.thread = Thread(target=self.test).start()
+    #self.thread = Thread(target=self.test).start()
     
   
   def rendevouz(self,agent)-> None:
@@ -123,10 +123,11 @@ class rendevouz:
          self.cumError=-14
 
     auxcumError=self.cumError
-    if modulo>0.25:        
+    if modulo>0.35:        
+      
       if(angleError>0.65 or angleError<-0.65):
               
-        w=(0.4*angleError)+0.1*self.cumError#*self.SAMPLETIME/1000 
+        w=(0.35*angleError)+0.1*self.cumError#*self.SAMPLETIME/1000 
         print("w:")
         print(w)
       else:
@@ -134,7 +135,6 @@ class rendevouz:
         giro=True
 
       
-      vel=0.0
      
     
       if giro:
@@ -146,10 +146,11 @@ class rendevouz:
     else:
       w=0
       vel=0
+      print("STOP----------------------------------------")
     velocity_robot=[w,vel]
     self.angularWheelSpeed(angularWheel,velocity_robot)
-    self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-   # print(angularWheel)
+    self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+    print(angularWheel)
     if self.tval_sample < 0:
        print("Error de tiempo")
        print(self.tval_sample)
@@ -195,11 +196,11 @@ class rendevouz:
     # if agent not in self.state:
     #   self.state[agent]={}
     # self.state[agent][topic] = ast.literal_eval(message)
-    # if self.Meta in self.Position and '2' in self.Position:
-    #   self.tval_before=time.time()*1000 
-    #   self.orientation('2')
-    # if topic == "position":
-    #   self.Position[agent]=message
+    if self.Meta in self.Position and '0' in self.Position:
+      self.tval_before=time.time()*1000 
+      self.orientation('0')
+    if topic == "position":
+      self.Position[agent]=message
       
     
  

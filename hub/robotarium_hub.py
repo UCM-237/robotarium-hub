@@ -32,9 +32,9 @@ class RobotariumHub:
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
-        self.commands_socket.bind(f'tcp://192.168.1.109:{CMD_PORT}')
+        self.commands_socket.bind(f'tcp://192.168.10.1:{CMD_PORT}')
         self.data_socket = self.context.socket(zmq.PUB)
-        self.data_socket.bind(f'tcp://192.168.1.109:{DATA_PORT}')
+        self.data_socket.bind(f'tcp://192.168.10.1:{DATA_PORT}')
         self.agents = {}
         self.camera = {}
         self.running = True
@@ -79,7 +79,7 @@ class RobotariumHub:
     def listen(self):
         logging.info(f'Listening to agents')
         while self.running:
-            socks = dict(self.poller.poll(100))
+            socks = dict(self.poller.poll(10))
             for a in self.agents:
                 s = self.agents[a]['socket']
                 if s in socks and socks[s] == zmq.POLLIN:
@@ -91,6 +91,7 @@ class RobotariumHub:
 
                     if topic == "data":
                         data = message["payload"]
+                        #print(data)
                         for k in data:
                             new_topic = f'{topic}/{k}/{message["topic"]}'
                             self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)

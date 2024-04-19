@@ -16,11 +16,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '127.0.0.1'
+AGENT_IP = '192.168.10.1'
 AGENT_CMD_PORT = 5563
 AGENT_DATA_PORT = 5564
 # Where the server is 
-HUB_IP = '127.0.0.1'
+HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -33,7 +33,7 @@ class Algorithm:
   def __init__(self, agent: Agent) -> None:
     self.agent = agent
     self.Position={}
-    self.Meta = '1'
+    self.Meta = '5'
     self.SAMPLETIME=250
     self.tval_before = 0
     self.tval_after= 0
@@ -109,10 +109,11 @@ class Algorithm:
     else:
       vel=0
       w=0
+      print("STOP----------------------------------------")
     velocity_robot=[float(w),vel]
     self.angularWheelSpeed(angularWheel,velocity_robot)
     print(angularWheel)
-    self.agent.send('control/2/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+    self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
    # print(angularWheel)
     if self.tval_sample < 0:
        print("Error de tiempo")
@@ -159,9 +160,9 @@ class Algorithm:
     # if agent not in self.state:
     #   self.state[agent]={}
     # self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in Position and '2' in Position:
+    if self.Meta in Position and '0' in Position:
       self.tval_before=time.time()*1000 
-      self.orientation('2')
+      self.orientation('0')
     if topic == "position":
       Position[agent]=message
       

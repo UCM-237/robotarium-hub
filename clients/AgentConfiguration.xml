@@ -9,7 +9,7 @@
         <HubIp>192.168.10.1</HubIp>
         <HubCmdPort>5555</HubCmdPort>
         <HubDataPort>5556</HubDataPort>
-        <AgentIp>192.168.10.56</AgentIp>
+        <AgentIp>192.168.10.1</AgentIp>
         <AgentCmdPort>5570</AgentCmdPort>
         <AgentDataPort>5571</AgentDataPort>
     </CommunicationConfiguration>
