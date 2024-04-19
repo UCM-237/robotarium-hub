@@ -142,6 +142,8 @@ class RealTimePlotter:
     
     self.x_corners = [x*5 for x in self.x_corners]
     self.y_corners = [y*5 for y in self.y_corners]
+
+    
     for robot_id, position_data in self.positions.items():
       # Convertir las coordenadas x e y a números flotantes
       x_position = float(position_data['x'])
