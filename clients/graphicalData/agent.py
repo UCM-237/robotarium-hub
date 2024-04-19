@@ -7,21 +7,20 @@ import zmq
 import matplotlib.pyplot as plt
 import numpy as np
 import threading
-import queue
 import time
 import json
-import pickle
-import tkinter as tk
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import csv
 # Configure logs
 logging.basicConfig(level=logging.DEBUG)
 
-
+class segment:
+  def __init__(self,pi,pf):
+      self.pi=np.array(pi)
+      self.pf=np.array(pf)
 class RealTimePlotter:
 
-  def __init__(self, id: str='RealPlotter', ip: str='192.168.1.109', cmd_port: int=5572, data_port:int=5573,
-               hub_ip: str='192.168.1.109', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
+  def __init__(self, id: str='RealPlotter', ip: str='192.168.10.1', cmd_port: int=5572, data_port:int=5573,
+               hub_ip: str='192.168.10.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
     self.cmd_port = cmd_port
@@ -35,6 +34,10 @@ class RealTimePlotter:
     self.data.bind(f'tcp://*:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
     #for plot 
+    self.ArenaLimitsReceived = False
+    self.ArenaLimits = {}
+    self.x=[None]*5
+    self.y=[None]*5
     self.robotData = {}
     self.positions = {}
     self.robot_positions ={}
@@ -100,6 +103,18 @@ class RealTimePlotter:
 
   #   plt.tight_layout()
   #   plt.pause(0.01)  # Pausa para actualizar la gráfica
+  def addLimits(self,limits):
+        
+    self.ArenaLimits = limits
+    self.x[1]=-self.ArenaLimits["x1"]
+    self.y[1]=-self.ArenaLimits["y1"]
+    self.x[2]=-self.ArenaLimits["x2"]
+    self.y[2]=-self.ArenaLimits["y2"]
+    self.x[3]=-self.ArenaLimits["x3"]
+    self.y[3]=-self.ArenaLimits["y3"]
+    self.x[4]=-self.ArenaLimits["x4"]
+    self.y[4]=-self.ArenaLimits["y4"]
+    #self.segmentOfTheRectangle = self.computeSegments()
   def update_plot(self) -> None:
     # Limpiar los ejes antes de actualizar los datos
     self.axs[0].cla()
@@ -124,7 +139,9 @@ class RealTimePlotter:
       self.axs_wheel[1].grid()
       plt.tight_layout()
       plt.pause(0.01)  # Pausa para actualizar la gráfica
-      
+    
+    self.x_corners = [x*5 for x in self.x_corners]
+    self.y_corners = [y*5 for y in self.y_corners]
     for robot_id, position_data in self.positions.items():
       # Convertir las coordenadas x e y a números flotantes
       x_position = float(position_data['x'])
@@ -172,6 +189,10 @@ class RealTimePlotter:
           writer.writerow([robot_id, position_data['x'][i], position_data['y'][i]])
   
   def start(self):
+     #take the arenaLimits
+    while( self.ArenaLimitsReceived == False):
+      self.send("localization/RobotariumData","")
+      time.sleep(1)
     while True:
       choice = input("Presiona 'q' para salir o cualquier otra tecla para continuar: ")
       if choice.lower() == 'q':
@@ -200,18 +221,28 @@ class RealTimePlotter:
       if topic == 'telemetry':
         if agent not in self.robotData:
           self.robotData[agent] = {'times': [], 'w_left_values': [], 'w_right_values': [], 'pwm_left_values': [], 'pwm_right_values': []}
-        
+        self.ArenaLimitsReceived 
         current_time = self.robotData[agent]['times'][-1] if self.robotData[agent]['times'] else 0
         self.robotData[agent]['times'].append(current_time + 100)
         self.robotData[agent]['w_left_values'].append(json.loads(message)['w_left'])
         self.robotData[agent]['w_right_values'].append(json.loads(message)['w_right'])
         self.robotData[agent]['pwm_left_values'].append(json.loads(message)['pwm_left'])
         self.robotData[agent]['pwm_right_values'].append(json.loads(message)['pwm_right'])
-      if topic == 'position':
+      elif topic == 'position':
         self.positions[agent] = json.loads(message)
+      elif topic == "ArenaSize":
+        self.ArenaLimitsReceived = True
+
+        self.addLimits(json.loads(message))
+
+      #update plot
       self.update_plot()
-      
+
      
+  def send(self, topic: str, data: dict) -> None:
+    '''Send data to a topic'''
+    self.data.send_string(topic, flags=zmq.SNDMORE)
+    self.data.send_json(data)
 
 if __name__ == "__main__":
     end = False

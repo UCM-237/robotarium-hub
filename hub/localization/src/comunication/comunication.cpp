@@ -150,7 +150,7 @@ void *AgentCommunication::sendArucoPosition(void *This)
             std::string yaw = std::to_string(data.yaw);
             std::string sep = "/";
             data2=  x+ sep +y+sep+yaw;
-            //std::cout<<id+sep+data2<<std::endl;
+            std::cout<<id+sep+data2<<std::endl;
             
             position[id]["x"] =x;
             position[id]["y"] =y;
@@ -172,7 +172,7 @@ void *AgentCommunication::sendArucoPosition(void *This)
             newPublisher.send(zmqMessage);
         
         }
-        usleep(50*1000);
+        usleep(200*1000);
         message.clear();
         position.clear();
     }

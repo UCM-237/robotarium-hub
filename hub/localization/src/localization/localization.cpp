@@ -131,7 +131,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -303,7 +303,7 @@ cv::Scalar color(0,0,255);
              
             for(long unsigned int i=0; i < ids.size(); i++)
             {
-                 cv::aruco::drawAxis(this->grayMat, this->camera_matrix, this->dist_coeffs,
+                 cv::aruco::drawAxis(this->image, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
                 
                         
@@ -318,10 +318,10 @@ cv::Scalar color(0,0,255);
 
                // cout<<"data y "<<data.y<<endl;
                 this->data.id=ids.at(i);
-                std::cout<<"data id "<<this->data.id<<std::endl;  
-                std::cout<<"data x "<<this->data.x<<std::endl;  
-                std::cout<<"data y "<<this->data.y<<std::endl;
-                std::cout<<"data yaw "<<this->data.yaw<<std::endl;
+                // std::cout<<"data id "<<this->data.id<<std::endl;  
+                // std::cout<<"data x "<<this->data.x<<std::endl;  
+                // std::cout<<"data y "<<this->data.y<<std::endl;
+                // std::cout<<"data yaw "<<this->data.yaw<<std::endl;
                 //arucoInfo.at(i)=data;
                 this->buffer->push(data);
                 // pthread_cond_signal(&listBlock);

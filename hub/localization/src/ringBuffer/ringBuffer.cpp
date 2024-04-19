@@ -16,9 +16,9 @@ void ringBuffer::push(const record_data &data)
     this->writePos = (this->writePos + 1) % BUFFER_SIZE;
     if (this->writePos == this->readPos) {
         this->full = true;
-        this->readPos = (this->readPos + 1) % BUFFER_SIZE;
+        this->readPos = (this->readPos) % BUFFER_SIZE;
     }
-   pthread_cond_signal(&bufferNotEmpty); // Señalar que hay datos disponibles
+    pthread_cond_signal(&bufferNotEmpty); // Señalar que hay datos disponibles
     pthread_mutex_unlock(&bufferMutex);
 }
 
