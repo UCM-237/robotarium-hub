@@ -10,17 +10,18 @@ import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 
 from agent import Agent
+import threading
 
 # Configure logs
 logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '192.168.10.1'
+AGENT_IP = '192.168.1.109'
 AGENT_CMD_PORT = 5563
 AGENT_DATA_PORT = 5564
 # Where the server is 
-HUB_IP = '192.168.10.1'
+HUB_IP = '192.168.1.109'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}
@@ -34,33 +35,33 @@ class Algorithm:
     self.agent = agent
     self.Position={}
     self.Meta = '5'
-    self.SAMPLETIME=250
+    self.SAMPLETIME=100
     self.tval_before = 0
     self.tval_after= 0
     self.tval_sample = 0
     self.L = 12.4  # Valor de ejemplo para L
     self.R = 3.35  # Valor de ejemplo para R
     self.next = False
-    self.cumError=0
+    self.angleCorrected= False
+    self.count=0
     self.A = [[self.L/(2*self.R), 1/self.R],
         [-self.L/(2*self.R), 1/self.R]]
     self.PI=math.pi
-
+    #control 1
     self.AngleError = ctrl.Antecedent(np.arange(-self.PI/2, self.PI/2, 0.1), 'AngleError')
     self.AngleError['bigNegative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/2,-self.PI/4])
-    self.AngleError['negative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/4,-0.2])
-    self.AngleError['zero'] = fuzz.trimf(self.AngleError.universe, [-0.65,0,0.65,])
-    self.AngleError['positive'] = fuzz.trimf(self.AngleError.universe, [0.2, self.PI/4, self.PI/2])
+    self.AngleError['negative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/4,0.0])
+    self.AngleError['zero'] = fuzz.trimf(self.AngleError.universe, [-self.PI/5,0, self.PI/5])
+    self.AngleError['positive'] = fuzz.trimf(self.AngleError.universe, [0.0, self.PI/4, self.PI/2])
     self.AngleError['bigPositive'] = fuzz.trimf(self.AngleError.universe, [self.PI/4, self.PI/2, self.PI/2])
-
-    self.W = ctrl.Consequent(np.arange(-self.PI, self.PI, 0.01), 'W')
+    self.W = ctrl.Consequent(np.arange(-1, 1, 0.01), 'W')
     
     # Membership functions for the consequent
-    self.W['farLeft'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI, -self.PI/2])
-    self.W['left'] = fuzz.trimf(self.W.universe, [-self.PI, -self.PI/2, 0])
-    self.W['center'] = fuzz.trimf(self.W.universe, [-self.PI/2, 0, self.PI/2])
-    self.W['right'] = fuzz.trimf(self.W.universe, [0, self.PI/2, self.PI])
-    self.W['farRight'] = fuzz.trimf(self.W.universe, [self.PI/2, self.PI, self.PI])
+    self.W['farLeft'] = fuzz.trimf(self.W.universe, [-1, -1, -0.45])
+    self.W['left'] = fuzz.trimf(self.W.universe, [-0.6, -0.3, 0])
+    self.W['center'] = fuzz.trimf(self.W.universe, [-0.2, 0, 0.2])
+    self.W['right'] = fuzz.trimf(self.W.universe, [0, 0.3, 0.6])
+    self.W['farRight'] = fuzz.trimf(self.W.universe, [0.45, 1, 1])
 
     self.rule1 = ctrl.Rule(self.AngleError['bigNegative'], self.W['farLeft'])
     self.rule2 = ctrl.Rule(self.AngleError['negative'], self.W['left'])
@@ -70,60 +71,178 @@ class Algorithm:
 
     self.W_ctrl = ctrl.ControlSystem([self.rule1, self.rule2, self.rule3,self.rule4,self.rule5])
     self.heading=ctrl.ControlSystemSimulation(self.W_ctrl)
+    
+    #control 2
+    self.AngleError2 = ctrl.Antecedent(np.arange(-self.PI, self.PI, 0.2), 'AngleError')
+    self.AngleError2['bigNegative'] = fuzz.trimf(self.AngleError2.universe, [-self.PI, -self.PI,-self.PI/2])
+    self.AngleError2['negative'] = fuzz.trimf(self.AngleError2.universe, [-self.PI/2, -self.PI/4,0])
+    self.AngleError2['zero'] = fuzz.trimf(self.AngleError2.universe, [-0.3,0,0.3,])
+    self.AngleError2['positive'] = fuzz.trimf(self.AngleError2.universe, [0, self.PI/4, self.PI/2])
+    self.AngleError2['bigPositive'] = fuzz.trimf(self.AngleError2.universe, [self.PI/2, self.PI, self.PI])
+    self.W2 = ctrl.Consequent(np.arange(-5, 5, 0.02), 'W')
+    
+    # Membership functions for the consequent
+    self.W2['farLeft'] = fuzz.trimf(self.W2.universe, [-5, -5, -3])
+    self.W2['left'] = fuzz.trimf(self.W2.universe, [-4, -3, 0])
+    self.W2['center'] = fuzz.trimf(self.W2.universe, [-3.5, 0, 3.5])
+    self.W2['right'] = fuzz.trimf(self.W2.universe, [0, 3, 4])
+    self.W2['farRight'] = fuzz.trimf(self.W2.universe, [3, 5, 5])
 
+    self.rule6 = ctrl.Rule(self.AngleError2['bigNegative'], self.W2['farLeft'])
+    self.rule7 = ctrl.Rule(self.AngleError2['negative'], self.W2['left'])
+    self.rule8 = ctrl.Rule(self.AngleError2['zero'], self.W2['center'])
+    self.rule9 = ctrl.Rule(self.AngleError2['positive'], self.W2['right'])
+    self.rule10 = ctrl.Rule(self.AngleError2['bigPositive'], self.W2['farRight'])
+
+    self.W_ctrl2 = ctrl.ControlSystem([self.rule6, self.rule7, self.rule8,self.rule9,self.rule10])
+    self.heading2=ctrl.ControlSystemSimulation(self.W_ctrl2)
+    
+    
+    #position
+    self.positionDataMeta = {}
   def connect(self):
     logging.debug('starting device')
-    #self.thread = Thread(target=self.test).start()
+    self.thread = threading.Thread(target=self.rendevouz).start()
+    
     
   
-  def rendevouz(self,agent)-> None:
-    while self.Meta not in Position or agent not in Position:
-      pass
-    self.orientation(agent)
-
-  def orientation(self,agent):
+  def rendevouz(self)-> None:
+    while len(self.Position)<2:
+      time.sleep(1)
+    self.orientation()
+  
+  def sendVel(self,angularWheel,agenName):
+    self.agent.send('control/'+agenName+'/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
     
+  def correctAngle(self):
+    self.tval_before=time.time()*1000
+    self.agent.send('control/RobotAgent1/move',{'v_left':0,'v_right':0})
+    angleError,modulo=self.computeAngleError()
+    w=0.0
     vel=0
     angularWheel = [0.0, 0.0]
+    self.count+=1
     
-    posdataMeta=json.loads(Position[self.Meta])
-    posdataAgent=json.loads(Position[agent])
-    x=float(posdataMeta['x'])-float(posdataAgent['x'])
-    y=float(posdataMeta['y'])-float(posdataAgent['y'])
+    if(abs(angleError)<0.40):
+      
+         
+      self.angleCorrected=True
+      print("angle corrected")
+      
+    else:
+      self.angleCorrected=False
+      
+      self.heading2.input['AngleError']=angleError
+      self.heading2.compute()
+      w=float(self.heading2.output['W'])
+     
+    if abs(w)<3.2:
+      if w>0:
+        w=3.2
+      else:
+        w=-3.2
+    velocity_robot=[float(w),vel]
+    self.angularWheelSpeed(angularWheel,velocity_robot)
+    print(angularWheel)
+    self.sendVel(angularWheel,'RobotAgent1')
+    self.tval_after=time.time()*1000
+    self.tval_sample=self.tval_after-self.tval_before
+    if self.tval_sample < 0:
+       print("Error de tiempo")
+       print(self.tval_sample)
+    elif self.tval_sample > 300:
+       print("(movimiento) Tiempo del programa mayor: ", self.tval_sample)
+    else:
+
+      print((300 - self.tval_sample) / 1000)
+      
+      time.sleep((300 - self.tval_sample)/1000)
+      
+  def computeAngleError(self):
+    x=float(self.positionDataMeta['x'])-float(self.positionDataAgent['x'])
+    y=float(self.positionDataMeta['y'])-float(self.positionDataAgent['y'])
     angle=math.atan2(y,x)
-    angleError=float(posdataAgent['yaw'])-angle
+    angleError=float(self.positionDataAgent['yaw'])-angle
     modulo=math.sqrt((x*x)+(y*y))
-    print("angle:")
-    print(angleError)
+    print("modulo:")
+    print(modulo)
+    
     if angleError > self.PI:
       angleError=angleError-2*self.PI
     elif angleError< (-self.PI):
       angleError=angleError+2*self.PI
-
-    if modulo > 0.25:
-      self.heading.input['AngleError']=angleError
-      self.heading.compute()
-      w=self.heading.output['W']
-      print(w)
-      vel=8.2*3.35
-    else:
+    print("angleError:")
+    print(angleError)
+    return angleError,modulo   
+  
+         
+  def orientation(self):
+    while(self.angleCorrected==False):   
+      self.correctAngle()
+    
+    while(True):
+      self.tval_before=time.time()*1000 
+      w=0.0
       vel=0
+      angularWheel = [0.0, 0.0]
+      
+      x=float(self.positionDataMeta['x'])-float(self.positionDataAgent['x'])
+      y=float(self.positionDataMeta['y'])-float(self.positionDataAgent['y'])
+      angle=math.atan2(y,x)
+      angleError=float(self.positionDataAgent['yaw'])-angle
+      modulo=math.sqrt((x*x)+(y*y))
+      print("modulo:")
+      print(modulo)
+      
+      if angleError > self.PI:
+        angleError=angleError-2*self.PI
+      elif angleError< (-self.PI):
+        angleError=angleError+2*self.PI
+      print("angleError:")
+      print(angleError)
+        
       w=0
-      print("STOP----------------------------------------")
-    velocity_robot=[float(w),vel]
-    self.angularWheelSpeed(angularWheel,velocity_robot)
-    print(angularWheel)
-    self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-   # print(angularWheel)
-    if self.tval_sample < 0:
-       print("Error de tiempo")
-       print(self.tval_sample)
-    elif self.tval_sample > self.SAMPLETIME:
-       print("(movimiento) Tiempo del programa mayor: ", self.tval_sample)
-    else:
+      vel=0
+      #first correct the angle
+      
+      if abs(angleError)>self.PI/2:
+        self.heading2.input['AngleError']=angleError
+        self.heading2.compute()
+        w=float(self.heading2.output['W'])
+      else:
+          self.heading.input['AngleError']=angleError
+          self.heading.compute()
+          w=float(self.heading.output['W'])
+          
+          vel=0
+      if modulo > 0.30:
+        self.heading.input['AngleError']=angleError
+        self.heading.compute()
+        w=float(self.heading.output['W'])
+        print(w)
+        vel=7.5*3.35
+        print("GO----------------------------------------")
+      else:
+        vel=0
+        w=0
+        print("STOP----------------------------------------")
+      velocity_robot=[float(w),vel]
+      self.angularWheelSpeed(angularWheel,velocity_robot)
+      print(angularWheel)
+      self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
+    # print(angularWheel)
+      self.tval_after=time.time()*1000
+      self.tval_sample=self.tval_after-self.tval_before
+      if self.tval_sample < 0:
+        print("Error de tiempo")
+        print(self.tval_sample)
+      elif self.tval_sample > self.SAMPLETIME:
+        print("(movimiento) Tiempo del programa mayor: ", self.tval_sample)
+      else:
 
-      #print((self.SAMPLETIME - self.tval_sample) / 1000)
-      time.sleep((self.SAMPLETIME - self.tval_sample) / 1000)
+        print((self.SAMPLETIME - self.tval_sample) / 1000)
+        
+        time.sleep((self.SAMPLETIME - self.tval_sample) / 1000)
 
 
   def angularWheelSpeed(self, w_wheel, velocity_robot):
@@ -160,11 +279,12 @@ class Algorithm:
     # if agent not in self.state:
     #   self.state[agent]={}
     # self.state[agent][topic] = ast.literal_eval(message)
-    if self.Meta in Position and '0' in Position:
-      self.tval_before=time.time()*1000 
-      self.orientation('0')
     if topic == "position":
-      Position[agent]=message
+      self.Position[agent]=message
+      if agent == self.Meta:
+        self.positionDataMeta = json.loads(message)
+      elif agent == '0':
+        self.positionDataAgent = json.loads(message)
       
     
  

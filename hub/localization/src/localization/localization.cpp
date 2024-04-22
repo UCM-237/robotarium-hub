@@ -131,7 +131,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -170,7 +170,7 @@ bool Localization::FindArena()
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
         
         
-        double minContourArea = 10000;
+        double minContourArea = 8000;
         for (const auto& contour : contours) {
             double area = cv::contourArea(contour);
             if (area > minContourArea) {
@@ -201,11 +201,13 @@ bool Localization::FindArena()
                 // for (size_t j = 0; j < approxCurve.size(); ++j) {
                 //     cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
                 // }
+
             }
             std::cout<<"Estimating Arena Position"<<std::endl;
             if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->heightArenaLength, this->rvecs, this->tvecs))
             {
-               cv::circle(this->image, approxCurve[1], 5, this->cornerColors[3], -1);
+               cv::circle(this->image, approxCurve[0], 5, this->cornerColors[3], -1);
+
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
                 // this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength/2);
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
@@ -395,10 +397,10 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
         if ((corners.size() == 4) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
         {
             std::vector<cv::Point2f> cornersNuevo;
-            cornersNuevo.push_back(corners[1]);
             cornersNuevo.push_back(corners[0]);
             cornersNuevo.push_back(corners[3]);
             cornersNuevo.push_back(corners[2]);
+            cornersNuevo.push_back(corners[1]);
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
             cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);

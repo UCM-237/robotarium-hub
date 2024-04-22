@@ -19,8 +19,8 @@ class segment:
       self.pf=np.array(pf)
 class RealTimePlotter:
 
-  def __init__(self, id: str='RealPlotter', ip: str='192.168.10.1', cmd_port: int=5572, data_port:int=5573,
-               hub_ip: str='192.168.10.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
+  def __init__(self, id: str='RealPlotter', ip: str='192.168.1.109', cmd_port: int=5572, data_port:int=5573,
+               hub_ip: str='192.168.1.109', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
     self.cmd_port = cmd_port
@@ -36,8 +36,8 @@ class RealTimePlotter:
     #for plot 
     self.ArenaLimitsReceived = False
     self.ArenaLimits = {}
-    self.x=[None]*5
-    self.y=[None]*5
+    self.x=[None]*4
+    self.y=[None]*4
     self.robotData = {}
     self.positions = {}
     self.robot_positions ={}
@@ -79,41 +79,49 @@ class RealTimePlotter:
     self.connected = response['result'] == 'ok'
     threading.Thread(target=self.start).start()#Thread listening to the hub
 
-  # def update_plot(self) -> None:
-  #   plt.clf()
-  #   num_robots = len(self.robotData)
-  #   rows = num_robots//2 + num_robots%2
-  #   cols = 2
-  #   for i, (self.robot_name, data) in enumerate(self.robotData.items(), start=1):
-  #       plt.subplot(rows, cols, i)
-  #       plt.scatter(data['times'], data['w_left_values'], label='w_left')
-  #       plt.scatter(data['times'], data['pwm_left_values'], label='pwm_left')
-  #       plt.xlabel('Tiempo')
-  #       plt.ylabel('Valor')
-  #       plt.title(self.robot_name + " - Left Wheel")
-  #       plt.legend()
+  def update_plot(self) -> None:
+    plt.clf()
+    num_robots = len(self.robotData)
+    rows = num_robots//2 + num_robots%2
+    cols = 2
+    for i, (self.robot_name, data) in enumerate(self.robotData.items(), start=1):
+        plt.subplot(rows, cols, i)
+        plt.scatter(data['times'], data['w_left_values'], label='w_left')
+        plt.scatter(data['times'], data['pwm_left_values'], label='pwm_left')
+        plt.xlabel('Tiempo')
+        plt.ylabel('Valor')
+        plt.title(self.robot_name + " - Left Wheel")
+        plt.legend()
         
-  #       plt.subplot(rows, cols, i+num_robots)  # Subgráfica para la rueda derecha
-  #       plt.scatter(data['times'], data['w_right_values'], label='w_right')
-  #       plt.scatter(data['times'], data['pwm_right_values'], label='pwm_right')
-  #       plt.xlabel('Tiempo')
-  #       plt.ylabel('Valor')
-  #       plt.title(self.robot_name + " - Right wheel")
-  #       plt.legend()
+        plt.subplot(rows, cols, i+num_robots)  # Subgráfica para la rueda derecha
+        plt.scatter(data['times'], data['w_right_values'], label='w_right')
+        plt.scatter(data['times'], data['pwm_right_values'], label='pwm_right')
+        plt.xlabel('Tiempo')
+        plt.ylabel('Valor')
+        plt.title(self.robot_name + " - Right wheel")
+        plt.legend()
 
-  #   plt.tight_layout()
-  #   plt.pause(0.01)  # Pausa para actualizar la gráfica
+    plt.tight_layout()
+    plt.pause(0.01)  # Pausa para actualizar la gráfica
   def addLimits(self,limits):
         
     self.ArenaLimits = limits
-    self.x[1]=-self.ArenaLimits["x1"]
-    self.y[1]=-self.ArenaLimits["y1"]
-    self.x[2]=-self.ArenaLimits["x2"]
-    self.y[2]=-self.ArenaLimits["y2"]
-    self.x[3]=-self.ArenaLimits["x3"]
-    self.y[3]=-self.ArenaLimits["y3"]
-    self.x[4]=-self.ArenaLimits["x4"]
-    self.y[4]=-self.ArenaLimits["y4"]
+    self.x[0]=-self.ArenaLimits["x1"]
+    self.y[0]=-self.ArenaLimits["y1"]
+    self.x[1]=-self.ArenaLimits["x2"]
+    self.y[1]=-self.ArenaLimits["y2"]
+    self.x[2]=-self.ArenaLimits["x3"]
+    self.y[2]=-self.ArenaLimits["y3"]
+    self.x[3]=-self.ArenaLimits["x4"]
+    self.y[3]=-self.ArenaLimits["y4"]
+    # self.x[0]=2.56
+    # self.y[0]=2.29
+    # self.x[1]=0.46
+    # self.y[1]=2.29
+    # self.x[2]=0.46
+    # self.y[2]=0.89
+    # self.x[3]=2.56
+    # self.y[3]=0.89
     #self.segmentOfTheRectangle = self.computeSegments()
   def update_plot(self) -> None:
     # Limpiar los ejes antes de actualizar los datos
@@ -137,11 +145,10 @@ class RealTimePlotter:
       self.axs_wheel[1].set_title(robot_name + " - Right wheel")
       self.axs_wheel[1].legend()
       self.axs_wheel[1].grid()
-      plt.tight_layout()
-      plt.pause(0.01)  # Pausa para actualizar la gráfica
-    
-    self.x_corners = [x*5 for x in self.x_corners]
-    self.y_corners = [y*5 for y in self.y_corners]
+      # plt.tight_layout()
+      # plt.pause(0.01)  # Pausa para actualizar la gráfica
+    self.axs_positions.cla()
+   
 
     
     for robot_id, position_data in self.positions.items():
@@ -169,6 +176,10 @@ class RealTimePlotter:
     self.axs_positions.set_ylabel('Y')
     self.axs_positions.set_title('Posiciones de los Robots')
     self.axs_positions.legend()
+    self.axs_positions.grid()
+    # Trazar el rectángulo
+    plt.xlim(self.x[0],self.x[2])
+    plt.ylim(self.y[0],self.y[2])
     
     # Ajustar el diseño y mostrar la gráfica actualizada de las posiciones de los robots
     plt.tight_layout()
@@ -216,6 +227,8 @@ class RealTimePlotter:
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/RealTimePlotter')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
+    self.addLimits("json.loads(message)")
+    self.update_plot()
     while not self.exit_event.is_set():
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
@@ -238,7 +251,7 @@ class RealTimePlotter:
         self.addLimits(json.loads(message))
 
       #update plot
-      self.update_plot()
+    
 
      
   def send(self, topic: str, data: dict) -> None:
