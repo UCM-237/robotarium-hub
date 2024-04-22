@@ -90,9 +90,9 @@ void setup() {
     // Se empieza con los motores parados
     robot.fullStop();
   
-    wheelControlerRight.setControlerParam(0.15, 0.01, 0.0);
+    wheelControlerRight.setControlerParam(0.15, 0.01, 0.00);
     wheelControlerRight.setFeedForwardParam(0.0895,-5.424);
-    wheelControlerLeft.setControlerParam(0.15, 0.01, 0.0);
+    wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
     wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin

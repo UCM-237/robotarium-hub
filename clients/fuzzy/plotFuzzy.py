@@ -8,15 +8,19 @@ import matplotlib.pyplot as plt
 PI=math.pi
 # New Antecedent/Consequent objects hold universe variables and membership
 # functions
-AngleError = ctrl.Antecedent(np.arange(-PI/2, PI/2, 0.1), 'AngleError')
-AngleError['bigNegative'] = fuzz.trimf(AngleError.universe, [-PI/2, -PI/2,-PI/4])
-AngleError['negative'] = fuzz.trimf(AngleError.universe, [-PI/2, -PI/4,-0.2])
+AngleError = ctrl.Antecedent(np.arange(-PI, PI, 0.05), 'AngleError')
+AngleError['bigNegative'] = fuzz.trimf(AngleError.universe, [-PI, -PI,-PI/2])
+AngleError['negative'] = fuzz.trimf(AngleError.universe, [-PI, -PI/2,-0.2])
 AngleError['zero'] = fuzz.trimf(AngleError.universe, [-0.5,0,0.65,])
-AngleError['positive'] = fuzz.trimf(AngleError.universe, [0.2, PI/4, PI/2])
-AngleError['bigPositive'] = fuzz.trimf(AngleError.universe, [PI/4, PI/2, PI/2])
+AngleError['positive'] = fuzz.trimf(AngleError.universe, [0.2, PI/2, PI])
+AngleError['bigPositive'] = fuzz.trimf(AngleError.universe, [PI/2, PI, PI])
 AngleError.view()
-# Mostrar la gráfica
+leyenda = ['bigNegative', 'negative', 'zero', 'positive', 'bigPositive']
+plt.legend(leyenda, loc='center right')
+plt.grid()
 plt.show()
+
+
 
 
 W = ctrl.Consequent(np.arange(-PI, PI, 0.01), 'W')
@@ -29,4 +33,7 @@ W['right'] = fuzz.trimf(W.universe, [0, PI/2, PI])
 W['farRight'] = fuzz.trimf(W.universe, [PI/2, PI, PI])
 
 W.view()
+leyenda = ['farLeft', 'left', 'center', 'right', 'farRight']
+plt.legend(leyenda, loc='best')
+plt.grid()
 plt.show()
