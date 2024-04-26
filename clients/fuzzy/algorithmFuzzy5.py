@@ -16,10 +16,10 @@ import threading
 logging.basicConfig(level=logging.INFO)
 
 # Who I am
-AGENT_ID = 'AlgorithmFuzzy0'
+AGENT_ID = 'AlgorithmFuzzy5'
 AGENT_IP = '192.168.1.109'
-AGENT_CMD_PORT = 5563
-AGENT_DATA_PORT = 5564
+AGENT_CMD_PORT = 5568
+AGENT_DATA_PORT = 5569
 # Where the server is 
 HUB_IP = '192.168.1.109'
 HUB_CMD_PORT = 5555
@@ -34,8 +34,8 @@ class Algorithm:
   def __init__(self, agent: Agent) -> None:
     self.agent = agent
     self.Position={}
-    self.Meta = '5'
-    self.SAMPLETIME=100
+    self.Meta = '0'
+    self.SAMPLETIME=200
     self.tval_before = 0
     self.tval_after= 0
     self.tval_sample = 0
@@ -47,7 +47,6 @@ class Algorithm:
     self.A = [[self.L/(2*self.R), 1/self.R],
         [-self.L/(2*self.R), 1/self.R]]
     self.PI=math.pi
-    self.positionDataAgent={}
     #control 1
     self.AngleError = ctrl.Antecedent(np.arange(-self.PI/2, self.PI/2, 0.1), 'AngleError')
     self.AngleError['bigNegative'] = fuzz.trimf(self.AngleError.universe, [-self.PI/2, -self.PI/2,-self.PI/4])
@@ -103,8 +102,8 @@ class Algorithm:
     self.positionDataMeta = {}
   def connect(self):
     logging.debug('starting device')
-    self.thread = threading.Thread(target=self.rendevouz('0','RobotAgent1')).start()
-    #self.thread = threading.Thread(target=self.rendevouz('5','RobotAgent5')).start()
+    #self.thread = threading.Thread(target=self.rendevouz('0','RobotAgent1')).start()
+    self.thread = threading.Thread(target=self.rendevouz('5','RobotAgent5')).start()
     
   
   def rendevouz(self,agentId,agentName)-> None:
@@ -117,6 +116,7 @@ class Algorithm:
     
   def correctAngle(self,agentId,agentName):
     self.tval_before=time.time()*1000
+    #self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})
     angleError,modulo=self.computeAngleError(agentId)
     w=0.0
     vel=0
@@ -125,10 +125,11 @@ class Algorithm:
     
     if(abs(angleError)<0.40):
       
-         
+      self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})   
       self.angleCorrected=True
       print("angle corrected")
       self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})
+      
     else:
       self.angleCorrected=False
       
@@ -158,8 +159,7 @@ class Algorithm:
       
       time.sleep((500 - self.tval_sample)/1000)
     # self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})
-    # time.sleep(1)
-      
+    # time.sleep(0.5)
       
   def computeAngleError(self,agentId):
     posdataMeta=json.loads(self.Position[self.Meta])
@@ -169,20 +169,20 @@ class Algorithm:
     angle=math.atan2(y,x)
     angleError=float(posdataAgent['yaw'])-angle
     modulo=math.sqrt((x*x)+(y*y))
-    # print("modulo:")
-    # print(modulo)
+    print("modulo:")
+    print(modulo)
     
     if angleError > self.PI:
       angleError=angleError-2*self.PI
     elif angleError< (-self.PI):
       angleError=angleError+2*self.PI
-    # print("angleError:")
-    # print(angleError)
+    print("angleError:")
+    print(angleError)
     return angleError,modulo   
   
          
   def orientation(self,agentId,agentName):
-    while(self.angleCorrected==False):   
+    while(self.angleCorrected == False):   
       self.correctAngle(agentId,agentName)
     
     while(True):
@@ -288,7 +288,7 @@ class Algorithm:
       self.Position[agent]=message
       if agent == self.Meta:
         self.positionDataMeta = json.loads(message)
-      elif agent == '0':
+      elif agent == '5':
         self.positionDataAgent = json.loads(message)
       
     
