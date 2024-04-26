@@ -182,8 +182,8 @@ class Algorithm:
   
          
   def orientation(self,agentId,agentName):
-    while(self.angleCorrected==False):   
-      self.correctAngle(agentId,agentName)
+    # while(self.angleCorrected==False):   
+    #   self.correctAngle(agentId,agentName)
     
     while(True):
       self.tval_before=time.time()*1000 
@@ -221,7 +221,7 @@ class Algorithm:
           w=float(self.heading.output['W'])
           
           vel=0
-      if modulo > 0.40:
+      if modulo > 0.45:
         self.heading.input['AngleError']=angleError
         self.heading.compute()
         #w=float(self.heading.output['W'])

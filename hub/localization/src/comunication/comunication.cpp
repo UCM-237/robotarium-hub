@@ -172,7 +172,7 @@ void *AgentCommunication::sendArucoPosition(void *This)
             newPublisher.send(zmqMessage);
         
         }
-        usleep(200*1000);
+        usleep(50*1000);
         message.clear();
         position.clear();
     }
