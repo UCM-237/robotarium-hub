@@ -18,11 +18,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Who I am
 AGENT_ID = 'Algorithm'
-AGENT_IP = '192.168.1.109'
+AGENT_IP = '192.168.10.1'
 AGENT_CMD_PORT = 5581
 AGENT_DATA_PORT = 5582
 # Where the server is 
-HUB_IP = '192.168.1.109'
+HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
 Position={}

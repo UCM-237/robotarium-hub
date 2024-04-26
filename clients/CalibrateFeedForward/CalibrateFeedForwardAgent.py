@@ -119,7 +119,7 @@ class CalibrateFeedForward:
 
       pwmLeft += 5
       pwmRight += 5
-      if pwmLeft > 255 or pwmRight > 255:
+      if pwmLeft > 250 or pwmRight > 250:
         self.move_wheels(0, 0)
         break
       
@@ -164,7 +164,7 @@ class CalibrateFeedForward:
     
   def move_wheels(self,pwm_left, pwm_right) -> None:
     '''Set the wheels' speed setpoint'''
-    self.agent.send('control/RobotAgent1/move_wheels', {'pwm_left': pwm_left, 'pwm_right': pwm_right})
+    self.agent.send('control/RobotAgent5/move_wheels', {'pwm_left': pwm_left, 'pwm_right': pwm_right})
   
   def stop_robot(self) -> None:
     '''Stop the robot'''
@@ -172,7 +172,7 @@ class CalibrateFeedForward:
   def request_telemetry(self) -> None:
     '''Request telemetry data'''
     #change RObotAgent1 for the name of the robot
-    self.agent.send('control/RobotAgent1/telemetry', {'op': self.OP_TELEMETRY})
+    self.agent.send('control/RobotAgent5/telemetry', {'op': self.OP_TELEMETRY})
    
     
   def turn_robot(self, angle) -> None:
