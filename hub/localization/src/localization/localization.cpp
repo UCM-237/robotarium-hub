@@ -317,7 +317,8 @@ cv::Scalar color(0,0,255);
             {
                  cv::aruco::drawAxis(this->image, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
-                
+                cv::aruco::drawAxis(frame, this->camera_matrix, this->dist_coeffs,
+                        this->rvecs[i], this->tvecs[i], 0.1);
                         
                 this->data.x=this->tvecs[i](0);
                 
@@ -356,7 +357,7 @@ cv::Scalar color(0,0,255);
 
         // Redimensionar el fotograma a la resolución deseada
         cv::resize(frame, frame, frame_size);
-        //video.write(frame);
+        video.write(frame);
 
          imshow("Pose estimation", this->image);
             char key = (char)cv::waitKey(1);

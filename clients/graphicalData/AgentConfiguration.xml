@@ -6,10 +6,10 @@
         <TargetAgent>RobotAgent1</TargetAgent>
     </AgentParameters>
     <CommunicationConfiguration>
-        <HubIp>192.168.1.109</HubIp>
+        <HubIp>192.168.10.1</HubIp>
         <HubCmdPort>5555</HubCmdPort>
         <HubDataPort>5556</HubDataPort>
-        <AgentIp>192.168.1.109</AgentIp>
+        <AgentIp>192.168.10.1</AgentIp>
         <AgentCmdPort>5572</AgentCmdPort>
         <AgentDataPort>5573</AgentDataPort>
     </CommunicationConfiguration>
