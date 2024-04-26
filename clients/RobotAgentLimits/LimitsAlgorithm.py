@@ -112,10 +112,10 @@ class LimitsAlgorithm:
             dy = 0
         if dx > 0:
             if dy > 0:
-                print('The robot is moving to the upper righ')
+                #print('The robot is moving to the upper righ')
                 # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
                 if self.x[2] < robotX and self.y[2] > robotY:
-                    print('The robot will move to the upper right corner of the rectangle.')
+                    #print('The robot will move to the upper right corner of the rectangle.')
                     # compute the nearest point to the segment, always compare two segment becouse the noise of the robot
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
@@ -129,11 +129,12 @@ class LimitsAlgorithm:
                             
                 else:
                     #stop the robot
-                    print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the left")          
+                    #print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the left")          
+                    pass
             elif dy < 0:
-                print('The robot is moving to the lower right corner.')
+                #print('The robot is moving to the lower right corner.')
                 if self.x[3] < robotX and self.y[3] < robotY:
-                    print('The robot will move to the lower right corner of the rectangle.')
+                    #print('The robot will move to the lower right corner of the rectangle.')
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
                     #take the minimum distance
@@ -147,9 +148,9 @@ class LimitsAlgorithm:
                     #stop the robot
                     print("probably collision with the wall at right. TODO: STOP THE ROBOT and turn it to the right")
             else:
-                print('The robot is moving to the right.')
+                #print('The robot is moving to the right.')
                 if self.x[2] < robotX:
-                    print('The robot will move to the right wall of the rectangle.')
+                    #print('The robot will move to the right wall of the rectangle.')
                     #in this case compare with 3 segments
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
@@ -165,9 +166,9 @@ class LimitsAlgorithm:
                             self.newHeading = -heading
         elif dx < 0:
             if dy > 0:
-                print('The robot is moving to the upper left corner.')
+                #print('The robot is moving to the upper left corner.')
                 if self.x[1] > robotX and self.y[1] > robotY:
-                    print('The robot will move to the upper left corner of the rectangle.')
+                    #print('The robot will move to the upper left corner of the rectangle.')
                     #in this case compare with 2 segments
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
@@ -182,9 +183,9 @@ class LimitsAlgorithm:
                     #stop the robot
                     print("probably collision with the wall at left.TODO: STOP THE ROBOT and turn it to the right")
             elif dy < 0:
-                print('The robot is moving to the lower left corner.')
+                #print('The robot is moving to the lower left corner.')
                 if self.x[4] > robotX and self.y[4] < robotY:
-                    print('El robot se dirigirá hacia la esquina inferior izquierda del rectángulo.')
+                    #print('El robot se dirigirá hacia la esquina inferior izquierda del rectángulo.')
                     #in this case compare with 2 segments
                     d1 = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[3])
@@ -200,7 +201,7 @@ class LimitsAlgorithm:
                     #stop the robot
                     print("probably collision with the wall at left. TODO: STOP THE ROBOT and turn it to the right")
             else:
-                print('The robot is moving to the left.')
+                #print('The robot is moving to the left.')
                 #compare with the left wall of the rectangle and the three segments 
                 if self.x[1] > robotX:
                     print('The robot will move to the left wall of the rectangle.')
@@ -221,12 +222,12 @@ class LimitsAlgorithm:
                     print("probably collision with the wall at left. TODO : STOP THE ROBOT and turn it to the right")  
         else:
             if dy > 0:
-                print('The robot is moving up.')
+                #print('The robot is moving up.')
                 d = self.distance(robotX, robotY, self.segmentOfTheRectangle[0])
                 if d < self.minimumSafetyDistance:
                     self.newHeading = -heading
             elif dy < 0:
-                print('The robot is moving down.')
+                #print('The robot is moving down.')
                 d = self.distance(robotX, robotY, self.segmentOfTheRectangle[2])
                 if d < self.minimumSafetyDistance:
                     self.newHeading = -(math.pi - abs(heading))

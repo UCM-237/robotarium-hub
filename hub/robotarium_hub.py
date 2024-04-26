@@ -32,9 +32,9 @@ class RobotariumHub:
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
-        self.commands_socket.bind(f'tcp://192.168.10.1:{CMD_PORT}')
+        self.commands_socket.bind(f'tcp://192.168.1.109:{CMD_PORT}')
         self.data_socket = self.context.socket(zmq.PUB)
-        self.data_socket.bind(f'tcp://192.168.10.1:{DATA_PORT}')
+        self.data_socket.bind(f'tcp://192.168.1.109:{DATA_PORT}')
         self.agents = {}
         self.camera = {}
         self.running = True
