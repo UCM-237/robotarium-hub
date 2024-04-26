@@ -9,7 +9,7 @@
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
 // Define a macro for debug printing
-#define DEBUG_ENABLED  // Comment out this line to disable debug prints
+//#define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
 #ifdef DEBUG_ENABLED
 #define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)

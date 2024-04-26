@@ -106,14 +106,14 @@ class RealTimePlotter:
   def addLimits(self,limits):
         
     self.ArenaLimits = limits
-    self.x[0]=-self.ArenaLimits["x1"]
-    self.y[0]=-self.ArenaLimits["y1"]
-    self.x[1]=-self.ArenaLimits["x2"]
-    self.y[1]=-self.ArenaLimits["y2"]
-    self.x[2]=-self.ArenaLimits["x3"]
-    self.y[2]=-self.ArenaLimits["y3"]
-    self.x[3]=-self.ArenaLimits["x4"]
-    self.y[3]=-self.ArenaLimits["y4"]
+    self.x[0]=self.ArenaLimits["x1"]
+    self.y[0]=self.ArenaLimits["y1"]
+    self.x[1]=self.ArenaLimits["x2"]
+    self.y[1]=self.ArenaLimits["y2"]
+    self.x[2]=self.ArenaLimits["x3"]
+    self.y[2]=self.ArenaLimits["y3"]
+    self.x[3]=self.ArenaLimits["x4"]
+    self.y[3]=self.ArenaLimits["y4"]
     # self.x[0]=2.56
     # self.y[0]=2.29
     # self.x[1]=0.46
@@ -150,11 +150,13 @@ class RealTimePlotter:
     self.axs_positions.cla()
    
 
-    
+    # if len(self.ArenaLimits)>0 and len(self.positions)>0:
     for robot_id, position_data in self.positions.items():
       # Convertir las coordenadas x e y a números flotantes
       x_position = float(position_data['x'])
       y_position = float(position_data['y'])
+      # x_position = -x_positions
+      # y_position = -y_positions
       
       # Agregar la posición a la lista correspondiente en el diccionario de posiciones
       if robot_id not in self.robot_positions:
@@ -168,6 +170,7 @@ class RealTimePlotter:
     # Actualizar los datos de las posiciones de los robots
     for robot_id, position_data in self.robot_positions.items():
         x_positions = position_data['x']
+        
         y_positions = position_data['y']
         self.axs_positions.scatter(x_positions, y_positions, label=robot_id)
     
@@ -208,6 +211,7 @@ class RealTimePlotter:
       time.sleep(1)
     while True:
       choice = input("Presiona 'q' para salir o cualquier otra tecla para continuar: ")
+
       if choice.lower() == 'q':
         self.exit_event.set()
         self.save_data()
@@ -227,8 +231,8 @@ class RealTimePlotter:
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/RealTimePlotter')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
-    self.addLimits("json.loads(message)")
-    self.update_plot()
+    #self.addLimits("json.loads(message)")
+    
     while not self.exit_event.is_set():
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
@@ -251,6 +255,7 @@ class RealTimePlotter:
         self.addLimits(json.loads(message))
 
       #update plot
+      self.update_plot()
     
 
      
