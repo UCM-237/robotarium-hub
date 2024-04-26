@@ -34,8 +34,8 @@ class Algorithm:
   def __init__(self, agent: Agent) -> None:
     self.agent = agent
     self.Position={}
-    self.Meta = '5'
-    self.SAMPLETIME=100
+    self.Meta = '2'
+    self.SAMPLETIME=400
     self.tval_before = 0
     self.tval_after= 0
     self.tval_sample = 0
@@ -86,7 +86,7 @@ class Algorithm:
     self.W2['farLeft'] = fuzz.trimf(self.W2.universe, [-5, -5, -3])
     self.W2['left'] = fuzz.trimf(self.W2.universe, [-4, -3, -1])
     self.W2['center'] = fuzz.trimf(self.W2.universe, [-3.5, 0, 3.5])
-    self.W2['right'] = fuzz.trimf(self.W2.universe, [1, 3, 4])
+    self.W2['right'] = fuzz.trimf(self.W2.universe, [-1, 3, 4])
     self.W2['farRight'] = fuzz.trimf(self.W2.universe, [3, 5, 5])
 
     self.rule6 = ctrl.Rule(self.AngleError2['bigNegative'], self.W2['farLeft'])
@@ -211,6 +211,7 @@ class Algorithm:
       #first correct the angle
       
       if abs(angleError)>self.PI/2:
+        print("control2")
         self.heading2.input['AngleError']=angleError
         self.heading2.compute()
         w=float(self.heading2.output['W'])
@@ -220,12 +221,12 @@ class Algorithm:
           w=float(self.heading.output['W'])
           
           vel=0
-      if modulo > 0.30:
+      if modulo > 0.40:
         self.heading.input['AngleError']=angleError
         self.heading.compute()
-        w=float(self.heading.output['W'])
+        #w=float(self.heading.output['W'])
         print(w)
-        vel=7.5*3.35
+        vel=8.5*3.35
         print("GO----------------------------------------")
       else:
         vel=0

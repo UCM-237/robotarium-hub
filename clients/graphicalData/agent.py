@@ -19,8 +19,8 @@ class segment:
       self.pf=np.array(pf)
 class RealTimePlotter:
 
-  def __init__(self, id: str='RealPlotter', ip: str='192.168.1.109', cmd_port: int=5572, data_port:int=5573,
-               hub_ip: str='192.168.1.109', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
+  def __init__(self, id: str='RealPlotter', ip: str='192.168.10.1', cmd_port: int=5572, data_port:int=5573,
+               hub_ip: str='192.168.10.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
     self.cmd_port = cmd_port
