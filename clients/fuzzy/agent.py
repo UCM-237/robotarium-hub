@@ -41,8 +41,8 @@ class Agent:
     self.data.bind(f'tcp://*:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
     self.device = device_class(agent=self)
-    self.device.connect()
     self.register()
+    self.device.connect()
     
 
   def _get_data_url(self):

@@ -81,7 +81,6 @@ int Localization::init(int argc,char **argv)
             10));
         if (!end || end == this->videoInput.c_str()) {
              /*  in_video.open(videoInput); // url
-            in_video.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
 			in_video.set(cv::CAP_PROP_FPS,20);*/
             
         } else {
@@ -113,6 +112,7 @@ int Localization::init(int argc,char **argv)
         } 
     }
     this->in_video.set(cv::CAP_PROP_FPS,30);
+    this->in_video.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('D', 'I', 'V', 'X'));
     
 
 
@@ -131,7 +131,7 @@ int Localization::init(int argc,char **argv)
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
-    cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
+    cv::FileStorage fs("/home/alex/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
 
@@ -201,11 +201,13 @@ bool Localization::FindArena()
                 // for (size_t j = 0; j < approxCurve.size(); ++j) {
                 //     cv::circle(this->grayMat, approxCurve[j], 5, this->cornerColors[j], -1);
                 // }
+
             }
             std::cout<<"Estimating Arena Position"<<std::endl;
             if(this->EstimateArenaPosition(approxCurve, this->baseArenaLength,this->heightArenaLength, this->rvecs, this->tvecs))
             {
-               cv::circle(this->image, approxCurve[1], 5, this->cornerColors[3], -1);
+               cv::circle(this->image, approxCurve[0], 5, this->cornerColors[3], -1);
+
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
                 // this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength/2);
                 // this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
@@ -247,39 +249,49 @@ bool Localization::FindArena()
 
 void Localization::FindRobot()
 {
+    int frame_width = this->in_video.get(cv::CAP_PROP_FRAME_WIDTH);
+    int frame_height = this->in_video.get(cv::CAP_PROP_FRAME_HEIGHT);
+    int fps = 30; // Tasa de fotogramas por segundo
+    std::cout<<"frame width: "<<frame_width/30<<std::endl;
+    std::cout<<"frame height: "<<frame_height/30<<std::endl;
+    cv::Size frame_size = cv::Size(1024, 720);
+    // Crear un objeto VideoWriter para escribir el video
+    cv::VideoWriter video("output.avi", cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), 30.0, frame_size,1);
+    if (!video.isOpened()) {
+       std:: cerr << "Error al abrir el archivo de salida para escribir el video" << std::endl;
+    }
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f> > corners;
     std::vector<float> reprojectionError;
     cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
     parameters->adaptiveThreshWinSizeMin = 4;
-    parameters->adaptiveThreshWinSizeMax = 24;
-    parameters->adaptiveThreshWinSizeStep = 4;
+    parameters->adaptiveThreshWinSizeMax = 28;
+    parameters->adaptiveThreshWinSizeStep = 2;
     // parameters->adaptiveThreshConstant = 7;
     // parameters->minMarkerPerimeterRate = 0.8;
-    // parameters->maxMarkerPerimeterRate = 1.2;
+    // parameters->maxMarkerPerimeterRate = 5;
     parameters->polygonalApproxAccuracyRate = 0.02;
     // parameters->minCornerDistanceRate = 0.05;
     // parameters->minDistanceToBorder = 3;
     parameters->cornerRefinementMethod = cv::aruco::CORNER_REFINE_CONTOUR;
     // parameters->minMarkerDistanceRate = 2.5; // Puede ajustarse según la distancia de los marcadores a la cámara
     // parameters->cornerRefinementWinSize = 5; // Tamaño de la ventana de refinamiento de esquinas
-    parameters->cornerRefinementMaxIterations = 30; // Número máximo de iteraciones de refinamiento de esquinas
+    parameters->cornerRefinementMaxIterations = 20; // Número máximo de iteraciones de refinamiento de esquinas
     parameters->cornerRefinementMinAccuracy = 0.01; // Precisión mínima de refinamiento de esquinas
     parameters->detectInvertedMarker = true; // Permitir la detección de marcadores invertidos si es necesario
 cv::Scalar color(0,0,255);
-    cv::Mat smoothed_image;
+    cv::Mat smoothed_image,frame;
     std::vector<std::vector<cv::Point2f>> rejected;
     while (this->in_video.grab())
     {
         this->rvecs.clear();
         this->tvecs.clear();
         this->in_video.retrieve(this->image);
-        
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
-        cv::threshold(this->grayMat, this->binary_image, 50, 255, cv::THRESH_BINARY);
+        this->image.copyTo(frame);
+        cv::threshold(this->grayMat, this->binary_image, 100, 255, cv::THRESH_BINARY);
 
-        cv::GaussianBlur(this->grayMat, this->grayMat, cv::Size(3,3), 0.0,0.0); // Tamaño del kernel y desviación estándar
-        this->image.copyTo(this->image_copy);
+        cv::GaussianBlur(this->grayMat, this->grayMat, cv::Size(3,3), 0.2,0.2); // Tamaño del kernel y desviación estándar
         
         //falta estimar la posicion de la camara con respecto a la arena
 
@@ -293,9 +305,9 @@ cv::Scalar color(0,0,255);
         {
             cv::aruco::drawDetectedMarkers(this->image, corners, ids);
             
-            MyestimatePoseSingleMarkers(corners, this->marker_length_m,
-                    camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
-        //cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
+            // MyestimatePoseSingleMarkers(corners, this->marker_length_m,
+            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
+        cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            
@@ -331,6 +343,7 @@ cv::Scalar color(0,0,255);
              for( long unsigned int i=0;i<this->filteredContours.size();i++){
                 cv::approxPolyDP(this->filteredContours[i], approxCurve, 0.04 * cv::arcLength(this->filteredContours[i], true), true);
                 cv::drawContours(this->image,this->filteredContours,i,color,2);
+                cv::drawContours(frame,this->filteredContours,i,color,2);
                 for (size_t j = 0; j < approxCurve.size(); ++j) {
                     cv::circle(this->image, approxCurve[j], 5, this->cornerColors[j], -1);
                 }
@@ -338,12 +351,21 @@ cv::Scalar color(0,0,255);
         }
 
          drawFrameAxes(this->image, this->camera_matrix, this->dist_coeffs, this->robotarioRvecs[0], this->robotarioTvecs[0], 0.1);
+         drawFrameAxes(frame, this->camera_matrix, this->dist_coeffs, this->robotarioRvecs[0], this->robotarioTvecs[0], 0.1);
+         // Escribir el fotograma en el archivo de video
+
+        // Redimensionar el fotograma a la resolución deseada
+        cv::resize(frame, frame, frame_size);
+        //video.write(frame);
+
          imshow("Pose estimation", this->image);
             char key = (char)cv::waitKey(1);
             if (key == 27)
                 break;
     }
-    in_video.release();
+    this->in_video.release();
+    video.release();
+    cv::destroyAllWindows();
 }
 
 void Localization::MyestimatePoseSingleMarkers(const std::vector<std::vector<cv::Point2f>> &corners, float markerLength, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, std::vector<cv::Vec3d> &rvecs, std::vector<cv::Vec3d> &tvecs, std::vector<float> &reprojectionError)

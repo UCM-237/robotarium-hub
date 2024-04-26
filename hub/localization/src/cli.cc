@@ -19,5 +19,6 @@ int main(int argc,char **argv)
         }
         localization->FindRobot();
     }
-
+    std::cout<<"Finishing"<<std::endl;  
+    return 0;
 }
