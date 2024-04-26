@@ -79,14 +79,15 @@ class Algorithm:
     self.AngleError2['zero'] = fuzz.trimf(self.AngleError2.universe, [-0.3,0,0.3,])
     self.AngleError2['positive'] = fuzz.trimf(self.AngleError2.universe, [0, self.PI/4, self.PI])
     self.AngleError2['bigPositive'] = fuzz.trimf(self.AngleError2.universe, [self.PI/2, self.PI, self.PI])
-    self.W2 = ctrl.Consequent(np.arange(-5, 5, 0.02), 'W')
+    self.W2 = ctrl.Consequent(np.arange(-6, 6, 0.02), 'W')
     
     # Membership functions for the consequent
-    self.W2['farLeft'] = fuzz.trimf(self.W2.universe, [-7, -7, -4])
-    self.W2['left'] = fuzz.trimf(self.W2.universe, [-6, -4, -2])
+    self.W2['farLeft'] = fuzz.trimf(self.W2.universe, [-5, -5, -3])
+    self.W2['left'] = fuzz.trimf(self.W2.universe, [-4, -3, -1])
     self.W2['center'] = fuzz.trimf(self.W2.universe, [-3.5, 0, 3.5])
-    self.W2['right'] = fuzz.trimf(self.W2.universe, [2, 4, 6])
-    self.W2['farRight'] = fuzz.trimf(self.W2.universe, [4, 7, 7])
+    self.W2['right'] = fuzz.trimf(self.W2.universe, [-1, 3, 4])
+    self.W2['farRight'] = fuzz.trimf(self.W2.universe, [3, 5, 5])
+
 
     self.rule6 = ctrl.Rule(self.AngleError2['bigNegative'], self.W2['farLeft'])
     self.rule7 = ctrl.Rule(self.AngleError2['negative'], self.W2['left'])
@@ -151,15 +152,15 @@ class Algorithm:
     if self.tval_sample < 0:
        print("Error de tiempo")
        print(self.tval_sample)
-    elif self.tval_sample > 500:
+    elif self.tval_sample > 100:
        print("(movimiento) Tiempo del programa mayor: ", self.tval_sample)
     else:
 
-      print((500 - self.tval_sample) / 1000)
+      #print((100 - self.tval_sample) / 1000)
       
-      time.sleep((500 - self.tval_sample)/1000)
-    self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})
-    time.sleep(1)
+      time.sleep((100 - self.tval_sample)/1000)
+    # self.agent.send('control/'+agentName+'/move',{'v_left':0,'v_right':0})
+    # time.sleep(1)
       
   def computeAngleError(self,agentId):
     posdataMeta=json.loads(self.Position[self.Meta])
@@ -182,8 +183,8 @@ class Algorithm:
   
          
   def orientation(self,agentId,agentName):
-    while(self.angleCorrected == False):   
-      self.correctAngle(agentId,agentName)
+    # while(self.angleCorrected == False):   
+    #   self.correctAngle(agentId,agentName)
     
     while(True):
       self.tval_before=time.time()*1000 
@@ -225,7 +226,7 @@ class Algorithm:
         self.heading.compute()
         w=float(self.heading.output['W'])
         print(w)
-        vel=7.5*3.35
+        vel=8.5*3.35
         print("GO----------------------------------------")
       else:
         vel=0

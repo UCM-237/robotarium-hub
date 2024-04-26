@@ -17,11 +17,11 @@ import ast
 logging.basicConfig(level=logging.INFO)
 
 # Who I am
-AGENT_ID = 'Algorithm'
+AGENT_ID = 'Algorithm5'
 AGENT_IP = '192.168.10.1'
-AGENT_CMD_PORT = 5581
-AGENT_DATA_PORT = 5582
-# Where the server is 
+AGENT_CMD_PORT = 6583
+AGENT_DATA_PORT = 6584
+# Where the server s 
 HUB_IP = '192.168.10.1'
 HUB_CMD_PORT = 5555
 HUB_DATA_PORT = 5556
@@ -95,8 +95,7 @@ class rendevouz:
         [-self.L/(2*self.R), 1/self.R]]
     self.PI=math.pi
     
-    self.AngleCorrected={'0':False,
-                         '1':False}
+    self.AngleCorrected=False
   def test(self):
     vel=8*3.35
     angularWheel = [0.0, 0.0]
@@ -119,8 +118,8 @@ class rendevouz:
       
   def connect(self):
     logging.debug('starting device')
-    self.thread = Thread(target=self.test).start()
-    #self.thread = Thread(target=self.rendevouz('0','RobotAgent1')).start()
+    #self.thread = Thread(target=self.test).start()
+    self.thread = Thread(target=self.rendevouz('5','RobotAgent5')).start()
     
   def sendVel(self,angularWheel,agentName):
     self.agent.send('control/'+agentName+'/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
@@ -152,17 +151,23 @@ class rendevouz:
   
   def correctAngleError(self,agent,agentName,pid):
     tval_before=time.time()*1000 
-    #self.agent.send('control/RobotAgent1/move',{'v_left':0,'v_right':0})
+    
+    angleError,modulo=self.ComputeAngleErrorAndDistance(agent)
     angleError,modulo=self.ComputeAngleErrorAndDistance(agent)
     w=0
     vel=0
     angularWheel = [0.0, 0.0]
-    if(abs(angleError)<0.50):
-      self.AngleCorrected[agent]=True
+    if(abs(angleError) < 0.50):
+      self.agent.send('control/RobotAgent1/move',{'v_left':0,'v_right':0})
+
+      self.AngleCorrected=True
+      self.agent.send('control/RobotAgent1/move',{'v_left':0,'v_right':0})
+
       
     else:
-      self.AngleCorrected[agent]=False
-      w=pid.compute(angleError,300/1000)
+      self.AngleCorrected=False
+      w=pid.compute(angleError,200/1000)
+      w=-w
       print("w: ",w)
     velocity_robot=[float(w),vel]
     self.angularWheelSpeed(angularWheel,velocity_robot)
@@ -173,13 +178,13 @@ class rendevouz:
     if tval_sample < 0:
        print("Error de tiempo")
        print(tval_sample)
-    elif tval_sample > 300:
+    elif tval_sample > 200:
        print("(movimiento) Tiempo del programa mayor: ", tval_sample)
     else:
       
-      print((300 - tval_sample) / 1000)
+      print((200 - tval_sample) / 1000)
       
-      time.sleep((300 - tval_sample)/1000)
+      time.sleep((200 - tval_sample)/1000)
       
   def orientation(self,agent,agentName):
     
@@ -187,10 +192,9 @@ class rendevouz:
     PI=math.pi
     vel=0
     angularWheel = [0.0, 0.0]
-    cumError = 0
-    pid = PIDController(0.83, 0.35, 0.08)
+    pid = PIDController(1.2, 0.45, 0.1)
     pid.reset()
-    while(self.AngleCorrected[agent]==False):
+    while(self.AngleCorrected==False):
       angleCorrected = self.correctAngleError(agent,agentName,pid)
       if angleCorrected:
         break
@@ -198,17 +202,17 @@ class rendevouz:
       
     print("Angle Corrected-----------------")  
     pid.reset()
-    pid.set_kd(0.0)
-    pid.set_ki(0.18)
-    pid.set_kp(0.43)
+    pid.set_kd(0.02)
+    pid.set_ki(0.15)
+    pid.set_kp(0.63)
     w=0
     while(True):
       tval_before=time.time()*1000 
       angleError,modulo=self.ComputeAngleErrorAndDistance(agent)
      
-      vel=8.2*3.35
+      vel=9.5*3.35
       angularWheel = [0.0, 0.0]
-      if(modulo<0.35):
+      if(modulo<0.50):
         vel=0
         w=0
         print("STOP----------------------------------------")
@@ -217,12 +221,11 @@ class rendevouz:
         print(angularWheel)
         self.sendVel(angularWheel,agentName)
         break
-      if(abs(angleError)<0.30):
-        w=0
-        
-      else:
-        self.AngleCorrected[agent]=False
-        w=pid.compute(angleError,300/1000)
+      
+      if(abs(angleError)<0.35):
+        w=0 
+      else: 
+        w=pid.compute(angleError,400/1000)
         print("w: ",w)
       velocity_robot=[float(w),vel]
       self.angularWheelSpeed(angularWheel,velocity_robot)
@@ -233,90 +236,13 @@ class rendevouz:
       if tval_sample < 0:
         print("Error de tiempo")
         print(tval_sample)
-      elif tval_sample > 300:
+      elif tval_sample > 200:
         print("(movimiento) Tiempo del programa mayor: ", tval_sample)
       else:
         
-        print((300 - tval_sample) / 1000)
+        print((400 - tval_sample) / 1000)
         
-        time.sleep((300 - tval_sample)/1000)
-  #   posdataMeta=json.loads(self.Position[self.Meta])
-  #   posdataAgent=json.loads(self.Position[agent])
-  #   x=float(posdataMeta['x'])-float(posdataAgent['x'])
-  #   y=float(posdataMeta['y'])-float(posdataAgent['y'])
-    
-    
-  #   modulo=math.sqrt((x*x)+(y*y))
-  #   angle=math.atan2(y,x)
-  #   angleError=float(posdataAgent['yaw'])-angle
-  #   print("angle:")
-  #   print(angleError)
-  #   if angleError > PI:
-  #     angleError=angleError-2*PI
-  #   elif angleError< (-PI):
-  #     angleError=angleError+2*PI
-  #   print("angle:")
-  #   print(angleError)
-  #   self.cumError= self.cumError+angleError
-
-  #   if angleError<0 and  self.cumError>0:
-  #     self.cumError=0
-        
-  #   elif(angleError>0 and  self.cumError<0):
-  #      self.cumError=0
-      
-  #   if( self.cumError>0):
-
-  #     if( self.cumError>14):
-          
-  #          self.cumError=14
-            
-        
-  #   elif( self.cumError<0):
-
-  #     if( self.cumError<-14):
-
-  #        self.cumError=-14
-
-  #   auxcumError=self.cumError
-  #   if modulo>0.35:        
-      
-  #     if(angleError>0.65 or angleError<-0.65):
-              
-  #       w=(0.35*angleError)+0.1*self.cumError#*self.SAMPLETIME/1000 
-  #       print("w:")
-  #       print(w)
-  #     else:
-  #       w=0
-  #       giro=True
-
-      
-     
-    
-  #     if giro:
-  #       self.next=True
-  #     self.tval_after=time.time()*1000
-  #     self.tval_sample = self.tval_after-self.tval_before
-  #     if self.next:
-  #       vel=8.2*3.35
-  #   else:
-  #     w=0
-  #     vel=0
-  #     print("STOP----------------------------------------")
-  #   velocity_robot=[w,vel]
-  #   self.angularWheelSpeed(angularWheel,velocity_robot)
-  #   self.agent.send('control/RobotAgent1/move',{'v_left':angularWheel[0],'v_right':angularWheel[1]})
-  #   print(angularWheel)
-  #   if self.tval_sample < 0:
-  #      print("Error de tiempo")
-  #      print(self.tval_sample)
-  #   elif self.tval_sample > self.SAMPLETIME:
-  #      print("(movimiento) Tiempo del programa mayor: ", self.tval_sample)
-  #   else:
-
-  #     #print((self.SAMPLETIME - self.tval_sample) / 1000)
-  #     time.sleep((self.SAMPLETIME - self.tval_sample) / 1000)
-
+        time.sleep((400 - tval_sample)/1000)
 
   def angularWheelSpeed(self, w_wheel, velocity_robot):
     fila = 2
