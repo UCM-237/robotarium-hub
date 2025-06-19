@@ -8,6 +8,8 @@
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
+
+
 // Define a macro for debug printing
 //#define DEBUG_ENABLED  // Comment out this line to disable debug prints
 

@@ -2,6 +2,8 @@
 
 void robot::pinSetup()
 {
+  #ifdef BOROMIR
+  
     this->pinENA = 12;
     this->pinIN1 = 7;
     this->pinIN2 = 8;
@@ -9,6 +11,17 @@ void robot::pinSetup()
     this->pinIN3 = 9;
     this->pinIN4 = 10;
     this->pinENB = 11;
+  
+  #else
+    this->pinENA = 6;
+    this->pinIN1 = 7;
+    this->pinIN2 = 8;
+
+    this->pinIN3 = 9;
+    this->pinIN4 = 10;
+    this->pinENB = 5;
+   
+   #endif
 
     this->pinMotorLeft[0] = this->pinENA;
     this->pinMotorLeft[1] = this->pinIN1;

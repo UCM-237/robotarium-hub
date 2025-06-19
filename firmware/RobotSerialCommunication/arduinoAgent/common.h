@@ -95,7 +95,7 @@ short bytesToShort(unsigned char *b)
 //-----------------contador encoder------------------------------------------------------------------------------------
 const int             MAX_ENCODER_STEPS =                      20;//Resolucion encoder       
 const int             encoderLeft =             2;//pin de entrada de encoder derecha
-const int             encoderRight=             15;//pin de entrada de encoder izquierda
+const int             encoderRight=             3;//pin de entrada de encoder izquierda
 
 int                   encoder_countRight_after=0;
 int                   encoder_countLeft_after=0;
