@@ -74,13 +74,14 @@ void loop() {
     Serial.println(server_operation->InitFlag);
     if (server_operation->InitFlag == INIT_FLAG){
           Serial.print("operation: \t");
+    
     Serial.println(server_operation->op);
     Serial.println(server_operation->InitFlag);
       do_operation(server_operation->op);
       serialCom = false;
     }
   }
-
+  op_saludo();
   // TO DO: Refactor
   if(currentTime - timeAfter >= SAMPLINGTIME) {
   
@@ -159,7 +160,7 @@ void op_saludo() {
   operation_send.len = sizeof (operation_send.data);  /* len */
   Serial1.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
   Serial1.flush();
-//  send(ID, OP_SALUDO, )
+  send(ID, OP_SALUDO, )
 }
 
 void op_message() { }
