@@ -11,11 +11,11 @@
 
 
 // Define a macro for debug printing
-//#define DEBUG_ENABLED  // Comment out this line to disable debug prints
+#define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
 #ifdef DEBUG_ENABLED
-#define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
-#define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
+#define DEBUG_PRINT(...)   Serial1.print(__VA_ARGS__)
+#define DEBUG_PRINTLN(...) Serial1.println(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)   // Debug print is empty when DEBUG_ENABLED is not defined
 #define DEBUG_PRINTLN(...) // Debug println is empty when DEBUG_ENABLED is not defined
@@ -86,7 +86,7 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
     // Se prepara la IMU para poder ser leida
     if (!IMU.begin()) {
-      Serial.println("Failed to initialize IMU!");
+      Serial1.println("Failed to initialize IMU!");
       while (1);
     }
     // Se empieza con los motores parados
@@ -149,7 +149,7 @@ void loop() {
   deltaTimeStopI = timeStopI - timeAfterDebounceLeft;
   meanFilterRight.AddValue(deltaTimeRight);
   meanFilterLeft.AddValue(deltaTimeLeft);
-  
+  do_operation(OP_HELLO);  
 
   if(currentTime - timeAfter >= SAMPLINGTIME) 
   {
