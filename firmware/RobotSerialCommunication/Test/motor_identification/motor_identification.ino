@@ -20,19 +20,19 @@
 using namespace std;
 
 // H-BRIDGE - Uncomment only one option
-#define H_BRIDGE_RED 
-//#define H_BRIDGE_BLACK  
+//#define H_BRIDGE_RED 
+#define H_BRIDGE_BLACK  
 
 // ARDUINO - Uncomment only one option
-#define ARDUINO_TYPE_EVERIS  
-//#define ARDUINO_TYPE_MKR  
+//#define ARDUINO_TYPE_EVERIS  
+#define ARDUINO_TYPE_MKR  
 
 // THE COMPANY - Uncomment only one option
-// #define MERRY
+ #define MERRY
 // #define FRODO
 //#define SAM
 //#define ARWEN
-#define BOROMIR
+//#define BOROMIR
 
 // -----------------------------------------------------------------------------
 // PIN layout
@@ -60,10 +60,10 @@ using namespace std;
 #ifdef H_BRIDGE_RED
   const int pin_left_motor_dir_1   = 8;
   const int pin_left_motor_dir_2   = 7  ;
-  const int pin_left_motor_enable  = 9;
-  const int pin_right_motor_dir_1  = 11;
-  const int pin_right_motor_dir_2  = 12;
-  const int pin_right_motor_enable = 10;
+  const int pin_left_motor_enable  = 5;
+  const int pin_right_motor_dir_1  = 9;
+  const int pin_right_motor_dir_2  = 10;
+  const int pin_right_motor_enable = 6;
 #endif
 
 // -----------------------------------------------------------------------------
@@ -71,7 +71,7 @@ using namespace std;
 // -----------------------------------------------------------------------------
 const int LEFT_WHEEL = 0;
 const int RIGHT_WHEEL = 1;
-const int PIN_SHARP = 1;
+const int PIN_SHARP = 2;
 const int R=6.5;
 
 #define FORWARD LOW
@@ -374,21 +374,43 @@ void update_control(double count_left_wheel, double count_right_wheel, double dt
  Serial.println(vel_enc_iz);
  
  if (lw_vel<255){
+ 
   lw_vel+=1;
-  digitalWrite(pin_left_motor_dir_1,HIGH);
-  digitalWrite(pin_left_motor_dir_2,LOW);
-  analogWrite(pin_left_motor_enable,lw_vel);
+    #ifdef H_BRIDGE_RED
+      digitalWrite(pin_left_motor_dir_1,HIGH);
+      digitalWrite(pin_left_motor_dir_2,LOW);
+      analogWrite(pin_left_motor_enable,lw_vel);
+  #endif
+    #ifdef H_BRIDGE_BLACK
+     digitalWrite(pin_left_motor_direction,HIGH);
+     analogWrite(pin_left_motor_enable,lw_vel);
+   #endif  
  }
  else {
-  digitalWrite(pin_left_motor_dir_1,HIGH);
-  digitalWrite(pin_left_motor_dir_2,LOW);
-  analogWrite(pin_left_motor_enable,0);
-  if (rw_vel<255){
+    #ifdef H_BRIDGE_RED
+    digitalWrite(pin_left_motor_dir_1,HIGH);
+    digitalWrite(pin_left_motor_dir_2,LOW);
+    analogWrite(pin_left_motor_enable,0);
+    #endif
+    #ifdef H_BRIDGE_BLACK
+     digitalWrite(pin_left_motor_direction,HIGH);
+     analogWrite(pin_left_motor_enable,0);
+   #endif  
+    
+    if (rw_vel<255){
     rw_vel+=1;
-    digitalWrite(pin_right_motor_dir_1,HIGH);
-    digitalWrite(pin_right_motor_dir_2,LOW);
-    analogWrite(pin_right_motor_enable,rw_vel);
+    #ifdef H_BRIDGE_RED
+    
+      digitalWrite(pin_right_motor_dir_1,HIGH);
+      digitalWrite(pin_right_motor_dir_2,LOW);
+      analogWrite(pin_right_motor_enable,rw_vel);
+    #endif
+    #ifdef H_BRIDGE_BLACK
+     digitalWrite(pin_right_motor_direction,HIGH);
+     analogWrite(pin_right_motor_enable,rw_vel);
+   #endif  
 
+    
  }
  }
  //rw_vel=pid_right_motor(vel_enc_d);
