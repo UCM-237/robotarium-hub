@@ -14,8 +14,8 @@
 #define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
 #ifdef DEBUG_ENABLED
-#define DEBUG_PRINT(...)   Serial1.print(__VA_ARGS__)
-#define DEBUG_PRINTLN(...) Serial1.println(__VA_ARGS__)
+#define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
+#define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)   // Debug print is empty when DEBUG_ENABLED is not defined
 #define DEBUG_PRINTLN(...) // Debug println is empty when DEBUG_ENABLED is not defined
@@ -81,12 +81,15 @@ void setup() {
     // Interrupciones para contar pulsos de encoder
     pinMode(encoderRight, INPUT_PULLUP);
     pinMode(encoderLeft, INPUT_PULLUP);
-
+    Serial.begin(9600);//for debuggin
+    Serial.println("Comunications initialised");
+    Serial1.begin(9600);
+   
     attachInterrupt(digitalPinToInterrupt(encoderLeft), isrLeft, RISING);//prepara la entrada del encoder como interrupcion
     attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
     // Se prepara la IMU para poder ser leida
     if (!IMU.begin()) {
-      Serial1.println("Failed to initialize IMU!");
+      Serial.println("Failed to initialize IMU!");
       while (1);
     }
     // Se empieza con los motores parados
@@ -97,8 +100,6 @@ void setup() {
     wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
     wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
-    Serial1.begin(9600);//for debuggin
-    Serial.begin(9600);
 
     //connect();
    DEBUG_PRINTLN("setup ok");
@@ -119,6 +120,7 @@ const int INIT_FLAG = 112;
 void loop() {
   currentTime = millis();
   serialEvent();
+  Serial.println("Ok loop");
   if (serialCom) 
   {
     // Serial.print("operationFlag: \t");

@@ -49,7 +49,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
   // Se prepara la IMU para poder ser leida
   if (!IMU.begin()) {
-    Serial.println("Failed to initialize IMU!");
+    Serial1.println("Failed to initialize IMU!");
     while (1);
   }
   // Se empieza con los motores parados

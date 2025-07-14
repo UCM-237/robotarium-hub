@@ -13,7 +13,7 @@
 
 
 //-----------------------------------------------------------
-#define ROBOT_ID BOROMIR
+#define ROBOT_ID FRODO
 
 class robot
 {
