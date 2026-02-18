@@ -18,8 +18,12 @@
 #include "robot.h"       // Definiciones físicas y configuración de pines del robot
 #include <math.h>
 #include <SimpleKalmanFilter.h>
+
+#ifdef ARDUINO_TYPE_MKR
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
+#endif
+
 #include "arduino_secrets.h" // Credenciales de red (SSID y Password)
 
 
@@ -33,11 +37,12 @@
 #define DEBUG_PRINTLN(...) 
 #endif
 
+#ifdef ARDUINO_TYPE_MKR
 // Variables de conectividad WiFi
 char ssid[] = SECRET_SSID;        
 char pass[] = SECRET_PASS;    
 int status = WL_IDLE_STATUS;     
-
+#endif
 using namespace std;
 unsigned char packetBuffer[256]; // Buffer para almacenar paquetes recibidos por Serial
 
@@ -116,7 +121,7 @@ double wLeft, wRight;
 // el comienzo de un mensaje válido y no ruido o datos corruptos.
 const int INIT_FLAG = 112;
 
-
+#ifdef ARDUINO_TYPE_MKR
 // Objeto que gestiona la conexión TCP/IP a través del chip WiFi del Arduino (MKR o Nano)
 // Es el "túnel" de datos básico para cualquier comunicación por red
 WiFiClient wifi;
@@ -136,7 +141,7 @@ int mqttPort = 1883;
 // Es fundamental para que el servidor sepa qué robot de los 10 está enviando datos
 const char device[] = "arduinoClient";
 
-
+#endif
 
 /**
  * Configuración inicial del sistema.
@@ -161,10 +166,10 @@ void setup() {
     
     // Inicializa la Unidad de Medición Inercial (IMU) interna para leer aceleración y rotación
     // Si la IMU no responde, el programa se detiene por seguridad para evitar errores de navegación
-    if (!IMU.begin()) {
+    /*if (!IMU.begin()) {
       Serial.println("Failed to initialize IMU!");
       while (1); // Bucle infinito de seguridad
-    }
+    }*/
 
     // Asegura que el robot comience totalmente estático frenando ambos motores eléctricamente
     robot.fullStop();
@@ -974,7 +979,7 @@ void serialEvent() {
 
  
 
-
+#ifdef ARDUINO_TYPE_MKR
 
 /**
  * Formatea un array de 6 bytes en una cadena hexadecimal separada por puntos.
@@ -1121,3 +1126,4 @@ void connect() {
   mqttClient.print(messagePayload);
   // Nota: Falta mqttClient.endMessage() si la librería lo requiere para enviar el buffer.
 }
+#endif
