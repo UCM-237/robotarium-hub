@@ -46,8 +46,8 @@ void robot::pinSetup() {
 
     #ifdef H_BRIDGE_BLACK
       // Configuración para el Puente en H Negro (L298N o similar)
-      this->pinENA = 5;  this->pinIN1 = 4; 
-      this->pinIN3 = 9;  this->pinENB = 8;
+      this->pinENA = 2;  this->pinIN1 = 3; 
+      this->pinIN3 = 6;  this->pinENB = 7;
     #endif
   
     #ifdef H_BRIDGE_RED
@@ -60,6 +60,18 @@ void robot::pinSetup() {
   #ifdef ARDUINO_TYPE_NANO
     this->pinLeftEncoder = 2;  this->pinRightEncoder = 3; 
     // (Configuraciones de pines para Nano...)
+     #ifdef H_BRIDGE_BLACK
+      // Configuración para el Puente en H Negro (L298N o similar)
+      this->pinENA = 2;  this->pinIN1 = 3; 
+      this->pinIN3 = 6;  this->pinENB = 7;
+    #endif
+  
+    #ifdef H_BRIDGE_RED
+      // Configuración para el Puente en H Rojo
+      this->pinENA = 10;  this->pinIN2 = 12;  this->pinIN1 = 11;
+      this->pinIN3 = 8; this->pinIN4 = 7; this->pinENB = 9;
+    #endif
+
   #endif
 
   // Asignación de arrays para facilitar el manejo de motores [ENABLE, IN1, IN2]
@@ -76,7 +88,7 @@ void robot::motorSetup() {
 // Mueve una rueda hacia adelante aplicando PWM
 void robot::moveForward(const int pinMotor[3], int speed) {
     digitalWrite(pinMotor[1], HIGH);
-    digitalWrite(pinMotor[2], LOW);
+    digitalWrite(pinMotor[2], LOW); 
     analogWrite(pinMotor[0], speed);
 }
 
