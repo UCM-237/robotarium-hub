@@ -63,8 +63,8 @@ void robot::pinSetup() {
   #endif
 
   // Asignación de arrays para facilitar el manejo de motores [ENABLE, IN1, IN2]
-  this->pinMotorRight[0] = pinENB; this->pinMotorRight[1] = pinIN3; this->pinMotorRight[2] = pinIN4;
-  this->pinMotorLeft[0] = pinENA;  this->pinMotorLeft[1] = pinIN1;  this->pinMotorLeft[2] = pinIN2;
+  this->pinMotorRight[0] = pinENA; this->pinMotorRight[1] = pinIN1; this->pinMotorRight[2] = pinIN2;
+  this->pinMotorLeft[0] = pinENB;  this->pinMotorLeft[1] = pinIN3;  this->pinMotorLeft[2] = pinIN4;
 }
 
 // Configura todos los pines de control como salida
