@@ -1,7 +1,19 @@
-#pragma once
+/*
+ * ----------------------------------------------------------------------------
+ * PROYECTO: Robotarium Hub (UCM)
+ * ARCHIVO:  controller.h / controller.cpp
+ * ----------------------------------------------------------------------------
+ * DESCRIPCIÓN:
+ * Implementación de los controladores de velocidad. Contiene la lógica del
+ * algoritmo PID (Proporcional-Integral-Derivativo) y el modelo FeedForward
+ * para la compensación de fricción y respuesta dinámica de los motores.
+ * ----------------------------------------------------------------------------
+ */
+ 
+ #pragma once
 #include <Arduino.h>
 
-#define MINPWM 100
+#define MINPWM 110
 #define MAXPWM 255
 class controler
 {
@@ -23,7 +35,7 @@ class controler
         int            PWM;
         double feedForwardParam_A;
         double feedForwardParam_B;
-        const double maxIntegralError=5;
+        double maxIntegralError=14;
         
 
 };
