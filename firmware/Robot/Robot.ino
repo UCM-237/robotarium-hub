@@ -22,6 +22,7 @@
 #ifdef ARDUINO_TYPE_MKR
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
+#include <ArduinoJson.h>
 #endif
 
 #include "arduino_secrets.h" // Credenciales de red (SSID y Password)
@@ -132,7 +133,7 @@ MqttClient mqttClient(wifi);
 
 // Dirección IP del servidor central (Broker MQTT)
 // En este caso, apunta a un dispositivo en tu red local (probablemente la Raspberry Pi o un PC)
-const char broker[] = "192.168.1.109";
+const char broker[] = "192.168.10.1";
 
 // Puerto estándar para el protocolo MQTT (sin cifrado)
 int mqttPort = 1883;
@@ -141,6 +142,8 @@ int mqttPort = 1883;
 // Es fundamental para que el servidor sepa qué robot de los 10 está enviando datos
 const char device[] = "arduinoClient";
 
+// Para decodificar el JSON
+StaticJsonDocument<200> doc;
 #endif
 
 /**
@@ -190,9 +193,29 @@ void setup() {
 
     // Inicializa la comunicación Serie por USB para monitorización y depuración en el PC
     Serial.begin(9600); 
-    
-    // connect(); // Comentado: Llamada para establecer conexión WiFi/MQTT (opcional)
 
+    #ifdef ARDUINO_TYPE_MKR
+    WiFi.begin(ssid,pass);
+    while(WiFi.status() != WL_CONNECTED){
+      Serial.print(".");
+      delay(500);
+    }
+    Serial.println(".");
+    Serial.println("Conectado a Wifi");
+    mqttClient.onMessage(onMqttMessage);
+    Serial.println("Conectando al broker Mqtt");
+     //Llamada para establecer conexión WiFi/MQTT (opcional)
+    if(!mqttClient.connect(broker,mqttPort)){
+      Serial.print("Conexion fallida");
+      Serial.println(mqttClient.connectError());
+      while(1);
+    }
+    const char topic[]="#";
+    
+    mqttClient.subscribe(topic);
+    Serial.print("Suscrito al tema: ");
+    Serial.println(topic);
+    #endif
     // Mensaje de confirmación si la depuración está activa
     DEBUG_PRINTLN("setup ok"); 
 }
@@ -225,11 +248,12 @@ void loop() {
   }
   
   // Mantiene viva la conexión MQTT
-  // call poll() regularly to allow the library to send MQTT keep alive which
+  #ifdef ARDUINO_TYPE_MKR
+   //Call poll() regularly to allow the library to send MQTT keep alive which
 
   // avoids being disconnected by the broker
-  //mqttClient.poll();
-
+   mqttClient.poll();
+  #endif
   
   // 3. PREPARACIÓN DE DATOS DE SENSORES
   int auxPWMD = 0, auxPWMI = 0; // Variables auxiliares para evitar enviar PWM repetido
@@ -981,6 +1005,34 @@ void serialEvent() {
 
 #ifdef ARDUINO_TYPE_MKR
 
+void onMqttMessage(int messageSize){
+  Serial.print("Mensaje recibido en el topic ");
+  Serial.println(mqttClient.messageTopic());
+  Serial.print(" Tamaño: ");
+  Serial.print(messageSize);
+  Serial.print(" bytes");
+  String incoming = "";
+
+    while(mqttClient.available()){
+      incoming += (char)mqttClient.read();
+    }
+  DeserializationError error = deserializeJson(doc, incoming);
+  float x = doc["x"], y = doc["y"], yaw = doc["yaw"];
+  Serial.println();
+  Serial.print("x=");
+  Serial.print(x); 
+  Serial.print(", y=");
+  Serial.print(y); 
+  Serial.print(", yaw=");
+  Serial.println(yaw); 
+
+  if (error) {
+    Serial.print("Error: ");
+    Serial.println(error.c_str());
+    return;
+  }
+  Serial.println("--------------------------------------------------");
+}
 /**
  * Formatea un array de 6 bytes en una cadena hexadecimal separada por puntos.
  * @param mac Array de 6 bytes con la dirección física.
