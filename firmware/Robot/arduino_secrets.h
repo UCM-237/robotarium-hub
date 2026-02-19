@@ -11,4 +11,4 @@
  */
  
 #define SECRET_SSID "RobotariumUCM"
-#define SECRET_PASS ""
+#define SECRET_PASS "robotario"
