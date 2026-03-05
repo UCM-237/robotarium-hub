@@ -5,9 +5,11 @@
 #include "robot.h"
 #include <math.h>
 #include <SimpleKalmanFilter.h>
+/* Arduino Nano Every no tiene WIFI
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
+*/
 // Define a macro for debug printing
 #define DEBUG_ENABLED  // Comment out this line to disable debug prints
 
@@ -18,12 +20,13 @@
 #define DEBUG_PRINT(...)   // Debug print is empty when DEBUG_ENABLED is not defined
 #define DEBUG_PRINTLN(...) // Debug println is empty when DEBUG_ENABLED is not defined
 #endif
+/* Arduino Nano Every no tiene WIFI
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the WiFi radio's status
 
-
+*/
 
 using namespace std;
 unsigned char packetBuffer[256]; //buffer to hold incoming packet
@@ -67,10 +70,12 @@ controler wheelControlerRight;
 controler wheelControlerLeft;
 /*define robot*/
 robot robot;
+/* Arduino Nano Every no tiene WIFI
 WiFiClient wifi;
 MqttClient mqttClient(wifi);
 const char broker[] ="192.168.1.109";
 int mqttPort = 1883;
+*/
 const char device[] = "arduinoClient";
 
 void setup() {
@@ -85,7 +90,7 @@ void setup() {
     // Se prepara la IMU para poder ser leida
     if (!IMU.begin()) {
       Serial.println("Failed to initialize IMU!");
-      while (1);
+      //while (1);
     }
     // Se empieza con los motores parados
     robot.fullStop();
@@ -117,10 +122,13 @@ const int INIT_FLAG = 112;
 void loop() {
   currentTime = millis();
   serialEvent();
+  Serial.print("En loop");  
   if (serialCom) 
   {
-    // Serial.print("operationFlag: \t");
-    // Serial.println(server_operation->InitFlag);
+    DEBUG_PRINT("operationFlag: \t");
+    DEBUG_PRINTLN(server_operation->InitFlag);
+    DEBUG_PRINT("operation: \t");
+    DEBUG_PRINTLN(server_operation->op);
     if (server_operation->InitFlag == INIT_FLAG)
     {
      DEBUG_PRINT("operationFlag: \t");
@@ -129,8 +137,8 @@ void loop() {
      DEBUG_PRINTLN(server_operation->op);
 
       do_operation((operation_t)server_operation->op);
-      serialCom = false;
     }
+    serialCom = false;
   }
   
   // call poll() regularly to allow the library to send MQTT keep alive which
@@ -329,6 +337,8 @@ void op_moveRobot() {
   // moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
   robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
   robot.moveRightWheel(PWM_Right, setpointWRight, backD);
+  // robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
+  // robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
   for(int i=0; i<10; i++)
@@ -597,6 +607,7 @@ void serialEvent() {
   
 // }
 
+/* Arduino Nano Every no tiene WIFi
 void printWifiData() {
   // print your board's IP address:
   IPAddress ip = WiFi.localIP();
@@ -646,11 +657,12 @@ void printMacAddress(byte mac[]) {
   }
   Serial.println();
 }
-
+*/
 
 /*
 Connects to Wifi and MQTT Broker
 */
+/*
 void connect() {
   Serial.print("checking wifi...");
   while ( status != WL_CONNECTED) {
@@ -685,11 +697,12 @@ void connect() {
   mqttClient.print(messagePayload);
 }
 
-
+*/
 
 /*
 Prints Wifi connection information
 */
+/*
 void printConnectionInformation() 
 {
   // Print Network SSID
@@ -743,3 +756,4 @@ void printConnectionInformation()
   Serial.print(":");
   Serial.println(mac[0], HEX);
 }
+*/

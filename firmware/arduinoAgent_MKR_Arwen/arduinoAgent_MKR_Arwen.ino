@@ -97,7 +97,7 @@ void setup() {
     // Comunicacion por puerto serie
     Serial1.begin(9600);//for debuggin
     Serial.begin(9600);
-
+    Serial.print("Inicio setup");   
     //connect();
    DEBUG_PRINTLN("setup ok");
 }
@@ -116,11 +116,15 @@ const int INIT_FLAG = 112;
 
 void loop() {
   currentTime = millis();
+  Serial.print("Loop (Antes serialEvent");
   serialEvent();
+  Serial.print("Loop");
   if (serialCom) 
   {
-    // Serial.print("operationFlag: \t");
-    // Serial.println(server_operation->InitFlag);
+    DEBUG_PRINT("operationFlag: \t");
+    DEBUG_PRINTLN(server_operation->InitFlag);
+    DEBUG_PRINT("operation: \t");
+    DEBUG_PRINTLN(server_operation->op);
     if (server_operation->InitFlag == INIT_FLAG)
     {
      DEBUG_PRINT("operationFlag: \t");
@@ -129,8 +133,8 @@ void loop() {
      DEBUG_PRINTLN(server_operation->op);
 
       do_operation((operation_t)server_operation->op);
-      serialCom = false;
     }
+    serialCom = false;
   }
   
   // call poll() regularly to allow the library to send MQTT keep alive which
@@ -261,6 +265,7 @@ void send(int operation, byte *data) {
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&data, operation_send.len);
   Serial1.flush();
+  Serial.print((char *)data);
 }
 
 void op_saludo() {
@@ -329,6 +334,8 @@ void op_moveRobot() {
   // moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
   robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
   robot.moveRightWheel(PWM_Right, setpointWRight, backD);
+  // robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
+  // robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
   for(int i=0; i<10; i++)

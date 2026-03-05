@@ -76,17 +76,20 @@ const char device[] = "arduinoClient";
 void setup() {
     robot.pinSetup();
     robot.motorSetup();
+     
     // Interrupciones para contar pulsos de encoder
     pinMode(encoderRight, INPUT_PULLUP);
     pinMode(encoderLeft, INPUT_PULLUP);
-
+    
     attachInterrupt(digitalPinToInterrupt(encoderLeft), isrLeft, RISING);//prepara la entrada del encoder como interrupcion
     attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
+    
     // Se prepara la IMU para poder ser leida
-    if (!IMU.begin()) {
+    /*if (!IMU.begin()) {
       Serial.println("Failed to initialize IMU!");
-      while (1);
-    }
+      // while (1);
+    }*/
+    
     // Se empieza con los motores parados
     robot.fullStop();
   
@@ -95,16 +98,17 @@ void setup() {
     wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
     wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
     // Comunicacion por puerto serie
-    Serial1.begin(9600);//for debuggin
-    Serial.begin(9600);
+    Serial1.begin(9600);
+    Serial.begin(9600);//for debugging
+    
+    //connect();//For WIFI connection
+   DEBUG_PRINTLN("setup ok"); 
 
-    //connect();
-   DEBUG_PRINTLN("setup ok");
 }
 //define common variables
 //TODO: Refactor
 int serialOperation = 0;
-static bool sendDataSerial = false;
+static bool sendDataSerial = true;
 bool serialCom = false;
 bool control = true;
 unsigned char *read_ptr; 
@@ -117,10 +121,17 @@ const int INIT_FLAG = 112;
 void loop() {
   currentTime = millis();
   serialEvent();
+  /*Serial.print("Encoder R: ");
+  Serial.println(encoder_countRight);
+  Serial.print("Encoder L: ");
+  Serial.println(encoder_countLeft);
+  */
   if (serialCom) 
   {
-    // Serial.print("operationFlag: \t");
-    // Serial.println(server_operation->InitFlag);
+    DEBUG_PRINT("operationFlag: \t");
+    DEBUG_PRINTLN(server_operation->InitFlag);
+    DEBUG_PRINT("operation: \t");
+    DEBUG_PRINTLN(server_operation->op);
     if (server_operation->InitFlag == INIT_FLAG)
     {
      DEBUG_PRINT("operationFlag: \t");
@@ -129,8 +140,8 @@ void loop() {
      DEBUG_PRINTLN(server_operation->op);
 
       do_operation((operation_t)server_operation->op);
-      serialCom = false;
     }
+    serialCom = false;
   }
   
   // call poll() regularly to allow the library to send MQTT keep alive which
@@ -216,7 +227,7 @@ void loop() {
     timeAfter = currentTime; 
   }
 
-  
+    
 }
 
 void do_operation(operation_t operation) {
@@ -257,6 +268,8 @@ void do_operation(operation_t operation) {
 void send(int operation, byte *data) {
   operation_send.op = operation;
   operation_send.len = sizeof(data);
+  Serial.print("Data len: ");
+  Serial.println((char*)&operation_send.len);
   Serial1.write((char*)&operation_send.op, 1);
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&data, operation_send.len);
@@ -329,6 +342,8 @@ void op_moveRobot() {
   // moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
   robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
   robot.moveRightWheel(PWM_Right, setpointWRight, backD);
+  // robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
+  // robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
   for(int i=0; i<10; i++)
@@ -359,16 +374,19 @@ void op_telemtry() {
   doubleToBytes(wRight, &operation_send.data[8]);
   longToBytes(PWM_Left, &operation_send.data[16]);
   longToBytes(PWM_Right, &operation_send.data[20]);
-  DEBUG_PRINT("vel robot--->");
+  /*DEBUG_PRINT("vel robot--->");
   DEBUG_PRINT(" wRight:");
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
-  DEBUG_PRINTLN(wLeft);
+  DEBUG_PRINTLN(wLeft);*/
+  
   operation_send.len = (int)sizeof(double)*2+sizeof(int)*2;  /* len */
-  Serial1.write((char*)&operation_send.InitFlag,4);
-  Serial1.write((char*)&operation_send.id,4);
-  Serial1.write((char*)&operation_send.op, 4);
-  Serial1.write((char*)&operation_send.len, 4);
+  DEBUG_PRINT("len: ");
+  DEBUG_PRINTLN((int)operation_send.len);
+  Serial1.write((char*)&operation_send.InitFlag,2);
+  Serial1.write((char*)&operation_send.id,2);
+  Serial1.write((char*)&operation_send.op, 2);
+  Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&operation_send.data, operation_send.len);
   Serial1.flush();
   //send(ID, OP_TELEMETRY, &operation_send.data);
@@ -513,6 +531,7 @@ void op_done()
   Serial1.flush();
 
 }
+
 void isrRight() {
   timeBeforeDebounceRight = millis();//tiempo para evitar rebotes
   deltaDebounceRight = timeBeforeDebounceRight - timeAfterDebounceRight;// tiempo que ha pasdo entre interrupcion e interrupcion
@@ -541,14 +560,12 @@ void isrLeft() {
     if(encoder_countLeft == MAX_ENCODER_STEPS)
     {
       wheelTurnCounterLeft++;
-    
     }
     deltaTimeLeft = startTimeLeft - timeAfterLeft;
     timeAfterLeft = startTimeLeft;
   }
   timeAfterDebounceLeft = timeBeforeDebounceLeft;
 }
-
 
 void serialEvent() {
   // read_ptr = (unsigned char*)&packetBuffer;
