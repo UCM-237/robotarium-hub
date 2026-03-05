@@ -119,8 +119,10 @@ void loop() {
   serialEvent();
   if (serialCom) 
   {
-    // Serial.print("operationFlag: \t");
-    // Serial.println(server_operation->InitFlag);
+    DEBUG_PRINT("operationFlag: \t");
+    DEBUG_PRINTLN(server_operation->InitFlag);
+    DEBUG_PRINT("operation: \t");
+    DEBUG_PRINTLN(server_operation->op);
     if (server_operation->InitFlag == INIT_FLAG)
     {
      DEBUG_PRINT("operationFlag: \t");
@@ -129,8 +131,8 @@ void loop() {
      DEBUG_PRINTLN(server_operation->op);
 
       do_operation((operation_t)server_operation->op);
-      serialCom = false;
     }
+    serialCom = false;
   }
   
   // call poll() regularly to allow the library to send MQTT keep alive which
@@ -257,6 +259,8 @@ void do_operation(operation_t operation) {
 void send(int operation, byte *data) {
   operation_send.op = operation;
   operation_send.len = sizeof(data);
+  /*Serial.print("len: ");
+  Serial.println((char*)&operation_send.len);*/
   Serial1.write((char*)&operation_send.op, 1);
   Serial1.write((char*)&operation_send.len, 2);
   Serial1.write((char*)&data, operation_send.len);
@@ -329,6 +333,8 @@ void op_moveRobot() {
   // moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
   robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
   robot.moveRightWheel(PWM_Right, setpointWRight, backD);
+  // robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
+  // robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
   for(int i=0; i<10; i++)
@@ -359,12 +365,14 @@ void op_telemtry() {
   doubleToBytes(wRight, &operation_send.data[8]);
   longToBytes(PWM_Left, &operation_send.data[16]);
   longToBytes(PWM_Right, &operation_send.data[20]);
-  DEBUG_PRINT("vel robot--->");
+  /*DEBUG_PRINT("vel robot--->");
   DEBUG_PRINT(" wRight:");
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
-  DEBUG_PRINTLN(wLeft);
+  DEBUG_PRINTLN(wLeft);*/
   operation_send.len = (int)sizeof(double)*2+sizeof(int)*2;  /* len */
+  Serial.print("len: ");
+  Serial.println((int)operation_send.len);
   Serial1.write((char*)&operation_send.InitFlag,4);
   Serial1.write((char*)&operation_send.id,4);
   Serial1.write((char*)&operation_send.op, 4);
