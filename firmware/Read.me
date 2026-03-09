@@ -1,0 +1,79 @@
+# 🤖 Robotarium Hub - Firmware (UCM)
+
+Este directorio contiene el código fuente del firmware para los robots de la plataforma **Robotarium Hub**. El sistema actúa como el controlador de bajo nivel (Low-Level Control) encargado de la ejecución de comandos en tiempo real, telemetría y gestión de hardware.
+
+## 📋 Descripción Técnica
+El firmware implementa un sistema de control diferencial robusto con las siguientes características:
+* **Lazo de Control (100Hz):** Sincronización determinista cada 10ms para asegurar la estabilidad de los algoritmos de control.
+* **Odometría:** Lectura de encoders de cuadratura mediante interrupciones (ISR) para máxima precisión.
+* **Algoritmos de Control:** Implementación de controladores PID + FeedForward para compensar fricciones y dinámicas del motor.
+* **Comunicación Dual:** * **Serial1:** Interfaz binaria de baja latencia con la Raspberry Pi.
+    * **MQTT:** Supervisión y telemetría de alto nivel vía WiFi.
+
+
+
+## 🛠️ Requisitos de Hardware
+* **Microcontrolador:** Arduino MKR WiFi 1010 o Arduino Nano 33 IoT.
+* **Drivers de Motor:** Controladores PWM con pin de dirección.
+* **Sensores:** Encoders de cuadratura (ópticos o magnéticos).
+
+## 📦 Librerías Necesarias
+Es necesario instalar las siguientes librerías desde el **Library Manager** del Arduino IDE:
+1. `WiFiNINA` - Gestión de conexión inalámbrica.
+2. `ArduinoMqttClient` - Comunicación con el broker MQTT.
+3. `PID` (de Brett Beauregard o versión compatible incluida en el repo).
+
+## 🚀 Instalación y Configuración
+
+1. **Gestión de Secretos:**
+   Renombra el archivo `arduino_secrets_template.h` a `arduino_secrets.h` e introduce tus credenciales:
+   ```cpp
+   #define SECRET_SSID "Nombre_De_Tu_Red"
+   #define SECRET_PASS "Password_De_Tu_Red"
+   
+2. **Calibración del Robot:**
+   Ajusta las constantes físicas en `Robot.h` o `Robot.cpp` según el modelo real. Estos valores son críticos para que la odometría y las velocidades sean precisas:
+   * `WHEEL_RADIUS`: Radio de la rueda en metros (ej. `0.0325`).
+   * `ROBOT_DIAMETER`: Distancia entre los centros de ambas ruedas (track width).
+   * `MAX_ENCODER_STEPS`: Pulsos por revolución que entrega el encoder tras la reductora.
+
+3. **Carga del Código:**
+   Abre `Robot.ino` en el Arduino IDE, selecciona tu placa (familia MKR o Nano 33 IoT) y el puerto COM asignado. Pulsa **Upload**.
+
+## 📑 Diccionario de Operaciones (OP_CODES)
+
+El robot procesa comandos binarios basados en la estructura `appdata`. Los códigos de operación (`op`) disponibles son:
+
+| OP_CODE | Nombre | Descripción | Parámetros |
+| :--- | :--- | :--- | :--- |
+| **100** | `OP_STOP` | Parada de emergencia inmediata. | Ninguno |
+| **101** | `OP_MOVE` | Movimiento lineal de consigna. | Velocidad (m/s) |
+| **102** | `OP_TURN` | Giro relativo sobre el eje central. | Ángulo (grados) |
+| **103** | `OP_CONF_PID` | Ajuste dinámico de constantes Kp, Ki, Kd. | 6 valores double |
+| **104** | `OP_CONF_FF` | Ajuste de FeedForward (Pendiente/Offset). | 4 valores double |
+| **105** | `OP_TELEMETRY`| Solicitud de estado (Velocidad/Batería). | Ninguno |
+| **106** | `OP_DONE` | ACK enviado por el robot al completar tarea. | - |
+| **108** | `OP_ERROR` | Notificación de fallo o comando inválido. | - |
+
+
+
+## 🔧 Solución de Problemas (Troubleshooting)
+
+| Problema | Causa probable | Solución |
+| :--- | :--- | :--- |
+| **No hay respuesta Serial** | Cableado TX/RX incorrecto o Baudrate. | Cruza cables TX->RX y verifica 115200 baudios. |
+| **Bucle "Checking WiFi"** | Credenciales mal configuradas o falta señal. | Revisa `arduino_secrets.h` y posición de antena. |
+| **Fallo de Conexión MQTT** | Broker offline o IP incorrecta. | Verifica que el Broker MQTT corra en la Raspberry Pi. |
+| **Giro en sentido opuesto** | Fase de motor o encoder invertida. | Intercambia los cables del motor o ajusta el signo en el código. |
+| **Error de InitFlag (112)** | Desincronización de trama binaria. | Asegura que la RPi termine cada paquete con '\n'. |
+
+## 📁 Estructura del Proyecto
+* `Robot.ino`: Lazo principal (10ms) y rutinas de interrupción (ISR).
+* `Robot.cpp/h`: Abstracción de hardware y cinemática diferencial.
+* `controller.cpp/h`: Lógica del PID y compensación de errores.
+* `common.h`: Estructuras de datos (`appdata`) sincronizadas con la Raspberry Pi.
+* `operation.h`: Definición de protocolos y gestores de comandos (handlers).
+
+---
+**Desarrollado por:** Universidad Complutense de Madrid (UCM)  
+**Repositorio Principal:** [github.com/UCM-237/robotarium-hub](https://github.com/UCM-237/robotarium-hub)
