@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * ----------------------------------------------------------------------------
  * PROYECTO: Robotarium Hub (UCM)
@@ -11,6 +12,9 @@
  */
  
  #pragma once
+=======
+#pragma once
+>>>>>>> 9fcf88d (Refactorización)
 #include <Arduino.h>
 
 #define MINPWM 110
