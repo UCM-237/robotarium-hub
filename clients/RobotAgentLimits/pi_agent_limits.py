@@ -210,6 +210,14 @@ class Robot:
   def checkArenaRules(self):
     '''Thread que continuamente verifica que el robot no colisione con los límites'''
     
+    """
+    Hilo principal de seguridad. Monitoriza la posición del robot en tiempo real
+    y decide si debe intervenir para evitar que el robot salga de la arena.
+    
+    Si el robot se acerca a un límite (definido en LimitsAlgorithm), activa 
+    el modo de recuperación, detiene el movimiento externo y gira el robot.
+    """
+
     # Espera a recibir la posición del robot y los límites de arena
     while(self.agentParameters['AgentId'] not in self.Position or self.ArenaLimitsReceived == False):
       self.agent.send("localization/RobotariumData", "")
@@ -271,7 +279,14 @@ class Robot:
           
           
   def move_robot(self, v_left, v_right) -> None:
-    '''Establece la velocidad deseada de las ruedas (m/s)'''
+    """
+    Convierte velocidades de cuerpo (m/s y rad/s) a comandos para las ruedas
+    y los envía al Arduino por puerto serie.
+    
+    Args:
+        linear_vel (float): Velocidad hacia adelante deseada.
+        angular_vel (float): Velocidad de giro deseada.
+    """
     len = 16  # 2 doubles = 16 bytes
     data = struct.pack('<dd', v_left, v_right)
     self.ArduinoSerialWrite(self.OP_MOVE_ROBOT, len, data)
@@ -365,7 +380,13 @@ class Robot:
 
 
   def on_data(self, topic: str, message: str) -> None:
-    '''Maneja datos recibidos del hub'''
+    """
+    Manejador de mensajes entrantes vía ZMQ (desde el servidor/hub).
+    
+    Args:
+        topic (str): Canal del mensaje ('data' para posición, 'control' para órdenes).
+        message (str): JSON con los datos (coordenadas x, y, theta o comandos).
+    """
     # Procesa comandos de control dirigidos a este agente
     if topic.startswith('control/') and self.IgnoreControlCommunication == False:
       # Extrae el nombre del comando del topic
@@ -413,7 +434,14 @@ class Robot:
         aux = 0    
 
   def ArduinoSerialWrite(self, operation, len, data):
-    '''Envía comando al Arduino a través del puerto serial'''
+    """
+    Empaqueta y envía una trama binaria estructurada al Arduino.
+    
+    Args:
+        operation (int): Código de operación (ej. OP_MOVE_ROBOT).
+        length (int): Tamaño de los datos.
+        data (bytes): Payload con los parámetros de la operación.
+    """
     # El protocolo es:
     # - initFlag: uint32 (4 bytes) = 112
     # - agent_id: uint32 (4 bytes)

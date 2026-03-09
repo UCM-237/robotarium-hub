@@ -137,6 +137,16 @@ class LimitsAlgorithm:
             # if not, then return the minimum distance to the segment endpoints
             return endpoint_dist
     def checkLimits(self,robotX,robotY,heading):
+        """
+    Calcula si el robot está en zona de colisión y determina el nuevo ángulo de escape.
+    
+    Args:
+        robotX, robotY (float): Posición actual del robot.
+        heading (float): Orientación actual en radianes.
+    
+    Returns:
+        float: El ángulo 'newHeading' al que debe apuntar el robot para alejarse del límite.
+    """
         d=0
         self.newHeading = 0
         dx = math.cos(heading)
