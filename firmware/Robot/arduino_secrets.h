@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * ----------------------------------------------------------------------------
  * PROYECTO: Robotarium Hub (UCM)
@@ -12,3 +13,7 @@
  
 #define SECRET_SSID "RobotariumUCM"
 #define SECRET_PASS "robotario"
+=======
+#define SECRET_SSID "MiFibra-3977"
+#define SECRET_PASS "nrjer4Vf"
+>>>>>>> 9fcf88d (Refactorización)

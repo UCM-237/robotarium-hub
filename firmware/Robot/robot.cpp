@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * ----------------------------------------------------------------------------
  * ARCHIVO:  Robot.cpp
@@ -8,6 +9,9 @@
  * de movimiento y la gestión de pines mediante registros de Arduino.
  * ----------------------------------------------------------------------------
  */
+=======
+#include "robot.h"
+>>>>>>> 9fcf88d (Refactorización)
 
 /*
 Boromir, Arwen y Gandalf tiene los pines del motor de la siguiente manera
@@ -21,6 +25,7 @@ ENABLE  10
 IN 1    11
 IN 2    12
 
+<<<<<<< HEAD
 En el Arduino MKR el pin 9 no puede usarse para el ENABLE. Así que:
 
 Motor Izquierdo:
@@ -94,18 +99,81 @@ void robot::moveForward(const int pinMotor[3], int speed) {
 
 // Mueve una rueda hacia atrás aplicando PWM
 void robot::moveBackward(const int pinMotor[3], int speed) {
+=======
+*/
+void robot::pinSetup()
+{
+<<<<<<<< HEAD:firmware/arduinoAgent/robot.cpp
+    this->pinENA = 6;
+    this->pinIN1 = 10;
+    this->pinIN2 = 9;
+
+    this->pinIN3 = 7;
+    this->pinIN4 = 8;
+    this->pinENB = 5;
+========
+    this->pinENA = 9;
+    this->pinIN1 = 8;
+    this->pinIN2 = 7;
+
+    this->pinIN3 = 11;
+    this->pinIN4 = 12;
+    this->pinENB = 10;
+>>>>>>>> 9fcf88d (Refactorización):firmware/Robot/robot.cpp
+
+    this->pinMotorLeft[0] = this->pinENA;
+    this->pinMotorLeft[1] = this->pinIN1;
+    this->pinMotorLeft[2] = this->pinIN2;
+
+    this->pinMotorRight[0] = this->pinENB;
+    this->pinMotorRight[1] = this->pinIN3;
+    this->pinMotorRight[2] = this->pinIN4;
+}
+
+void robot::motorSetup()
+{
+    pinMode(this->pinIN1, OUTPUT);
+    pinMode(this->pinIN2, OUTPUT);
+    pinMode(this->pinENA, OUTPUT);
+    pinMode(this->pinIN3, OUTPUT);
+    pinMode(this->pinIN4, OUTPUT);
+    pinMode(this->pinENB, OUTPUT);
+}
+
+void robot::moveForward(const int pinMotor[3], int speed)
+{
+    digitalWrite(pinMotor[1], HIGH);
+    digitalWrite(pinMotor[2], LOW);
+    analogWrite(pinMotor[0], speed);
+}
+
+void robot::moveBackward(const int pinMotor[3], int speed)
+{
+>>>>>>> 9fcf88d (Refactorización)
     digitalWrite(pinMotor[1], LOW);
     digitalWrite(pinMotor[2], HIGH);
     analogWrite(pinMotor[0], speed);
 }
 
+<<<<<<< HEAD
 // Freno electrónico: Pone ambos pines de dirección en HIGH
 void robot::fullStopRightWheel() {
+=======
+void robot::fullStop()
+{
+    this->fullStopLeftWheel();
+    this->fullStopRightWheel();
+}
+
+void robot::fullStopRightWheel()
+{
+>>>>>>> 9fcf88d (Refactorización)
     digitalWrite(this->pinMotorRight[1], HIGH);
     digitalWrite(this->pinMotorRight[2], HIGH);
     analogWrite(this->pinMotorRight[0], 0);
 }
 
+<<<<<<< HEAD
 // Lógica de decisión para la rueda derecha
 void robot::moveRightWheel(int pwm, double w, bool back) {
     if(pwm == 0 || ((int)w) == 0) {
@@ -180,6 +248,8 @@ void robot::moveLeftWheel(int pwm, double w, bool back)
 }
 // Implementación de los métodos de parada individual (Freno activo)
 
+=======
+>>>>>>> 9fcf88d (Refactorización)
 void robot::fullStopLeftWheel()
 {
     digitalWrite(this->pinMotorLeft[1], HIGH);
@@ -187,6 +257,7 @@ void robot::fullStopLeftWheel()
     analogWrite(this->pinMotorLeft[0], 0);
 }
 
+<<<<<<< HEAD
 /**
  * Retorna el número de pin asignado al encoder de la rueda izquierda.
  * Se utiliza en setup() para configurar la interrupción (attachInterrupt).
@@ -203,4 +274,62 @@ int robot::getPinLeftEncoder()
 int robot::getPinRightEncoder()
 {
     return this->pinRightEncoder; // Retorna el pin configurado en pinSetup()
+=======
+void robot::moveRightWheel(int pwm, double w, bool back)
+{
+    if(pwm == 0 || ((int)w) == 0)
+    {
+        fullStopRightWheel();
+    } 
+    else 
+    {
+        if(back) 
+        {
+            moveBackward(this->pinMotorRight, pwm);
+        } 
+        else if(!back) 
+        {
+            moveForward(this->pinMotorRight, pwm);
+        }
+    }
+}
+
+void robot::moveLeftWheel(int pwm, double w, bool back)
+{
+    if(pwm == 0 || ((int)w) == 0)
+    {
+        fullStopLeftWheel();
+    } 
+    else 
+    {
+        if(back) 
+        {
+            moveBackward(this->pinMotorLeft, pwm);
+        } 
+        else if(!back) 
+        {
+            moveForward(this->pinMotorLeft, pwm);
+        }
+    }
+}
+
+double robot::getRobotWheelDiameter()
+{
+    return this->RobotWheelDiamter;
+}
+
+double robot::getRobotWheelRadius()
+{
+    return this->RobotWheelRadius;
+}
+
+double robot::getRobotDiameter()
+{
+    return RobotDiameter;
+}
+
+uint8_t robot::getRobotID()
+{
+    return this->robotID;
+>>>>>>> 9fcf88d (Refactorización)
 }

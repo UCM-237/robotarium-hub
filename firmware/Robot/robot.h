@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * ----------------------------------------------------------------------------
  * ARCHIVO:  Robot.h
@@ -24,12 +25,19 @@
 
 
 
+=======
+#pragma once
+#include <Arduino.h>
+
+>>>>>>> 9fcf88d (Refactorización)
 class robot
 {
     public:
         void pinSetup();
         void motorSetup();
+
         void set_wheel_speed(int wheel, int direction, int speed) ;
+
         void moveForward(const int pinMotor[3], int speed);
         void moveBackward(const int pinMotor[3], int speed);
         void fullStop();
@@ -41,10 +49,11 @@ class robot
         double getRobotWheelRadius();
         double getRobotDiameter();
         uint8_t getRobotID();
+
         int getPinLeftEncoder();
         int getPinRightEncoder();
         
-       
+
     private:
         int pinIN1;
         int pinIN2;
@@ -54,16 +63,20 @@ class robot
         int pinENB;
         int pinMotorRight[3];
         int pinMotorLeft[3];
+
         int pinLeftEncoder;
         int pinRightEncoder;
         
+
 
         double RobotWheelDiamter = 6.7;
         double RobotWheelRadius = 3.35;
         double RobotDiameter = 14.5;
         uint8_t robotID=5;
+
         const int LEFT_WHEEL = 0;
         const int RIGHT_WHEEL = 1;
+
 
 
 
