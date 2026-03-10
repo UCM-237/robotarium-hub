@@ -1,7 +1,7 @@
 <AgentConfiguration>
     <AgentParameters>
-        <AgentId>0</AgentId>
-        <AgentName>RobotAgent1</AgentName>
+        <AgentId>5</AgentId>
+        <AgentName>RobotAgent5</AgentName>
         <AgentType>Robot</AgentType>
         <DeviceName>USB2.0-Serial</DeviceName>
     </AgentParameters>
