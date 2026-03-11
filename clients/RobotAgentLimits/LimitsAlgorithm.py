@@ -7,11 +7,16 @@ class segment:
         self.pf=np.array(pf)
 class LimitsAlgorithm:
     
-    def __init__(self):
+    def __init__(self, minimum_safety_distance=0.15):
+        """Inicializa el algoritmo de límites.
+        
+        Args:
+            minimum_safety_distance: Distancia de seguridad en metros (default: 0.15 m)
+        """
         self.ArenaLimits = {}
         self.newHeading = 0
         self.segmentOfTheRectangle = []
-        self.minimumSafetyDistance = 0.0
+        self.minimumSafetyDistance = minimum_safety_distance
         self.x=[None]*5
         self.y=[None]*5
 
