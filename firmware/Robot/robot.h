@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 /*
  * ----------------------------------------------------------------------------
  * ARCHIVO:  Robot.h
@@ -19,17 +19,15 @@
 #define H_BRIDGE_RED
 
 // ARDUINO TYPE: UNCOMMENT ONLY ONE OPTION
-#define ARDUINO_TYPE_MKR
-//#define ARDUINO_TYPE_NANO
+//#define ARDUINO_TYPE_MKR
+#define ARDUINO_TYPE_NANO
 
 
 
 
-=======
 #pragma once
 #include <Arduino.h>
 
->>>>>>> 9fcf88d (Refactorización)
 class robot
 {
     public:

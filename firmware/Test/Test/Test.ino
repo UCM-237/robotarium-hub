@@ -312,8 +312,24 @@ void loop() {
     Serial.println(wRight);
     Serial.print("wL: ");
     Serial.println(wLeft);
-    
-      switch(test_case){
+
+    if (test_case<5){
+      wheelControlerRight.setSetPoint(test_case);
+      wheelControlerLeft.setSetPoint(0);
+      Serial.print("Rueda derecha: ");
+      Serial.println(test_case);              
+    }
+    else if(test_case<10){
+      wheelControlerRight.setSetPoint(0);
+      wheelControlerLeft.setSetPoint(test_case-5);
+      Serial.print("Rueda izquierda: ");
+      Serial.println(test_case-5);              
+
+    }
+    else {
+      test_case=0;
+    }
+      /*switch(test_case){
         case 0: 
               // STEP 1: Rueda derecha a tope
               wheelControlerRight.setSetPoint(10);
@@ -371,7 +387,7 @@ void loop() {
               Serial.println("Parada");
               PWM_Left=180;
               PWM_Right=180;
-      }
+      }*/
 
        
            

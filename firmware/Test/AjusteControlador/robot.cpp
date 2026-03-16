@@ -1,4 +1,3 @@
-
 /*
  * ----------------------------------------------------------------------------
  * ARCHIVO:  Robot.cpp
@@ -9,7 +8,6 @@
  * de movimiento y la gestión de pines mediante registros de Arduino.
  * ----------------------------------------------------------------------------
  */
-#include "robot.h"
 
 /*
 Boromir, Arwen y Gandalf tiene los pines del motor de la siguiente manera
@@ -23,7 +21,6 @@ ENABLE  10
 IN 1    11
 IN 2    12
 
-<<<<<<< HEAD
 En el Arduino MKR el pin 9 no puede usarse para el ENABLE. Así que:
 
 Motor Izquierdo:
@@ -45,7 +42,7 @@ IN 2    9
 void robot::pinSetup() {
   #ifdef ARDUINO_TYPE_MKR
     this->pinLeftEncoder = 1;  // Pin interrupción izquierda MKR
-    this->pinRightEncoder = 4; // Pin interrupción derecha MKR
+    this->pinRightEncoder = 0; // Pin interrupción derecha MKR
 
     #ifdef H_BRIDGE_BLACK
       // Configuración para el Puente en H Negro (L298N o similar)
@@ -56,12 +53,12 @@ void robot::pinSetup() {
     #ifdef H_BRIDGE_RED
       // Configuración para el Puente en H Rojo
       this->pinENA = 7;  this->pinIN2 = 9;  this->pinIN1 = 8;
-      this->pinIN3 = 11; this->pinIN4 = 12; this->pinENB = 10;
+      this->pinIN3 = 11; this->pinIN4 = 12; this->pinENB = 10;      
     #endif
   #endif
   
   #ifdef ARDUINO_TYPE_NANO
-    this->pinLeftEncoder = 2;  this->pinRightEncoder = 3; 
+    this->pinLeftEncoder = 3;  this->pinRightEncoder = 2; 
     // (Configuraciones de pines para Nano...)
      #ifdef H_BRIDGE_BLACK
       // Configuración para el Puente en H Negro (L298N o similar)
@@ -79,7 +76,7 @@ void robot::pinSetup() {
 
   // Asignación de arrays para facilitar el manejo de motores [ENABLE, IN1, IN2]
   this->pinMotorRight[0] = pinENA; this->pinMotorRight[1] = pinIN1; this->pinMotorRight[2] = pinIN2;
-  this->pinMotorLeft[0] = pinENB;  this->pinMotorLeft[1] = pinIN3;  this->pinMotorLeft[2] = pinIN4;
+  this->pinMotorLeft[0] = pinENB;  this->pinMotorLeft[1] = pinIN4;  this->pinMotorLeft[2] = pinIN3;
 }
 
 // Configura todos los pines de control como salida
@@ -97,15 +94,13 @@ void robot::moveForward(const int pinMotor[3], int speed) {
 
 // Mueve una rueda hacia atrás aplicando PWM
 void robot::moveBackward(const int pinMotor[3], int speed) {
-
-
     digitalWrite(pinMotor[1], LOW);
     digitalWrite(pinMotor[2], HIGH);
     analogWrite(pinMotor[0], speed);
 }
 
-void robot::fullStopRightWheel()
-{
+// Freno electrónico: Pone ambos pines de dirección en HIGH
+void robot::fullStopRightWheel() {
     digitalWrite(this->pinMotorRight[1], HIGH);
     digitalWrite(this->pinMotorRight[2], HIGH);
     analogWrite(this->pinMotorRight[0], 0);
@@ -113,7 +108,7 @@ void robot::fullStopRightWheel()
 
 // Lógica de decisión para la rueda derecha
 void robot::moveRightWheel(int pwm, double w, bool back) {
-    if(pwm == 0 || ((int)w) == 0) {
+    if(pwm == 0 ) {
         fullStopRightWheel(); // Si la velocidad es 0, frenar
     } else {
         if(back) moveBackward(this->pinMotorRight, pwm);
@@ -166,7 +161,7 @@ void robot::fullStop()
 void robot::moveLeftWheel(int pwm, double w, bool back)
 {
     // Si la potencia es 0 o la velocidad deseada es 0, detenemos la rueda
-    if(pwm == 0 || ((int)w) == 0)
+    if(pwm == 0 )
     {
         fullStopLeftWheel();
     } 
@@ -184,6 +179,7 @@ void robot::moveLeftWheel(int pwm, double w, bool back)
     }
 }
 // Implementación de los métodos de parada individual (Freno activo)
+
 void robot::fullStopLeftWheel()
 {
     digitalWrite(this->pinMotorLeft[1], HIGH);
@@ -207,9 +203,4 @@ int robot::getPinLeftEncoder()
 int robot::getPinRightEncoder()
 {
     return this->pinRightEncoder; // Retorna el pin configurado en pinSetup()
-}
-
-double robot::getRobotWheelDiameter()
-{
-    return this->RobotWheelDiamter;
 }
