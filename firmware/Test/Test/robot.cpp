@@ -58,7 +58,7 @@ void robot::pinSetup() {
   #endif
   
   #ifdef ARDUINO_TYPE_NANO
-    this->pinLeftEncoder = 2;  this->pinRightEncoder = 3; 
+    this->pinLeftEncoder = 3;  this->pinRightEncoder = 2; 
     // (Configuraciones de pines para Nano...)
      #ifdef H_BRIDGE_BLACK
       // Configuración para el Puente en H Negro (L298N o similar)

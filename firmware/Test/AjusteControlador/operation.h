@@ -1,4 +1,3 @@
-
 /*
  * ----------------------------------------------------------------------------
  * PROYECTO: Robotarium Hub (UCM)
@@ -33,7 +32,6 @@ typedef enum Operation{
 }operation_t;
 
 // Variable global que almacena la operación que se está ejecutando actualmente
-
 operation_t operation;
 
 #endif

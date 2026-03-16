@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /*
  * ----------------------------------------------------------------------------
  * PROYECTO: Robotarium Hub (UCM)
@@ -31,7 +30,7 @@
 
 // Configuración de macros para depuración por el Monitor Serie
 #define DEBUG_ENABLED  
-=======
+
 
 //robot2
 #include "common.h"
@@ -42,21 +41,16 @@
 #include <ArduinoMqttClient.h>
 #include <WiFiNINA.h>
 #include "arduino_secrets.h"
-// Define a macro for debug printing
-#define DEBUG_ENABLED  // Comment out this line to disable debug prints
-
->>>>>>> 9fcf88d (Refactorización)
 #ifdef DEBUG_ENABLED
 #define DEBUG_PRINT(...)   Serial.print(__VA_ARGS__)
 #define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
 #else
-<<<<<<< HEAD
 #define DEBUG_PRINT(...)   
 #define DEBUG_PRINTLN(...) 
 #endif
 
 #ifdef ARDUINO_TYPE_MKR
-// Variables de conectividad WiFi
+// Variables de conectividad WiFi 
 char ssid[] = SECRET_SSID;        
 char pass[] = SECRET_PASS;    
 int status = WL_IDLE_STATUS;     
@@ -86,10 +80,13 @@ void op_saludo();      // Handshake inicial
 void op_message();     // Procesamiento de mensajes genéricos
 void op_moveRobot();   // Control cinemático diferencial (v, w)
 void op_StopRobot();   // Parada de emergencia
-void op_telemetry();   // Envío de estado de sensores y encoders
+void op_telemtry();   // Envío de estado de sensores y encoders
 void op_turn_robot();  // Giro sobre el propio eje
 void op_error();       // Respuesta ante comando desconocido
-
+void op_silence();
+void op_conf_pid();
+void op_conf_ff();
+void op_moveWheels();
 // Control de bajo nivel e interrupciones
 void isrRight();       // Interrupción Rueda Derecha: cálculo de tiempos entre pulsos
 void isrLeft();        // Interrupción Rueda Izquierda
@@ -163,11 +160,52 @@ const char device[] = "arduinoClient";
 StaticJsonDocument<200> doc;
 #endif
 
+void serialEvent() {
+  // Verifica si hay al menos un byte esperando en el buffer de entrada
+  if(Serial1.available())
+  {
+    // Lee una ráfaga de bytes y los guarda en 'packetBuffer'
+    // Se detiene si: encuentra un '\n', llena el buffer, o pasan 1000ms (timeout por defecto)
+    int rlen = Serial1.readBytesUntil('\n', (char*)&packetBuffer, sizeof(packetBuffer));
+    
+    // Mapea la estructura 'server_operation' sobre el buffer de bytes recibidos
+    // Esto permite acceder a packetBuffer[0] como server_operation->InitFlag, etc.
+    server_operation = (struct appdata *)&packetBuffer;
+    
+    // Indica al loop() que hay un mensaje listo para ser procesado
+    serialCom = true;
+    DEBUG_PRINT("Bytes leidos: \t");
+    DEBUG_PRINTLN(rlen);
+    // Imprime la cantidad de bytes leídos para depuración
+  // read_ptr = (unsigned char*)&packetBuffer;
+  // while (Serial1.available()) {
+  //   *(read_ptr++) = Serial1.read();
+  //   server_operation = (struct appdata *)&packetBuffer;
+  //   serialCom = true;
+  // }
+/*  if(Serial1.available())
+  {
+    int rlen = Serial1.readBytesUntil('\n', (char*)&packetBuffer, sizeof(packetBuffer));
+    server_operation = (struct appdata *)&packetBuffer;
+    serialCom = true;
+    D EBUG_PRINTLN(rlen);
+  }*/
+}
+
+}
 /**
  * Configuración inicial del sistema.
  * Se ejecuta una sola vez al encender el robot o presionar reset.
  */
 void setup() {
+     // Inicializa la comunicación Serie por USB para monitorización y depuración en el PC
+    Serial.begin(9600);
+    while (!Serial) {
+        ; // Espera a que el monitor serie se abra. 
+          // El LED del Arduino debería quedarse esperando aquí.
+    }
+    delay(500);
+    Serial.println("¡Ahora sí! Comunicacion Serie PK");
     // Inicializa la configuración de pines según el hardware (MKR/Nano y tipo de puente en H)
     robot.pinSetup();
     
@@ -204,13 +242,15 @@ void setup() {
     // Los parámetros varían ligeramente para compensar diferencias mecánicas entre motores
     wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
     wheelControlerLeft.setFeedForwardParam(0.0772, -3.173);
+    
 
     // Inicializa la comunicación Serie 1 (pines físicos) con la Raspberry Pi a 9600 baudios
     Serial1.begin(9600);
-
-    // Inicializa la comunicación Serie por USB para monitorización y depuración en el PC
-    Serial.begin(9600); 
-
+    while(!Serial1){
+      ;
+    }
+    
+    DEBUG_PRINTLN("Comunicacion con RB Ok");
     #ifdef ARDUINO_TYPE_MKR
     WiFi.begin(ssid,pass);
     while(WiFi.status() != WL_CONNECTED){
@@ -241,130 +281,39 @@ void setup() {
 void loop() {
  // 1. GESTIÓN DE TIEMPO Y COMUNICACIONES
   currentTime = millis(); // Registra el tiempo actual para el control de frecuencia
-  serialEvent();          // Verifica si han llegado bytes por el puerto serie (Raspberry Pi)
-  
+  //serialEvent();          // Verifica si han llegado bytes por el puerto serie (Raspberry Pi)
+  if(Serial1.available()){
+      // Lee una ráfaga de bytes y los guarda en 'packetBuffer'
+    // Se detiene si: encuentra un '\n', llena el buffer, o pasan 1000ms (timeout por defecto)
+    int rlen = Serial1.readBytesUntil('\n', (char*)&packetBuffer, sizeof(packetBuffer));
+    
+    // Mapea la estructura 'server_operation' sobre el buffer de bytes recibidos
+    // Esto permite acceder a packetBuffer[0] como server_operation->InitFlag, etc.
+    server_operation = (struct appdata *)&packetBuffer;
+    
+    // Indica al loop() que hay un mensaje listo para ser procesado
+    serialCom = true;
+    DEBUG_PRINT("Bytes leidos: \t");
+    DEBUG_PRINTLN(rlen);
+
+  }
   // 2. PROCESAMIENTO DE COMANDOS SERIALES
   if (serialCom) {
     // Depuración: imprime la cabecera y el código de operación recibidos
-=======
-#define DEBUG_PRINT(...)   // Debug print is empty when DEBUG_ENABLED is not defined
-#define DEBUG_PRINTLN(...) // Debug println is empty when DEBUG_ENABLED is not defined
-#endif
-///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = SECRET_SSID;        // your network SSID (name)
-char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
-int status = WL_IDLE_STATUS;     // the WiFi radio's status
-
-
-
-using namespace std;
-unsigned char packetBuffer[256]; //buffer to hold incoming packet
-
-//--------------------------------------------filtro de media movil simple para estabilizar la lectura de rad/s---------------------------------------
-
-MeanFilter<long> meanFilterRight(10);
-MeanFilter<long> meanFilterLeft(10);
-const double MAX_OPTIMAL_VEL=20;//rad/S
-
-
-
-//operation variables
-struct appdata operation_send;
-struct appdata *server_operation;
-
-//prototypes//
-//TODO: DO a reuqest manager for the opeartions and handle serial and mqtt communication
-void do_operation(int operation);
-void op_saludo();
-void op_message();
-void op_moveRobot();
-void op_StopRobot();
-void op_telemtry();
-void op_turn_robot();
-void op_error();//unrecognized operation
-void isrRight();
-void isrLeft();
-void send(int operation, byte *data);
-void connect();
-
-
-
-int option;
-int led = 13;
-//Time variables
-unsigned long previous_timer;
-unsigned long timer=10000;
-/*define controler*/
-controler wheelControlerRight;
-controler wheelControlerLeft;
-/*define robot*/
-robot robot;
-WiFiClient wifi;
-MqttClient mqttClient(wifi);
-const char broker[] ="192.168.1.109";
-int mqttPort = 1883;
-const char device[] = "arduinoClient";
-
-void setup() {
-    robot.pinSetup();
-    robot.motorSetup();
-    // Interrupciones para contar pulsos de encoder
-    pinMode(encoderRight, INPUT_PULLUP);
-    pinMode(encoderLeft, INPUT_PULLUP);
-
-    attachInterrupt(digitalPinToInterrupt(encoderLeft), isrLeft, RISING);//prepara la entrada del encoder como interrupcion
-    attachInterrupt(digitalPinToInterrupt(encoderRight), isrRight, RISING);
-    // Se prepara la IMU para poder ser leida
-    if (!IMU.begin()) {
-      Serial.println("Failed to initialize IMU!");
-      while (1);
-    }
-    // Se empieza con los motores parados
-    robot.fullStop();
-  
-    wheelControlerRight.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerRight.setFeedForwardParam(0.0895,-5.424);
-    wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerLeft.setFeedForwardParam(0.0772,-3.173);
-    // Comunicacion por puerto serie
-    Serial1.begin(9600);//for debuggin
-    Serial.begin(9600);
-
-    //connect();
-   DEBUG_PRINTLN("setup ok");
-}
-//define common variables
-//TODO: Refactor
-int serialOperation = 0;
-static bool sendDataSerial = false;
-bool serialCom = false;
-bool control = true;
-unsigned char *read_ptr; 
-unsigned long currentTime, timeAfter = 0;
-const unsigned long SAMPLINGTIME= 10;//ms
-double wLeft,wRight; // measured angular velocity
-
-const int INIT_FLAG = 112;
-
-void loop() {
-  currentTime = millis();
-  serialEvent();
-  if (serialCom) 
-  {
->>>>>>> 9fcf88d (Refactorización)
-    DEBUG_PRINT("operationFlag: \t");
+    /*DEBUG_PRINT("operationFlag: \t");
     DEBUG_PRINTLN(server_operation->InitFlag);
     DEBUG_PRINT("operation: \t");
     DEBUG_PRINTLN(server_operation->op);
-<<<<<<< HEAD
-
+    */
     // Validación: Solo procesa si la cabecera coincide con INIT_FLAG (112)
     if (server_operation->InitFlag == INIT_FLAG) {
       DEBUG_PRINT("operationFlag: \t");
       DEBUG_PRINTLN(server_operation->InitFlag);
       DEBUG_PRINT("operation: \t");
       DEBUG_PRINTLN(server_operation->op);
-
+      DEBUG_PRINT("RobotID: \t");
+      DEBUG_PRINTLN(server_operation->id); 
+    
       // Ejecuta la función correspondiente según el código de operación (OP_MOVE, OP_STOP, etc.)
       do_operation((operation_t)server_operation->op);
     }
@@ -405,11 +354,13 @@ void loop() {
 
     // FILTRO DE SEGURIDAD: Convierte frecuencia (Hz) a velocidad angular (rad/s)
     // Solo actualiza w si el valor es físicamente posible según el límite de seguridad
-=======
     if (server_operation->InitFlag == INIT_FLAG)
     {
      DEBUG_PRINT("operationFlag: \t");
      DEBUG_PRINTLN(server_operation->InitFlag);
+     DEBUG_PRINT("RobotID: \t");
+     DEBUG_PRINTLN(server_operation->id);
+     
      DEBUG_PRINT("operation: \t");
      DEBUG_PRINTLN(server_operation->op);
 
@@ -423,8 +374,6 @@ void loop() {
   // avoids being disconnected by the broker
 
   //mqttClient.poll();
-  int auxPWMD = 0, auxPWMI = 0;
-  double fD, fI;
   timeStopD = timeStopI = millis();
   //condition for know when the wheel is stoped
   //se define un contador de tiempo para comprobar que las reudas estan paradas
@@ -444,7 +393,6 @@ void loop() {
     // DEBUG_PRINTLN(fD);
     //condicion para que no supere linealidad y se sature.
     //es un filtro para que no de valores ridiculos
->>>>>>> 9fcf88d (Refactorización)
     if(fD < double(MAX_OPTIMAL_VEL/2.0/M_PI)) 
     { 
       wRight = 2*M_PI*fD; 
@@ -453,7 +401,6 @@ void loop() {
     { 
       wLeft = 2*M_PI*fI; 
     }
-<<<<<<< HEAD
     
     // 5. ALGORITMO DE CONTROL PID
     if(control)
@@ -492,7 +439,6 @@ void loop() {
       auxPWMI = PWM_Left; // Actualiza el valor auxiliar para la siguiente comparación
     }
     if(auxPWMD != PWM_Right){
-=======
     //fin filtro
     if(control)
     { 
@@ -530,33 +476,24 @@ void loop() {
     }
     if(auxPWMD != PWM_Right){
       //moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
->>>>>>> 9fcf88d (Refactorización)
       robot.moveRightWheel(PWM_Right, wheelControlerRight.getSetPoint(), backD);
       auxPWMD = PWM_Right;
     }
 
-<<<<<<< HEAD
-    // 7. TELEMETRÍA
+   // 7. TELEMETRÍA
     // Si la Raspberry Pi solicitó datos (sendDataSerial), envía el estado de los sensores
-=======
-    
->>>>>>> 9fcf88d (Refactorización)
     if(sendDataSerial)
     {
       op_telemtry();
     }
-<<<<<<< HEAD
     
     // Actualiza la marca de tiempo para el próximo ciclo de muestreo
-=======
->>>>>>> 9fcf88d (Refactorización)
     timeAfter = currentTime; 
   }
 
-  
+  }  
 }
 
-<<<<<<< HEAD
 /**
  * Gestor de comandos (Dispatcher).
  * Recibe un enumerado de tipo operation_t y ejecuta la acción correspondiente.
@@ -618,47 +555,15 @@ void do_operation(operation_t operation) {
     case OP_MOVE_WHEELS:
       op_moveWheels();
       break;
-
+  
     // Caso por defecto: Error.
     // Si el código de operación no existe o está corrupto, notifica el fallo.
-=======
-void do_operation(operation_t operation) {
-  switch (operation) {
-    case OP_HELLO:
-      op_saludo();
-      break;
-    case OP_MOVE_ROBOT:
-      op_moveRobot();
-      break;
-    case OP_STOP_ROBOT:
-      op_StopRobot();
-      break;
-    case OP_TELEMETRY:
-      sendDataSerial = true;
-      break;
-    case OP_TURN_ROBOT:
-      op_turn_robot();
-      break;
-    case OP_SILENCE:
-      op_silence();
-      break;
-    case OP_CONF_PID:
-      op_conf_pid();
-      break;
-    case OP_CONF_FF:
-      op_conf_ff();
-      break;
-    case OP_MOVE_WHEELS:
-      op_moveWheels();
-      break;
->>>>>>> 9fcf88d (Refactorización)
     default:
       op_error();
       break;
   }
 }
 
-<<<<<<< HEAD
 /**
  * Envía un paquete de datos estructurado a través del puerto Serie 1.
  * @param operation Código de la operación (ej. OP_TELEMETRY o OP_DONE).
@@ -728,88 +633,29 @@ void op_moveWheels()
   // 'false' indica que el movimiento por defecto es hacia adelante.
   robot.moveLeftWheel(PWMLeft, 1, false);
   robot.moveRightWheel(PWMRight, 1, false);
-
-  // PRE-FILTRADO:
-  // Se añaden 10 valores de golpe al filtro de media móvil para "limpiar" el histórico.
-  // Esto ayuda a que el cálculo de velocidad angular (w) en el loop() no tenga 
-  // picos bruscos justo después de recibir un comando de movimiento nuevo.
-=======
-void send(int operation, byte *data) {
-  operation_send.op = operation;
-  operation_send.len = sizeof(data);
-  Serial1.write((char*)&operation_send.op, 1);
-  Serial1.write((char*)&operation_send.len, 2);
-  Serial1.write((char*)&data, operation_send.len);
-  Serial1.flush();
 }
-
-void op_saludo() {
-  operation_send.op = OP_HELLO;
-
-  operation_send.len = sizeof (operation_send.data);  /* len */
-  Serial1.write((char*)operation_send.data, operation_send.len + HEADER_LEN);
-  Serial1.flush();
-//  send(ID, OP_HELLO, )
-}
-
-void op_message() { }
-void op_moveWheels()
-{
-  DEBUG_PRINTLN("move Wheels");
-  int PWMRight = bytesToLong(&server_operation->data[0]);
-  int PWMLeft = bytesToLong(&server_operation->data[4]);
-  robot.moveLeftWheel(PWMLeft, 1, false);
-  robot.moveRightWheel(PWMRight, 1, false);
->>>>>>> 9fcf88d (Refactorización)
-  for(int i=0; i<10; i++)
-  {
-    meanFilterRight.AddValue(deltaTimeRight);
-    meanFilterLeft.AddValue(deltaTimeLeft);
-  }
-}
-<<<<<<< HEAD
-
-
+ 
 /**
  * Operación de Movimiento Cinemático.
  * Traduce las velocidades deseadas (setpoints) enviadas por la Raspberry Pi
  * en señales de dirección y potencia (FeedForward) para los motores.
  */
 void op_moveRobot() {
-  DEBUG_PRINTLN("move");
-
-  // 1. EXTRACCIÓN DE DATOS:
-  // Se reconstruyen los valores 'double' (8 bytes cada uno) desde el buffer de datos.
-  // Bytes 0-7: Velocidad deseada rueda derecha | Bytes 8-15: Velocidad deseada rueda izquierda.
-  double setpointWRight = bytesToDouble(&server_operation->data[0]);
-  double setpointWLeft = bytesToDouble(&server_operation->data[8]);
-
-  DEBUG_PRINT("setpointWRight:");
-  DEBUG_PRINT(setpointWRight);
-  DEBUG_PRINT(" setpointWLeft:");
-  DEBUG_PRINTLN(setpointWLeft);
-
-  // 2. FILTRO DE ZONA MUERTA (Deadband):
-  // Si la velocidad solicitada es muy baja (entre -1 y 1 rad/s), se fuerza a 0.
-  // Esto evita que los motores "vibran" o zumben sin tener fuerza suficiente para moverse.
-=======
-void op_moveRobot() {
  DEBUG_PRINTLN("move");
-  double setpointWRight = bytesToDouble(&server_operation->data[0]);
-  double setpointWLeft = bytesToDouble(&server_operation->data[8]);
+  float setpointWLeft = bytesToFloat(&server_operation->data[0]);
+  float setpointWRight = bytesToFloat(&server_operation->data[4]);
+  DEBUG_PRINT(" setpointWLeft:");
+  DEBUG_PRINTLN(setpointWLeft);
+
   DEBUG_PRINT("setpointWRight:");
   DEBUG_PRINT(setpointWRight);
 
-  DEBUG_PRINT(" setpointWLeft:");
-  DEBUG_PRINTLN(setpointWLeft);
->>>>>>> 9fcf88d (Refactorización)
   if(setpointWRight < 1 && setpointWRight > -1) {
     setpointWRight = 0;
   }
   if(setpointWLeft < 1 && setpointWLeft > -1) {
     setpointWLeft = 0;
   }
-<<<<<<< HEAD
 
   // 3. LÓGICA DE DIRECCIÓN (Rueda Derecha):
   // Si el valor es negativo, el robot debe ir hacia atrás.
@@ -830,8 +676,8 @@ void op_moveRobot() {
 
   // 4. ACTUALIZACIÓN DEL CONTROLADOR:
   // Se informa a los objetos de control cuál es la nueva velocidad objetivo.
-  wheelControlerLeft.setSetPoint(setpointWLeft);
-  wheelControlerRight.setSetPoint(setpointWRight);
+  //wheelControlerLeft.setSetPoint(setpointWLeft);
+  //wheelControlerRight.setSetPoint(setpointWRight);
 
   // 5. CÁLCULO DE POTENCIA INICIAL (FeedForward):
   // El FeedForward estima el PWM necesario basándose en la velocidad deseada 
@@ -839,7 +685,6 @@ void op_moveRobot() {
   PWM_Left = wheelControlerLeft.feedForward();
   PWM_Right = wheelControlerRight.feedForward();
 
-=======
   if(setpointWRight < 0) {
     setpointWRight = setpointWRight*(-1);
     backD = true;
@@ -858,12 +703,10 @@ void op_moveRobot() {
 
   PWM_Left=wheelControlerLeft.feedForward();
   PWM_Right=wheelControlerRight.feedForward();
->>>>>>> 9fcf88d (Refactorización)
   DEBUG_PRINT("PWM_Left:");
   DEBUG_PRINT(PWM_Left);
   DEBUG_PRINT(" PWM_Right:");
   DEBUG_PRINTLN(PWM_Right);
-<<<<<<< HEAD
 
   // 6. EJECUCIÓN FÍSICA:
   // Se envían las señales a los puentes en H a través de la clase robot.
@@ -873,18 +716,16 @@ void op_moveRobot() {
   // 7. ESTABILIZACIÓN DE SENSORES:
   // Se fuerzan 10 lecturas iniciales en el filtro de media móvil para que 
   // el sistema de control de velocidad no herede datos de cuando el robot estaba en otro estado.
-=======
   // feedForwardD();
   // feedForwardI();  
   // moveWheel(PWM_Left, setpointWLeft, pinMotorI, backI);
   // moveWheel(PWM_Right, setpointWRight, pinMotorD, backD);
-  robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
-  robot.moveRightWheel(PWM_Right, setpointWRight, backD);
+  //robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
+  //robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   // robot.moveLeftWheel(PWM_Left, setpointWLeft, backI);
   // robot.moveRightWheel(PWM_Right, setpointWRight, backD);
   //take the mean of the last 5 values for measure the angular velocity 
   //of every wheel
->>>>>>> 9fcf88d (Refactorización)
   for(int i=0; i<10; i++)
   {
     meanFilterRight.AddValue(deltaTimeRight);
@@ -892,7 +733,6 @@ void op_moveRobot() {
   }
 }
 
-<<<<<<< HEAD
 
 /**
  * Operación de Parada del Robot.
@@ -922,43 +762,6 @@ void op_StopRobot() {
  * Empaqueta y envía el estado actual del robot (velocidad real y PWM) 
  * hacia la Raspberry Pi a través del puerto Serie 1.
  */
-void op_telemtry() {
-  // Notificación de depuración para saber que se está enviando el reporte
-  DEBUG_PRINT("op telemetry:");
-  DEBUG_PRINTLN(OP_TELEMETRY);
-
-  // 1. CONFIGURACIÓN DE LA CABECERA (HEADER)
-  // Se prepara la estructura con los datos de identificación del paquete
-  operation_send.InitFlag = (int)INIT_FLAG; // Bandera 112 para sincronización
-  operation_send.id = robot.getRobotID();   // ID único del robot (ej. 5)
-  operation_send.op = (int)OP_TELEMETRY;    // Código de la operación actual
-
-  // 2. EMPAQUETADO DE DATOS (PAYLOAD):
-  // Se convierten los valores numéricos a bytes para su transmisión binaria.
-  
-  // Bytes 0-7: Velocidad angular medida en la rueda izquierda (double, 8 bytes)
-  doubleToBytes(wLeft, &operation_send.data[0]);
-  
-  // Bytes 8-15: Velocidad angular medida en la rueda derecha (double, 8 bytes)
-  doubleToBytes(wRight, &operation_send.data[8]);
-  
-  // Bytes 16-19: Potencia PWM actual de la rueda izquierda (long, 4 bytes)
-  longToBytes(PWM_Left, &operation_send.data[16]);
-  
-  // Bytes 20-23: Potencia PWM actual de la rueda derecha (long, 4 bytes)
-  longToBytes(PWM_Right, &operation_send.data[20]);
-
-  // Depuración por USB para monitorizar la velocidad medida en tiempo real
-=======
-void op_StopRobot() {
-  DEBUG_PRINT("op stop:");
-  DEBUG_PRINTLN(OP_STOP_ROBOT);
-  wheelControlerLeft.setSetPoint(0.0);
-  wheelControlerRight.setSetPoint(0.0);
-  // fullStop(pinMotorI);
-  // fullStop(pinMotorD);
-  robot.fullStop();
-}
 
 void op_telemtry() {
   DEBUG_PRINT("op telemetry:");
@@ -971,13 +774,11 @@ void op_telemtry() {
   doubleToBytes(wRight, &operation_send.data[8]);
   longToBytes(PWM_Left, &operation_send.data[16]);
   longToBytes(PWM_Right, &operation_send.data[20]);
->>>>>>> 9fcf88d (Refactorización)
   DEBUG_PRINT("vel robot--->");
   DEBUG_PRINT(" wRight:");
   DEBUG_PRINT(wRight);
   DEBUG_PRINT(" wLeft:");
   DEBUG_PRINTLN(wLeft);
-<<<<<<< HEAD
 
   // 3. CÁLCULO DE LONGITUD:
   // Se define el tamaño total de los datos: (2 doubles * 8 bytes) + (2 longs * 4 bytes) = 24 bytes
@@ -1005,22 +806,11 @@ void op_telemtry() {
  * Realiza una rotación precisa sobre el eje central basándose en el conteo de encoders.
  * Calcula la distancia que debe recorrer cada rueda para cumplir el ángulo solicitado.
  */
-=======
-  operation_send.len = (int)sizeof(double)*2+sizeof(int)*2;  /* len */
-  Serial1.write((char*)&operation_send.InitFlag,4);
-  Serial1.write((char*)&operation_send.id,4);
-  Serial1.write((char*)&operation_send.op, 4);
-  Serial1.write((char*)&operation_send.len, 4);
-  Serial1.write((char*)&operation_send.data, operation_send.len);
-  Serial1.flush();
-  //send(ID, OP_TELEMETRY, &operation_send.data);
-}
->>>>>>> 9fcf88d (Refactorización)
+
 void op_turn_robot()
 {
   DEBUG_PRINT("op turn:");
   DEBUG_PRINTLN(OP_TURN_ROBOT);
-<<<<<<< HEAD
   
   bool turnRight;
   // Extrae el ángulo deseado (en grados) de los primeros 4 bytes del paquete
@@ -1035,7 +825,6 @@ void op_turn_robot()
   {
     turnRight = true;
     angle = angle * (-1); // Trabajamos con el valor absoluto para los cálculos
-=======
   bool turnRight;
   int angle = bytesToLong(&server_operation->data[0]);
   DEBUG_PRINT("angle:");
@@ -1044,13 +833,11 @@ void op_turn_robot()
   {
     turnRight = true;
     angle = angle*(-1);
->>>>>>> 9fcf88d (Refactorización)
   }
   else
   {
     turnRight = false;
   }
-<<<<<<< HEAD
 
   // 2. CÁLCULOS GEOMÉTRICOS (Cinemática):
   // Convertimos el ángulo de grados a radianes
@@ -1078,7 +865,6 @@ void op_turn_robot()
     if(turnRight) 
     {
       // Girar a la derecha: Rueda izquierda adelante, Rueda derecha atrás
-=======
   //If angle is negative, turn right else turn left
   double angleInRad = ((double)angle)*M_PI/180;
   double angleToTurn = angleInRad*(robot.getRobotDiameter())/2;
@@ -1091,21 +877,16 @@ void op_turn_robot()
   {
     if(turnRight<0)
     {
->>>>>>> 9fcf88d (Refactorización)
       robot.moveLeftWheel(MINPWM, 1, false);
       robot.moveRightWheel(MINPWM, 1, true);
     }
     else
     {
-<<<<<<< HEAD
       // Girar a la izquierda: Rueda izquierda atrás, Rueda derecha adelante
-=======
->>>>>>> 9fcf88d (Refactorización)
       robot.moveLeftWheel(MINPWM, 1, true);
       robot.moveRightWheel(MINPWM, 1, false);
     }
   }
-<<<<<<< HEAD
 
   // 6. FINALIZACIÓN:
   // Una vez alcanzado el ángulo, frenamos en seco
@@ -1114,22 +895,19 @@ void op_turn_robot()
   // Enviamos confirmación a la Raspberry Pi de que la tarea ha terminado
   op_done();
 }
+  }
+  }
+}
 
 
 /**
  * Operación de Silencio.
  * Desactiva el envío automático de telemetría para liberar el bus de datos.
  */
-=======
-  robot.fullStop();
-  op_done();
-}
->>>>>>> 9fcf88d (Refactorización)
 inline void op_silence()
 {
   DEBUG_PRINT("op silense:");
   DEBUG_PRINTLN(OP_SILENCE);
-<<<<<<< HEAD
 
   // Desactiva la bandera que permite el envío de datos en el loop()
   sendDataSerial = false;
@@ -1143,17 +921,11 @@ inline void op_silence()
  * Se ejecuta cuando el robot recibe un comando que no sabe procesar.
  * Envía un paquete de notificación de vuelta al servidor.
  */
-=======
-  sendDataSerial = false;
-  op_done();
-}
 
->>>>>>> 9fcf88d (Refactorización)
 inline void op_error()
 {
   DEBUG_PRINT("op error:");
   DEBUG_PRINTLN(OP_ERROR);
-<<<<<<< HEAD
 
   // 1. PREPARACIÓN DEL PAQUETE DE ERROR
   operation_send.op = OP_ERROR;
@@ -1179,25 +951,10 @@ inline void op_error()
  * Extrae las constantes Kp, Ki y Kd para ambas ruedas desde el buffer de datos
  * y las aplica a los controladores en tiempo real.
  */
-=======
-  operation_send.op = OP_ERROR;
-  operation_send.InitFlag=INIT_FLAG;
-  operation_send.id=(int)robot.getRobotID();
-  operation_send.len = sizeof (operation_send.data);  /* len */
-
-  Serial1.write((char*)&operation_send.InitFlag,4);
-  Serial1.write((char*)&operation_send.id,4);
-  Serial1.write((char*)&operation_send.op, 4);
-  Serial1.write((char*)&operation_send.len, 4);
-  Serial1.write((char*)&operation_send.data, operation_send.len);
-  Serial1.flush();
-}
->>>>>>> 9fcf88d (Refactorización)
 void op_conf_pid()
 {
     DEBUG_PRINT("conf pid:");
     DEBUG_PRINTLN(OP_CONF_PID);
-<<<<<<< HEAD
 
     // 1. EXTRACCIÓN DE CONSTANTES PARA LA RUEDA DERECHA:
     // Cada valor 'double' ocupa 8 bytes en el buffer.
@@ -1207,17 +964,11 @@ void op_conf_pid()
 
     // 2. EXTRACCIÓN DE CONSTANTES PARA LA RUEDA IZQUIERDA:
     // Se continúa desde el offset 24 para evitar solapamiento.
-=======
-    double kp_right = bytesToDouble(&server_operation->data[0]);
-    double ki_right = bytesToDouble(&server_operation->data[8]);
-    double kd_right = bytesToDouble(&server_operation->data[16]);
-
->>>>>>> 9fcf88d (Refactorización)
+   
     double kp_left = bytesToDouble(&server_operation->data[24]);
     double ki_left = bytesToDouble(&server_operation->data[32]);
     double kd_left = bytesToDouble(&server_operation->data[40]);
 
-<<<<<<< HEAD
     // 3. ACTUALIZACIÓN DE LOS CONTROLADORES:
     // Se pasan los nuevos valores a los objetos wheelControler.
     // Esto reinicia el comportamiento de cálculo en la siguiente iteración del loop().
@@ -1242,34 +993,10 @@ void op_conf_pid()
  * Ajusta la pendiente (A) y el offset (B) del modelo lineal de cada motor.
  * Esto permite compensar el rozamiento y la respuesta eléctrica de los motores.
  */
-=======
-    wheelControlerRight.setControlerParam(kp_right, ki_right, kd_right);
-    wheelControlerLeft.setControlerParam(kp_left, ki_left, kd_left);
-
-    op_done();
-    DEBUG_PRINT(kp_right);
-    DEBUG_PRINT(",");
-
-    DEBUG_PRINT(ki_right);
-    DEBUG_PRINT(",");
-
-    DEBUG_PRINT(kd_right);
-    DEBUG_PRINT(",");
-
-    DEBUG_PRINT(kp_left);
-    DEBUG_PRINT(",");
-    DEBUG_PRINT(ki_left);
-    DEBUG_PRINT(",");
-    DEBUG_PRINT(kd_left);
-
-}
-
->>>>>>> 9fcf88d (Refactorización)
 void op_conf_ff()
 {
   DEBUG_PRINT("conf ff:");
   DEBUG_PRINTLN(OP_CONF_FF);
-<<<<<<< HEAD
 
   // 1. EXTRACCIÓN DE PARÁMETROS PARA LA RUEDA DERECHA:
   // A (Pendiente): Relación entre velocidad angular y PWM.
@@ -1300,6 +1027,7 @@ void op_conf_ff()
   // Informa a la Raspberry Pi que los parámetros han sido actualizados con éxito.
   op_done();
 }
+
 /**
  * Operación de Confirmación (ACK).
  * Notifica a la Raspberry Pi que la operación solicitada se ha completado.
@@ -1384,7 +1112,6 @@ void isrLeft() {
     }
 
     // El deltaTimeLeft es lo que luego usa el filtro de media móvil en el loop()
-=======
   double A_right = bytesToDouble(&server_operation->data[0]);
   double B_right = bytesToDouble(&server_operation->data[8]);
 
@@ -1404,98 +1131,9 @@ void isrLeft() {
   DEBUG_PRINT(",");
   
   DEBUG_PRINTLN(B_left);
-  op_done();
+  //op_done();
 }
-void op_done()
-{
-  DEBUG_PRINT("op done:");
-  DEBUG_PRINTLN(OP_DONE);
-  operation_send.op = OP_DONE;
-  operation_send.InitFlag=INIT_FLAG;
-  operation_send.id=(int)robot.getRobotID();
-  operation_send.len = sizeof (operation_send.data);  /* len */
-
-  Serial1.write((char*)&operation_send.InitFlag,4);
-  Serial1.write((char*)&operation_send.id,4);
-  Serial1.write((char*)&operation_send.op, 4);
-  Serial1.write((char*)&operation_send.len, 4);
-  Serial1.write((char*)&operation_send.data, operation_send.len);
-  Serial1.flush();
-
 }
-void isrRight() {
-  timeBeforeDebounceRight = millis();//tiempo para evitar rebotes
-  deltaDebounceRight = timeBeforeDebounceRight - timeAfterDebounceRight;// tiempo que ha pasdo entre interrupcion e interrupcion
-  if(deltaDebounceRight > TIMEDEBOUNCE) {//condicion para evitar rebotes
-    //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeRight=millis();
-    encoder_countRight++;
-    if(encoder_countRight == MAX_ENCODER_STEPS)
-    {
-      wheelTurnCounterRight++;
-    }
-    deltaTimeRight = startTimeRight - timeAfterRight;
-      
-    timeAfterRight = startTimeRight;
-  }
-  timeAfterDebounceRight = timeBeforeDebounceRight;  
-}
-
-void isrLeft() {
-  timeBeforeDebounceLeft = millis();//tiempo para evitar rebotes
-  deltaDebounceLeft = timeBeforeDebounceLeft - timeAfterDebounceLeft;// tiempo que ha pasdo entre interrupcion e interrupcion
-  if(deltaDebounceLeft > TIMEDEBOUNCE) {//condicion para evitar rebotes
-    //se empieza a contar el tiempo que ha pasado entre una interrupcion "valida" y otra.    
-    startTimeLeft = millis();
-    encoder_countLeft++;//se cuenta los pasos de encoder
-    if(encoder_countLeft == MAX_ENCODER_STEPS)
-    {
-      wheelTurnCounterLeft++;
-    
-    }
->>>>>>> 9fcf88d (Refactorización)
-    deltaTimeLeft = startTimeLeft - timeAfterLeft;
-    timeAfterLeft = startTimeLeft;
-  }
-  timeAfterDebounceLeft = timeBeforeDebounceLeft;
-}
-
-
-void serialEvent() {
-<<<<<<< HEAD
-  // Verifica si hay al menos un byte esperando en el buffer de entrada
-  if(Serial1.available())
-  {
-    // Lee una ráfaga de bytes y los guarda en 'packetBuffer'
-    // Se detiene si: encuentra un '\n', llena el buffer, o pasan 1000ms (timeout por defecto)
-    int rlen = Serial1.readBytesUntil('\n', (char*)&packetBuffer, sizeof(packetBuffer));
-    
-    // Mapea la estructura 'server_operation' sobre el buffer de bytes recibidos
-    // Esto permite acceder a packetBuffer[0] como server_operation->InitFlag, etc.
-    server_operation = (struct appdata *)&packetBuffer;
-    
-    // Indica al loop() que hay un mensaje listo para ser procesado
-    serialCom = true;
-
-    // Imprime la cantidad de bytes leídos para depuración
-=======
-  // read_ptr = (unsigned char*)&packetBuffer;
-  // while (Serial1.available()) {
-  //   *(read_ptr++) = Serial1.read();
-  //   server_operation = (struct appdata *)&packetBuffer;
-  //   serialCom = true;
-  // }
-  if(Serial1.available())
-  {
-    int rlen = Serial1.readBytesUntil('\n', (char*)&packetBuffer, sizeof(packetBuffer));
-    server_operation = (struct appdata *)&packetBuffer;
-    serialCom = true;
->>>>>>> 9fcf88d (Refactorización)
-    DEBUG_PRINTLN(rlen);
-  }
-}
-
-<<<<<<< HEAD
 /* TODO: Revisar esta version mejorada no bloqueante
  *  void serialEvent() {
   static int index = 0; // Mantiene la posición del buffer entre llamadas a la función
@@ -1694,34 +1332,26 @@ void printCurrentNet() {
   Serial.println(WiFi.SSID());
 
   // print the MAC address of the router you're attached to:
->>>>>>> 9fcf88d (Refactorización)
   byte bssid[6];
   WiFi.BSSID(bssid);
   Serial.print("BSSID: ");
   printMacAddress(bssid);
 
-<<<<<<< HEAD
   // Intensidad de la señal (RSSI - Received Signal Strength Indication)
   // Valores cercanos a -30 son excelentes, -80 es una conexión muy débil
-=======
   // print the received signal strength:
->>>>>>> 9fcf88d (Refactorización)
   long rssi = WiFi.RSSI();
   Serial.print("signal strength (RSSI):");
   Serial.println(rssi);
 
-<<<<<<< HEAD
   // Tipo de seguridad (WPA2, WEP, etc.) en formato hexadecimal
-=======
   // print the encryption type:
->>>>>>> 9fcf88d (Refactorización)
   byte encryption = WiFi.encryptionType();
   Serial.print("Encryption Type:");
   Serial.println(encryption, HEX);
   Serial.println();
 }
 
-<<<<<<< HEAD
 
 /**
  * Establece la conexión WiFi y sincroniza el cliente MQTT.
@@ -1769,114 +1399,3 @@ void connect() {
   // Nota: Falta mqttClient.endMessage() si la librería lo requiere para enviar el buffer.
 }
 #endif
-=======
-void printMacAddress(byte mac[]) {
-  for (int i = 5; i >= 0; i--) {
-    if (mac[i] < 16) {
-      Serial.print("0");
-    }
-    Serial.print(mac[i], HEX);
-    if (i > 0) {
-      Serial.print(":");
-    }
-  }
-  Serial.println();
-}
-
-
-/*
-Connects to Wifi and MQTT Broker
-*/
-void connect() {
-  Serial.print("checking wifi...");
-  while ( status != WL_CONNECTED) {
-    status = WiFi.begin(ssid, pass);
-    Serial.print(".");
-    delay(1000);
-  }
-  Serial.println("\nconnected to WiFi!\n");
-  
-  // Connection successful
-  Serial.print("[INFO] Connection Successful");
-  Serial.print("");  
-  printConnectionInformation();
-  Serial.println("-----------------------------------------------");
-  Serial.println(""); 
-
-  Serial.print("Attempting MQTT connection ....");
-  Serial.println(broker);
-  if(!mqttClient.connect(broker,mqttPort))
-  {
-    Serial.print("MQTT connection failed! Error code = ");
-
-    Serial.println(mqttClient.connectError());
-
-
-    while (1);
-  }
-  Serial.println("You're connected to the MQTT broker!");
- // Construct the operation message as a JSON string
-  String messagePayload = "{\"operation\": \"hello\", \"source_id\": \"arduinoClient\", \"payload\": {\"url\": \"example.com\"}}";
-  mqttClient.beginMessage("");
-  mqttClient.print(messagePayload);
-}
-
-
-
-/*
-Prints Wifi connection information
-*/
-void printConnectionInformation() 
-{
-  // Print Network SSID
-  Serial.print("[INFO] SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // Print Router's MAC address
-  byte bssid[6];
-  WiFi.BSSID(bssid);
-  Serial.print("[INFO] BSSID: ");
-  Serial.print(bssid[5], HEX);
-  Serial.print(":");
-  Serial.print(bssid[4], HEX);
-  Serial.print(":");
-  Serial.print(bssid[3], HEX);
-  Serial.print(":");
-  Serial.print(bssid[2], HEX);
-  Serial.print(":");
-  Serial.print(bssid[1], HEX);
-  Serial.print(":");
-  Serial.println(bssid[0], HEX);
-
-  // Print received signal strength
-  long rssi = WiFi.RSSI();
-  Serial.print("[INFO] Signal Strength (RSSI): ");
-  Serial.println(rssi);
-
-  // Print encryption type
-  byte encryption = WiFi.encryptionType();
-  Serial.print("[INFO] Encryption Type: ");
-  Serial.println(encryption, HEX);
-
-  // Print WiFi Shield's IP address
-  IPAddress ip = WiFi.localIP();
-  Serial.print("[INFO] IP Address: ");
-  Serial.println(ip);
-
-  // Print MAC address
-  byte mac[6];
-  WiFi.macAddress(mac);
-  Serial.print("[INFO] MAC Address: ");
-  Serial.print(mac[5], HEX);
-  Serial.print(":");
-  Serial.print(mac[4], HEX);
-  Serial.print(":");
-  Serial.print(mac[3], HEX);
-  Serial.print(":");
-  Serial.print(mac[2], HEX);
-  Serial.print(":");
-  Serial.print(mac[1], HEX);
-  Serial.print(":");
-  Serial.println(mac[0], HEX);
-}
->>>>>>> 9fcf88d (Refactorización)

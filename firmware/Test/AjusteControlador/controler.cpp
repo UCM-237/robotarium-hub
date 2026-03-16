@@ -1,4 +1,3 @@
-
 /*
  * ----------------------------------------------------------------------------
  * PROYECTO: Robotarium Hub (UCM)
@@ -37,7 +36,7 @@ int controler::pid(double w) {
     double aux = abs(this->error);
 
     // Zona muerta: Si el error es menor a 0.3 rad/s, no aplicamos corrección para evitar oscilaciones
-    if(aux >= 0.3) {
+    if(aux >= 0.2) {
         // Acumulamos el error para la parte Integral
         this->cumError += this->error * this->elapsedTime;
         
@@ -47,7 +46,7 @@ int controler::pid(double w) {
         }
 
         // Anti-windup: Limitamos el error acumulado para que el motor no se quede "atascado" al máximo
-        constrain(this->cumError, -maxIntegralError, maxIntegralError);
+        this->cumError = constrain(this->cumError, -maxIntegralError, maxIntegralError);
         
         // Cálculo de la parte Derivativa (pendiente del error)
         this->rateError = (this->error - this->lastError) / this->elapsedTime;
@@ -58,12 +57,11 @@ int controler::pid(double w) {
     }
     
     this->previousTime = this->currentTime;
-    return output;
+    return constrain(output,MINPWM,MAXPWM);
 }
 
 // Configura los coeficientes de la recta de FeedForward (PWM = A*w + B)
 void controler::setFeedForwardParam(double A, double B) {
-
     this->feedForwardParam_A = A;
     this->feedForwardParam_B = B;
 }

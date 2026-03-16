@@ -24,14 +24,14 @@
 // Tamaño máximo del paquete de datos que el Arduino puede procesar por Serial
 const int MAXDATASIZE=255; 
 // Tamaño de la cabecera calculada como 5 enteros (InitFlag, id, op, len...)
-const int HEADER_LEN =sizeof(int)*4; 
+const int HEADER_LEN =sizeof(int)*5; 
 
 // Estructura para el intercambio de mensajes con la Raspberry Pi
 struct appdata {
-  uint32_t InitFlag; // Marcador de inicio de trama (ej: 112)
-  uint32_t id;       // Identificador del robot en el enjambre
-  uint32_t op;       // Código de la operación a ejecutar (ver operation.h)
-  uint32_t len;      // Longitud real de los datos en el array 'data'
+  uint16_t InitFlag; // Marcador de inicio de trama (ej: 112)
+  uint16_t id;       // Identificador del robot en el enjambre
+  uint16_t op;       // Código de la operación a ejecutar (ver operation.h)
+  uint16_t len;      // Longitud real de los datos en el array 'data'
   unsigned char data [MAXDATASIZE-HEADER_LEN]; // Carga útil del mensaje
 };
 
@@ -130,7 +130,7 @@ bool backD=false, backI=false;
 
 // --- FILTRO DE DEBOUNCE (ANTI-REBOTES) ---
 // Evita lecturas erróneas por ruido eléctrico en las interrupciones del encoder
-unsigned long TIMEDEBOUNCE = 12; // Tiempo mínimo (ms) entre pulsos válidos
+unsigned long TIMEDEBOUNCE = 1; // Tiempo mínimo (ms) entre pulsos válidos
 volatile unsigned long timeAfterDebounceRight= 0;
 volatile unsigned long timeBeforeDebounceRight=0;
 volatile unsigned long deltaDebounceRight= 0;
@@ -143,18 +143,11 @@ volatile unsigned long deltaDebounceLeft= 0;
 // Se usan para medir el periodo entre pulsos y derivar la velocidad angular
 volatile unsigned long startTimeLeft= 0;
 volatile unsigned long timeAfterLeft= 0;
-volatile unsigned deltaTimeLeft; // Tiempo entre flancos en la rueda izquierda
+volatile unsigned long deltaTimeLeft; // Tiempo entre flancos en la rueda izquierda
 
 volatile unsigned long startTimeRight= 0;
 volatile unsigned long timeAfterRight= 0;
-volatile unsigned deltaTimeRight; // Tiempo entre flancos en la rueda derecha
+volatile unsigned long deltaTimeRight; // Tiempo entre flancos en la rueda derecha
 
 volatile unsigned encoder_countRight= 0; // Contador de pulsos brutos (derecha)
 volatile unsigned encoder_countLeft= 0;  // Contador de pulsos brutos (izquierda)
-
-
-
-const int PIN_LEFT = 3 ;// For Arwen and Arduino Nano Every
-//const int PIN_LEFT = 2; // For Gandalf and Boromir and Arduino Nano 33IoT
-const int PIN_RIGHT = 5 ;//For Arwen and Arduino Nano Every
-//const int PIN_RIGHT = 3 ;<//For For Gandalf and Boromir and Arduino Nano 33IoT
