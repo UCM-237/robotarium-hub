@@ -91,4 +91,7 @@ class Localization
     record_data data;
 
     bool twoCameras=false;
+    // Transformación del arena
+    cv::Vec3d arena_rvec, arena_tvec;
+    cv::Mat arena_R;
 };

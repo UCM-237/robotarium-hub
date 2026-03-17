@@ -1,32 +1,36 @@
+// Clase Localization para localizar robots y arena en Robotarium usando OpenCV y ArUco
 #include "localization.h"
 
 Localization::Localization()
 {
-
+    // Constructor de la clase Localization
 }
 
 Localization::~Localization()
 {
-  
+    // Destructor de la clase Localization
 }
 
 void Localization::setComunication(std::shared_ptr<AgentCommunication> agentCommunication)
 {
+    // Establecer la instancia de comunicación de agente
     this->agentCommunication=agentCommunication;
 }
 
 void Localization::setRingBuffer(std::shared_ptr<ringBuffer> buffer)
 {
+    // Establecer el buffer de anillo compartido
     this->buffer=buffer;    
 }
 
 void Localization::initRingBuffer()
 {
-    
+    // Inicializar el buffer de anillo (función vacía por ahora)
 }
 
 int Localization::init(int argc,char **argv)
 {
+    // Inicializar la localización con argumentos de línea de comandos
 
     cv::Mat R, T, R1, R2, P1, P2, Q;
     cv::Mat map1x, map1y, map2x, map2y;
@@ -35,7 +39,7 @@ int Localization::init(int argc,char **argv)
 
     
     this->twoCameras=false;
-     //init aruco code----------
+    // Inicializar código ArUco
     cv::CommandLineParser parser(argc, argv, keys);
     parser.about(about);
 
@@ -127,10 +131,12 @@ int Localization::init(int argc,char **argv)
         return -1;
     }
 
-     this->dictionary =
+     // Cargar diccionario ArUco
+    this->dictionary =
         cv::aruco::getPredefinedDictionary( \
         cv::aruco::PREDEFINED_DICTIONARY_NAME(dictionaryId));
     
+    // Cargar parámetros de calibración de la cámara
     cv::FileStorage fs("/home/admin/workspace/robotarium-hub/hub/localization/calibration_params.yml", cv::FileStorage::READ);
     fs["camera_matrix"] >> this->camera_matrix;
     fs["distortion_coefficients"] >> this->dist_coeffs;
@@ -148,6 +154,7 @@ int Localization::init(int argc,char **argv)
 
 bool Localization::FindArena()
 {
+    // Buscar el arena en el video
     bool ArenaFound=false;
     std::vector<float> reprojectionError;
     cv::Scalar color(0,0,255);
@@ -160,11 +167,9 @@ bool Localization::FindArena()
         cv::Mat bothImages;
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
         this->image.copyTo(this->image_copy);
-        //Finding the contours of the arena
-        //cv::threshold(this->grayMat,this->binary_image,110,255,cv::CHAIN_APPROX_NONE);
-        // Aplicar un desenfoque para reducir el ruido
+        // Encontrar contornos del arena
         GaussianBlur(this->grayMat, this->grayMat, cv::Size(5, 5), 0);
-        // Detectar bordes usando el algoritmo de Canny
+        // Detectar bordes con Canny
         cv::Canny(this->grayMat, this->grayMat, 50, 250);
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
@@ -179,10 +184,10 @@ bool Localization::FindArena()
              std::vector<cv::Point> approx;
             cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
 
-            if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Check if the contour has 4 vertices (rectangle)
+            if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Verificar si es un rectángulo
                 this->filteredContours.push_back(approx);
 
-                // Optionally, you can draw the rectangles on the image
+                // Dibujar rectángulos en la imagen
                 cv::polylines(this->image, approx, true, color, 2);
                 //save the lines
 
@@ -208,28 +213,26 @@ bool Localization::FindArena()
             {
                cv::circle(this->image, approxCurve[0], 5, this->cornerColors[3], -1);
 
-                // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
-                // this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength/2);
-                // this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
-                // this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength/2);
-                // this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength/2);
-                // this->RobotariumData.y.push_back(this->tvecs[0][1]-this->heightArenaLength/2);
-                // this->RobotariumData.x.push_back(this->tvecs[0][0]-this->baseArenaLength/2);
-                // this->RobotariumData.y.push_back(this->tvecs[0][1]-this->heightArenaLength/2);
-               
-                this->RobotariumData.x.push_back(this->tvecs[0][0]);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]);
-                this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]);
-                this->RobotariumData.x.push_back(this->tvecs[0][0]+this->baseArenaLength);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength);
-                this->RobotariumData.x.push_back(this->tvecs[0][0]);
-                this->RobotariumData.y.push_back(this->tvecs[0][1]+this->heightArenaLength);
+                // Guardar transformación del arena
+                this->arena_rvec = this->rvecs[0];
+                this->arena_tvec = this->tvecs[0];
+                cv::Rodrigues(this->arena_rvec, this->arena_R);
+
+                // Guardar coordenadas del arena en su propio sistema (origen en esquina)
+                this->RobotariumData.x.push_back(0.0f);
+                this->RobotariumData.y.push_back(0.0f);
+                this->RobotariumData.x.push_back(this->baseArenaLength);
+                this->RobotariumData.y.push_back(0.0f);
+                this->RobotariumData.x.push_back(this->baseArenaLength);
+                this->RobotariumData.y.push_back(this->heightArenaLength);
+                this->RobotariumData.x.push_back(0.0f);
+                this->RobotariumData.y.push_back(this->heightArenaLength);
                 //agentCommunication->setRobotariumData(RobotariumData);
                 ArenaFound=true;
                 std::cout<<"ARENA FOUND"<<std::endl;
                 for (long unsigned int i = 0; i < rvecs.size(); ++i) {
                     
+                    // Dibujar ejes de coordenadas
                     cv::drawFrameAxes(this->image,  this->camera_matrix, this->dist_coeffs, this->rvecs[i], this->tvecs[i], 0.1);
                     this->robotarioTvecs.push_back(this->tvecs[i]);
                     this->robotarioRvecs.push_back(this->rvecs[i]);
@@ -249,13 +252,14 @@ bool Localization::FindArena()
 
 void Localization::FindRobot()
 {
+    // Buscar robots usando marcadores ArUco
     int frame_width = this->in_video.get(cv::CAP_PROP_FRAME_WIDTH);
     int frame_height = this->in_video.get(cv::CAP_PROP_FRAME_HEIGHT);
     int fps = 30; // Tasa de fotogramas por segundo
     std::cout<<"frame width: "<<frame_width/30<<std::endl;
     std::cout<<"frame height: "<<frame_height/30<<std::endl;
     cv::Size frame_size = cv::Size(1024, 720);
-    // Crear un objeto VideoWriter para escribir el video
+    // Crear VideoWriter para salida
     cv::VideoWriter video("output.avi", cv::VideoWriter::fourcc('D', 'I', 'V', 'X'), 30.0, frame_size,1);
     if (!video.isOpened()) {
        std:: cerr << "Error al abrir el archivo de salida para escribir el video" << std::endl;
@@ -297,17 +301,17 @@ cv::Scalar color(0,0,255);
 
         
         
-        //cv::aruco::detectMarkers(this->binary_image, this->dictionary, corners, ids);
+        // Detectar marcadores ArUco
         cv::aruco::detectMarkers(this->grayMat, this->dictionary, corners, ids, parameters, rejected);
        
         // if at least one marker detected
         if (ids.size() > 0)
         {
+            // Dibujar marcadores detectados
             cv::aruco::drawDetectedMarkers(this->image, corners, ids);
             
-            // MyestimatePoseSingleMarkers(corners, this->marker_length_m,
-            //         camera_matrix, dist_coeffs, this->rvecs, this->tvecs,reprojectionError);
-        cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
+            // Estimar pose de los marcadores
+            cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m, camera_matrix, dist_coeffs, this->rvecs, this->tvecs);
             // cv::aruco::estimatePoseSingleMarkers(corners, marker_length_m,
             //         camera_matrix, dist_coeffs, rvecs, tvecs);
            
@@ -315,27 +319,28 @@ cv::Scalar color(0,0,255);
              
             for(long unsigned int i=0; i < ids.size(); i++)
             {
-                 cv::aruco::drawAxis(this->image, this->camera_matrix, this->dist_coeffs,
+                // Dibujar ejes para cada marcador
+                cv::aruco::drawAxis(this->image, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
                 cv::aruco::drawAxis(frame, this->camera_matrix, this->dist_coeffs,
                         this->rvecs[i], this->tvecs[i], 0.1);
                         
-                this->data.x=this->tvecs[i](0);
-                
-                this->data.y=this->tvecs[i](1);
-               
-                this->data.z=this->tvecs[i](2);
-                cv::Rodrigues(this->rvecs[i], this->rot_mat);
-                this->ang_yaw=atan2(this->rot_mat.at<double>(1,0),this->rot_mat.at<double>(0,0));//range [-pi,pi]
-                this->data.yaw=this->ang_yaw;
+                // Transformar posición del robot al sistema del arena
+                cv::Vec3d P_camera(this->tvecs[i][0], this->tvecs[i][1], this->tvecs[i][2]);
+                cv::Vec3d P_arena = this->arena_R.t() * (P_camera - this->arena_tvec);
+                this->data.x = P_arena[0];
+                this->data.y = P_arena[1];
+                this->data.z = P_arena[2];
 
-               // cout<<"data y "<<data.y<<endl;
-                this->data.id=ids.at(i);
-                // std::cout<<"data id "<<this->data.id<<std::endl;  
-                // std::cout<<"data x "<<this->data.x<<std::endl;  
-                // std::cout<<"data y "<<this->data.y<<std::endl;
-                // std::cout<<"data yaw "<<this->data.yaw<<std::endl;
-                //arucoInfo.at(i)=data;
+                // Transformar rotación del robot al sistema del arena
+                cv::Mat marker_R;
+                cv::Rodrigues(this->rvecs[i], marker_R);
+                cv::Mat total_R = this->arena_R.t() * marker_R;
+                this->ang_yaw = atan2(total_R.at<double>(1,0), total_R.at<double>(0,0));
+                this->data.yaw = this->ang_yaw;
+
+                this->data.id = ids.at(i);
+                // Guardar datos del robot en el buffer
                 this->buffer->push(data);
                 // pthread_cond_signal(&listBlock);
                 
@@ -401,6 +406,7 @@ void Localization::MyestimatePoseSingleMarkers(const std::vector<std::vector<cv:
 bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners, float baseLength,float heightLength,
                                std::vector<cv::Vec3d>& rvecs, std::vector<cv::Vec3d>& tvecs)
 {
+    // Estimar la posición del arena usando solvePnP
 
     std::vector<cv::Point3f> objPoints;
     cv::Point3f p;
@@ -442,5 +448,6 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
 
 ArenaLimits Localization::getRobotariumData()
 {
+    // Obtener los datos del robotarium (límites del arena)
     return this->RobotariumData;
 }

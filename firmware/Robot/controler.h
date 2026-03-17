@@ -15,7 +15,7 @@
 
 #include <Arduino.h>
 
-#define MINPWM 110
+#define MINPWM 80
 #define MAXPWM 255
 class controler
 {

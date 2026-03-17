@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 class Agent:
   '''Pre-declare class Agent'''
 
-class Device(Protocol):
+class device(Protocol):
 
   def __init__(self, agent: Agent) -> None:
     '''The constructor optionally receive a list of listeners'''
@@ -26,7 +26,7 @@ class Device(Protocol):
 
 class Agent:
 
-  def __init__(self, device_class: Device, id: str, ip: str, cmd_port: int=5555, data_port:int=5556,
+  def __init__(self, device_class: device, id: str, ip: str, cmd_port: int=5555, data_port:int=5556,
                hub_ip: str='127.0.0.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
@@ -40,7 +40,12 @@ class Agent:
     self.data = context.socket(zmq.PUB)
     self.data.bind(f'tcp://*:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
-    self.device = device_class(agent=self)
+    if isinstance(device_class, type):
+      self.device=device_class(agent=self)
+    else:
+      self.device=device_class
+      self.device.agent=self
+    
     self.device.connect()
     self.register()
     
@@ -80,15 +85,17 @@ class Agent:
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
 
-    logging.debug('Subscribing to data')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
+    '''logging.debug('Subscribing to data')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')'''
 
     logging.debug('Subscribing to control')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/RobotAgent5')
    
-    logging.debug('Subscribing to ArenaLimits')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE,b'RobotariumData')
-
+    logging.debug('Subscribing to position')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE,b'Camara_0/position/5')
+   
+    logging.debug('Subscribing to ArenaSize')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE,b'Camara_0/ArenaSize')
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()
