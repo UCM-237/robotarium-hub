@@ -71,12 +71,15 @@ class Robot:
   communicationParameters = {}
   agentParameters = {}
   operations = {}
+  AgentName = None
+  AgentId = 5
  
 
-  def __init__(self, agent: Agent) -> None:
+  def __init__(self, agent=None) -> None:
     # `agent` es la instancia de `Agent` que envía/recibe mensajes mediante zmqtt.
     # Guardamos la referencia para que la clase Robot pueda publicar mediciones
     # y reaccionar a eventos de topics suscritos.
+    self.agent=agent
     self.parsers = {
       self.OP_TELEMETRY: self.speed
     }
@@ -94,13 +97,14 @@ class Robot:
     # Inicializar LimitsAlgorithm (se configurará después de parseConfigurations())
     self.LimitsAlgorithm = None
     self.Position={}
+    self.Pos=False
     self.ArenaLimitsReceived = False
     self.stopCommand = False
     self.operationFromRobotDone = Event()
     self.IgnoreControlCommunication = False
     # Parámetros para movimiento aleatorio
-    self.maxRandomSpeed = 0.1  # Velocidad máxima para movimiento aleatorio (se configura desde XML)
-    self.randomMovementInterval = 0.5  # Intervalo entre cambios de dirección aleatoria (segundos)
+    self.maxRandomSpeed = 4  # Velocidad máxima para movimiento aleatorio (se configura desde XML)
+    self.randomMovementInterval = 1  # Intervalo entre cambios de dirección aleatoria (segundos)
     self.L = 14.5  # Valor de ejemplo para L
     self.R = 3.35  # Valor de ejemplo para R
     self.A = [[self.L/(2*self.R), 1/self.R],
@@ -110,7 +114,7 @@ class Robot:
     self.tval_after= 0
     self.tval_sample = 0
     self.AgentName
-    
+    self.AgentId
     #self.orientationControl = OrientationControl.orientationControl(self.SAMPLETIME)
 
 
@@ -141,9 +145,11 @@ class Robot:
     self.LimitsAlgorithm = LimitsAlgorithm.LimitsAlgorithm(minimum_safety_distance=min_safety_dist)
     
     # Obtener la velocidad máxima para movimiento aleatorio (default: 0.1 m/s)
-    self.maxRandomSpeed = float(self.agentParameters.get('MaxRandomSpeed', 0.1))
+    self.maxRandomSpeed = float(self.agentParameters.get('MaxRandomSpeed', 4))
     
     self.AgentName = self.agentParameters['AgentName']
+    self.AgentId= self.agentParameters['AgentId']
+    logging.info(f"AgentID: {self.AgentId}")
     
     
   def connect(self) -> None:
@@ -205,8 +211,9 @@ class Robot:
     
     #take the arenaLimits
     logging.info(f"[checkArenaRules] Aguardando límites de arena y posición inicial...")
-    while(self.agentParameters['AgentId'] not in self.Position or self.ArenaLimitsReceived == False):
-      self.agent.send("localization/RobotariumData","")
+    while(self.Pos==False and self.ArenaLimitsReceived == False):
+      #self.agent.send("localization/RobotariumData","")
+      logging.info("[checkArenaRules] Esperando posicion o limites...")
       time.sleep(1)
     logging.info(f"[checkArenaRules] Límites recibidos. Iniciando control de movimiento.")
     #First check the arena limits
@@ -215,8 +222,9 @@ class Robot:
     while(True):
       iteration += 1
       if len(self.Position)>0:
-        robotData = json.loads(self.Position[self.agentParameters['AgentId']])
-        self.Position.pop(self.agentParameters['AgentId'])
+        #logging.info(f"Position:{self.Position[agent]}")
+        robotData = self.Position[agent]
+        #self.Position.pop(self.agentParameters['AgentId'])
         robotX = -float(robotData["x"])
         robotY = -float(robotData["y"])
         heading = -float(robotData["yaw"])
@@ -226,6 +234,7 @@ class Robot:
           heading = 2*PI + heading
         
         newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
+        logging.debug(f"Heading: {newHeading}")
         minDist = self.LimitsAlgorithm.minimumSafetyDistance
         
         angleError = round((newHeading - heading)*180/PI)
@@ -239,7 +248,7 @@ class Robot:
         
         if newHeading != 0:
           # DETECTÓ PELIGRO - Girar
-          logging.warning(f"[Iter {iteration}] ⚠️  LÍMITE DETECTADO - Distancia de seguridad: {minDist}m. Girando {angleError}° para evitar colisión.")
+          logging.warning(f"[Iter {iteration}]  IMITE DETECTADO - Distancia de seguridad: {minDist}m. Girando {angleError}° para evitar colisión.")
           self.IgnoreControlCommunication = True
           #stop command of moving the robot
           logging.info(f"[Iter {iteration}] Deteniendo robot...")
@@ -265,17 +274,18 @@ class Robot:
           
           
   def random_movement(self) -> None:
-    '''Genera velocidades aleatorias lentas y envía comando de movimiento al robot.'''
+    '''Mueve el robot lento en linea reacta y envía comando de movimiento al robot.'''
     # Generar velocidades aleatorias entre -maxRandomSpeed y +maxRandomSpeed
-    v_left = random.uniform(-self.maxRandomSpeed, self.maxRandomSpeed)
-    v_right = random.uniform(-self.maxRandomSpeed, self.maxRandomSpeed)
+    v_left =11
+    v_right = 12
     logging.debug(f"[random_movement] Enviando velocidades: IZQ={v_left:.4f} m/s, DER={v_right:.4f} m/s")
-    self.move_robot(v_left, v_right)
-    
+    self.move_robot(v_left,v_right)
+
   def move_robot(self, v_left, v_right) -> None:
     '''Set the wheels' speed setpoint'''
-    len=16#bytes
-    data=( struct.pack('<dd', v_left,v_right))
+    len=8
+    data=( struct.pack('f', v_left)+struct.pack('f',v_right))
+    logging.debug(f"[move_robot] data: {data}")
     self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,len,data)
 
   def move_wheels(self,pwm_left, pwm_right) -> None:
@@ -362,33 +372,42 @@ class Robot:
 
 
   def on_data(self, topic: str, message: str) -> None:
-    print(f'{topic} {message}')
-    try:
+    #print(f'{topic} {message}')
+    '''try
       _,agent,topic=topic.split('/')
     except ValueError:
       logging.error(f"Error al procesar el topic: {topic}. Se esperaban 3 campos")
-      return
-
-    if topic=="control"  and self.IgnoreControlCommunication == False:
-      cmd = topic[len(f'control/{self.AgentName}')+1:].upper()
-      params = json.loads(message)
-      self.exec(cmd, **params)
-    else:
-      print("Topic");
-      print(f'{topic}')
-      print("Mensaje: ")
-      print(f'{message}')
-      if topic== "position":
-        #print("Agent: ", agent)
-        if int(agent)==int(self.agentParameters["AgentId"]):
-          #print("Message: ",message)
-          self.Position[agent]= message
-          #print(f'{self.Position[agent]}')
-      elif topic == "ArenaSize":
+      return '''
+    try:
+      full_json = json.loads(message)
+      robot_id=str(self.agentParameters['AgentId'])
+      if topic=="control"  and self.IgnoreControlCommunication == False:
+        cmd = topic[len(f'control/{self.AgentName}')+1:].upper()
+        # params = json.loads(message)
+        self.exec(cmd, **data)
+      elif topic=="Camara_0/position/5":
+          payload=full_json.get("payload",{})
+          pos=payload.get(robot_id)
+          
+          self.Position[agent]= pos
+          self.Pos=True
+          #print(f'position: {self.Position[agent]}')
+      elif topic == "Camara_0/ArenaSize":
         self.ArenaLimitsReceived = True
-
-        self.LimitsAlgorithm.addLimits(json.loads(message))
-               
+        payload=full_json.get("payload",{})
+        arena=payload.get("arenaSize")
+        self.LimitsAlgorithm.addLimits(arena)
+        #print(f"Arena Limits: {arena}")
+      else:
+        logging.error(f"Topic {topic} desconocido")
+    
+    except json.JSONDecodeError :
+      logging.error(f"Error: el mensaje no es un json valido:{message}")
+      self.move_robot(0,0)
+    except Exception as e:
+      logging.error(f"Error al procesar el topic {topic}:{e}")
+      self.move_robot(0,0)	
+    
        
   def angularWheelSpeed(self, w_wheel, velocity_robot):
     fila = 2
@@ -414,15 +433,26 @@ class Robot:
   def ArduinoSerialWrite(self,operation,len,data):
     #in arduino initFlag is uint8_t, agent_id is uint8_t, operation is uint8_t, len is uint16_t
     
-    
-    head = struct.pack('iii', self.INIT_FLAG, int(self.agentParameters['AgentId']), operation) + struct.pack('i',len)
+    #head=struct.pack('ii',self.INIT_FLAG,operation)+struct.pack('i',len)
+    head = struct.pack('i', self.INIT_FLAG)+ struct.pack('i', int(self.agentParameters['AgentId']))+ struct.pack('i',operation) + struct.pack('i',len)
     message=head + data
     message += b'\n'
     bytes_written= self.arduino.write(message)
-		
+    logging.info(f"[ArduinoSerialWrite] written data:  {message}")		
 
 if __name__ == "__main__":
-  logging.info(\"=\"*70)\n  logging.info(\"🤖 INICIANDO ROBOT AGENT CON CONTROL DE LÍMITES\")\n  logging.info(\"=\"*70)\n  \n  # Instanciamos la clase Robot y cargamos configuración desde XML\n  robot = Robot\n  logging.info(\"[main] Leyendo configuración desde AgentConfiguration.xml...\")\n  robot.parseConfigurations(robot)\n  logging.info(f\"[main] Configuración cargada: {robot.agentParameters['AgentName']}\")\n  logging.info(f\"[main] Velocidad aleatoria máxima: {robot.maxRandomSpeed} m/s\")\n  logging.info(f\"[main] Distancia de seguridad: {robot.LimitsAlgorithm.minimumSafetyDistance} m\")\n  \n  # Creamos el agente ZMQ utilizando los parámetros obtenidos del XML. El\n  # agente se suscribe automáticamente a los topics RobotariumData, control\n  # y data gracias a la implementación de la clase Agent.\n  logging.info(\"[main] Creando agente ZMQ...\")\n  agent = Agent(
+  logging.info("=")
+  logging.info(" INICIANDO ROBOT AGENT CON CONTROL DE LIMITES")
+  # Instanciamos la clase Robot y cargamos configuración desde XM
+  robot = Robot()
+  logging.info("[main] Leyendo configuración desde AgentConfiguration.xml...") 
+  robot.parseConfigurations()
+  logging.info(f"[main] Configuración cargada: {robot.agentParameters['AgentName']}") 
+  logging.info(f"[main] Velocidad aleatoria máxima: {robot.maxRandomSpeed}ms")
+  logging.info(f"[main] Distancia de seguridad: {robot.LimitsAlgorithm.minimumSafetyDistance} m")
+   # Creamos el agente ZMQ utilizando los parámetros obtenidos del XML. agente se suscribe automáticamente a los topics RobotariumData, contro# y data gracias a la implementación de la clase Agen\n
+  logging.info("[main] Creando agente ZMQ...")
+  agent = Agent(
     device_class=robot,
     id=robot.agentParameters['AgentName'],
     ip=robot.communicationParameters['AgentIp'],
@@ -432,6 +462,7 @@ if __name__ == "__main__":
     hub_cmd_port = robot.communicationParameters['HubCmdPort'],
     hub_data_port = robot.communicationParameters['HubDataPort'],
   )
+  robot.connect()
   #agent.device.on_data('control/RobotAgent1/telemetry', '{}')
   
   # agent = Agent(

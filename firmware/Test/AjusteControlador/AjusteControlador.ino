@@ -16,7 +16,7 @@ double VELOCIDAD_OBJETIVO = 0.01; // rad/s (ajusta según necesites)
 bool TEST_RUEDA_DERECHA = true;   // true para derecha, false para izquierda
 // ------------------------------
 
-
+int pwm_output=0;
 robot miRobot;
 controler PID_Rueda;
 
@@ -25,11 +25,17 @@ void setup() {
   Serial.begin(115200);
   miRobot.pinSetup();
   miRobot.motorSetup();
-  double A=1.0;
-  double B= 100.0;
+  double A=15.7;
+  double B= -78;
   // Paso 1: Objetivo realista (aprox 2 vueltas por segundo)
   VELOCIDAD_OBJETIVO = 15.0; 
   PID_Rueda.setSetPoint(VELOCIDAD_OBJETIVO);
+  /* Rueda derecha
+   *  A=11.07
+   *  B=33.58
+   *  PWM_MIN=100 w=6 r/s
+   *  PWM_MAX=255 w=20 r/s
+   */
   PID_Rueda.setFeedForwardParam(10.0,0);
 
   // Paso 2: Solo proporcional (Kp). Ki y Kd a CERO.
@@ -44,12 +50,24 @@ void setup() {
 
 void loop() {
   static unsigned long lastMillis = 0;
-    int pwm_output=0;
-      
+    
+  if(pwm_output>=255)
+    pwm_output=255;    
   // Ejecutamos el bucle de control cada 10ms (100Hz) como en tu Robot.ino original
-  if (millis() - lastMillis >= 10) {
+  if (millis() - lastMillis >= 500) {
     lastMillis = millis();
+    pwm_output+=10;
+     double w_real;
 
+    if (TEST_RUEDA_DERECHA) {
+            w_real = (6.28318 / 20.0) / ((double)deltaTimeLeft / 1000000.0); 
+
+            miRobot.moveLeftWheel(pwm_output, VELOCIDAD_OBJETIVO, false);
+            Serial.print("pwm: ");
+            Serial.print(pwm_output);
+            Serial.print(", w_real: ");
+            Serial.println(w_real);
+/*
     double w_real;
 
     // Calcular velocidad real (rad/s) basándonos en los encoders
@@ -67,6 +85,14 @@ int ajuste_pid = PID_Rueda.pid(w_real);
 
 // 3. Sumamos ambos. Si w_real < deseada, ajuste_pid será positivo y subirá de la base.
 pwm_output = constrain(base_pwm + ajuste_pid, 110, 255);
+Serial.print("set_point: ");
+Serial.print(VELOCIDAD_OBJETIVO);
+Serial.print("FF: ");
+Serial.print(base_pwm);
+Serial.print(" | PID: ");
+Serial.print(ajuste_pid);
+Serial.print(" | Total:" );
+Serial.println(pwm_output);
 
 miRobot.moveRightWheel(pwm_output, VELOCIDAD_OBJETIVO, false);    } 
     else {
@@ -78,12 +104,14 @@ miRobot.moveRightWheel(pwm_output, VELOCIDAD_OBJETIVO, false);    }
     }
 
     // Formato para el Serial Plotter de Arduino
-    Serial.print(VELOCIDAD_OBJETIVO);
+   /* Serial.print(VELOCIDAD_OBJETIVO);
     Serial.print(",");
     Serial.print(w_real);
     Serial.print(",");
     Serial.println(pwm_output); // O el PWM si quieres verlo
+   */ 
   }
+}
 }
 
 // --- ISR Necesarias (Copiadas de tu lógica en Robot.ino) ---
@@ -100,8 +128,13 @@ unsigned long ahora = micros();
   }
 
 void isr_left() {
-  timeAfterLeft = micros();
-  deltaTimeLeft = timeAfterLeft - startTimeLeft;
-  startTimeLeft = timeAfterLeft;
-  encoder_countLeft++;
+  unsigned long ahora = micros();
+  if (ahora -timeBeforeDebounceLeft > 1000){
+    deltaTimeLeft=ahora -startTimeLeft;
+    startTimeLeft=ahora;
+    timeBeforeDebounceLeft=ahora;
+    timeAfterLeft=ahora;
+    encoder_countLeft++;
+    
+  }
 }

@@ -5,7 +5,7 @@
         <AgentType>Robot</AgentType>
         <DeviceName>USB2.0-Serial</DeviceName>
         <MinimumSafetyDistance>0.15</MinimumSafetyDistance>
-        <MaxRandomSpeed>0.1</MaxRandomSpeed>
+        <MaxRandomSpeed>10</MaxRandomSpeed>
     </AgentParameters>
     <CommunicationConfiguration>
         <HubIp>192.168.10.1</HubIp>

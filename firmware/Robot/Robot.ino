@@ -236,12 +236,12 @@ void setup() {
     // setControlerParam: Ajusta las constantes PID (Kp=0.15, Ki=0.01, Kd=0.00)
     // setFeedForwardParam: Ajusta la compensación directa (Pendiente=0.0895, Offset=-5.424)
     wheelControlerRight.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerRight.setFeedForwardParam(0.0895, -5.424);
+    wheelControlerRight.setFeedForwardParam(14.36, -46.6);
 
     // Configuración del controlador de la rueda izquierda:
     // Los parámetros varían ligeramente para compensar diferencias mecánicas entre motores
     wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerLeft.setFeedForwardParam(0.0772, -3.173);
+    wheelControlerLeft.setFeedForwardParam(14.36, -46.6);
     
 
     // Inicializa la comunicación Serie 1 (pines físicos) con la Raspberry Pi a 9600 baudios
@@ -293,9 +293,9 @@ void loop() {
     
     // Indica al loop() que hay un mensaje listo para ser procesado
     serialCom = true;
-    DEBUG_PRINT("Bytes leidos: \t");
+  /*  DEBUG_PRINT("Bytes leidos: \t");
     DEBUG_PRINTLN(rlen);
-
+*/
   }
   // 2. PROCESAMIENTO DE COMANDOS SERIALES
   if (serialCom) {
@@ -307,13 +307,13 @@ void loop() {
     */
     // Validación: Solo procesa si la cabecera coincide con INIT_FLAG (112)
     if (server_operation->InitFlag == INIT_FLAG) {
-      DEBUG_PRINT("operationFlag: \t");
+  /*    DEBUG_PRINT("operationFlag: \t");
       DEBUG_PRINTLN(server_operation->InitFlag);
       DEBUG_PRINT("operation: \t");
       DEBUG_PRINTLN(server_operation->op);
       DEBUG_PRINT("RobotID: \t");
       DEBUG_PRINTLN(server_operation->id); 
-    
+    */
       // Ejecuta la función correspondiente según el código de operación (OP_MOVE, OP_STOP, etc.)
       do_operation((operation_t)server_operation->op);
     }
@@ -356,14 +356,14 @@ void loop() {
     // Solo actualiza w si el valor es físicamente posible según el límite de seguridad
     if (server_operation->InitFlag == INIT_FLAG)
     {
-     DEBUG_PRINT("operationFlag: \t");
+    /* DEBUG_PRINT("operationFlag: \t");
      DEBUG_PRINTLN(server_operation->InitFlag);
      DEBUG_PRINT("RobotID: \t");
      DEBUG_PRINTLN(server_operation->id);
      
      DEBUG_PRINT("operation: \t");
      DEBUG_PRINTLN(server_operation->op);
-
+*/
       do_operation((operation_t)server_operation->op);
     }
     serialCom = false;
@@ -419,17 +419,17 @@ void loop() {
       }
       
       // Impresión de depuración de velocidades angulares si hay movimiento
-      if(wRight > 0){
+//      if(wRight > 0){
         DEBUG_PRINT("wRight:");
         DEBUG_PRINT(wRight);
         DEBUG_PRINT(" wLeft:");
         DEBUG_PRINTLN(wLeft);
         
-        Serial.print("wRight:");
+      /*  Serial.print("wRight:");
         Serial.print(wRight);
         Serial.print(" wLeft:");
-        Serial.println(wLeft);
-      }
+        Serial.println(wLeft);*/
+  //    }
     }
     
    // 6. ACTUALIZACIÓN DE MOTORES (Escritura en Hardware)
@@ -641,15 +641,15 @@ void op_moveWheels()
  * en señales de dirección y potencia (FeedForward) para los motores.
  */
 void op_moveRobot() {
- DEBUG_PRINTLN("move");
+ //DEBUG_PRINTLN("move");
   float setpointWLeft = bytesToFloat(&server_operation->data[0]);
   float setpointWRight = bytesToFloat(&server_operation->data[4]);
-  DEBUG_PRINT(" setpointWLeft:");
+  /*DEBUG_PRINT(" setpointWLeft:");
   DEBUG_PRINTLN(setpointWLeft);
 
   DEBUG_PRINT("setpointWRight:");
   DEBUG_PRINT(setpointWRight);
-
+ */
   if(setpointWRight < 1 && setpointWRight > -1) {
     setpointWRight = 0;
   }
@@ -1110,29 +1110,18 @@ void isrLeft() {
     if(encoder_countLeft == MAX_ENCODER_STEPS) {
       wheelTurnCounterLeft++;
     }
-
-    // El deltaTimeLeft es lo que luego usa el filtro de media móvil en el loop()
-  double A_right = bytesToDouble(&server_operation->data[0]);
-  double B_right = bytesToDouble(&server_operation->data[8]);
-
-  double A_left = bytesToDouble(&server_operation->data[16]);
-  double B_left = bytesToDouble(&server_operation->data[24]);
-
-  wheelControlerRight.setFeedForwardParam(A_right, B_right);
-  wheelControlerLeft.setFeedForwardParam(A_left, B_left);
-
-  DEBUG_PRINT(A_right);
- DEBUG_PRINT(",");
+   // 3. CÁLCULO DE VELOCIDAD (Delta Time)
+    // Calcula el tiempo exacto transcurrido entre este pulso y el anterior
+    // Este valor es inversamente proporcional a la velocidad de la rueda
+    deltaTimeLeft = startTimeLeft - timeAfterLeft;
+     
+    // Guarda este instante para compararlo con el próximo pulso
+    timeAfterLeft = startTimeLeft;
+  }
   
-  DEBUG_PRINT(B_right);
-  DEBUG_PRINT(",");
-  
-  DEBUG_PRINT(A_left);
-  DEBUG_PRINT(",");
-  
-  DEBUG_PRINTLN(B_left);
-  //op_done();
-}
+  // Actualiza el registro de tiempo para el siguiente chequeo de rebote
+  timeAfterDebounceLeft = timeBeforeDebounceLeft;   
+
 }
 /* TODO: Revisar esta version mejorada no bloqueante
  *  void serialEvent() {
