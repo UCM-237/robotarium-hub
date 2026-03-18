@@ -104,7 +104,7 @@ class Robot:
     self.IgnoreControlCommunication = False
     # Parámetros para movimiento aleatorio
     self.maxRandomSpeed = 4  # Velocidad máxima para movimiento aleatorio (se configura desde XML)
-    self.randomMovementInterval = 1  # Intervalo entre cambios de dirección aleatoria (segundos)
+    self.randomMovementInterval = 0.1  # Intervalo entre cambios de dirección aleatoria (segundos)
     self.L = 14.5  # Valor de ejemplo para L
     self.R = 3.35  # Valor de ejemplo para R
     self.A = [[self.L/(2*self.R), 1/self.R],
@@ -225,16 +225,16 @@ class Robot:
         #logging.info(f"Position:{self.Position[agent]}")
         robotData = self.Position[agent]
         #self.Position.pop(self.agentParameters['AgentId'])
-        robotX = -float(robotData["x"])
-        robotY = -float(robotData["y"])
-        heading = -float(robotData["yaw"])
+        robotX = float(robotData["x"])
+        robotY = float(robotData["y"])
+        heading = float(robotData["yaw"])
         logging.debug(f"[Iter {iteration}] Posición: X={robotX:.3f}, Y={robotY:.3f}, YAW={heading:.3f}")
         
         if heading < 0:
           heading = 2*PI + heading
         
-        newHeading = self.LimitsAlgorithm.checkLimits(robotX,robotY,heading)
-        logging.debug(f"Heading: {newHeading}")
+        d, newHeading = self.LimitsAlgorithm.checkLimitsNew(robotX,robotY,heading)
+        logging.debug(f"Distancia: {d}")
         minDist = self.LimitsAlgorithm.minimumSafetyDistance
         
         angleError = round((newHeading - heading)*180/PI)
@@ -248,19 +248,28 @@ class Robot:
         
         if newHeading != 0:
           # DETECTÓ PELIGRO - Girar
-          logging.warning(f"[Iter {iteration}]  IMITE DETECTADO - Distancia de seguridad: {minDist}m. Girando {angleError}° para evitar colisión.")
+          logging.warning(f"[Iter {iteration}]  LIMITE DETECTADO - Distancia de seguridad: {d}m. Girando {angleError}° para evitar colisión.")
           self.IgnoreControlCommunication = True
-          #stop command of moving the robot
-          logging.info(f"[Iter {iteration}] Deteniendo robot...")
-          self.move_robot(0,0)
-          self.operationFromRobotDone.wait(timeout=0.1)
-          if self.operationFromRobotDone.is_set():
-            self.operationFromRobotDone.clear()
-          #wait for op_done
-          logging.info(f"[Iter {iteration}] Ejecutando giro de {angleError}°")
-          self.turn_robot(angleError)
-          self.operationFromRobotDone.wait()
-          logging.info(f"[Iter {iteration}] Giro completado.")
+          if d<minDist: 
+            #stop command of moving the robot
+            logging.info(f"[Iter {iteration}] Deteniendo robot...")
+            self.move_robot(0,0)
+	    #self.operationFromRobotDone.wait(timeout=0.1)
+	    #iif self.operationFromRobotDone.is_set():
+	    #self.operationFromRobotDone.clear()
+	    #wait for o
+          else:
+            logging.info(f"[Iter {iteration}] Ejecutando giro de {angleError}°")
+	    #self.turn_robot(angleError)
+            if angleError>0:
+              v_r=10
+              v_l=15
+            else:
+              v_r=15
+              v_l=10
+            self.move_robot(v_l,v_r)   
+            #self.operationFromRobotDone.wait()
+            logging.info(f"[Iter {iteration}] Vl={v_l:.4f}, Vr={v_r:.4f}")
         else:
           # Robot seguro - Movimiento aleatorio
           self.IgnoreControlCommunication = False
@@ -276,8 +285,8 @@ class Robot:
   def random_movement(self) -> None:
     '''Mueve el robot lento en linea reacta y envía comando de movimiento al robot.'''
     # Generar velocidades aleatorias entre -maxRandomSpeed y +maxRandomSpeed
-    v_left =11
-    v_right = 12
+    v_left =15
+    v_right = 10
     logging.debug(f"[random_movement] Enviando velocidades: IZQ={v_left:.4f} m/s, DER={v_right:.4f} m/s")
     self.move_robot(v_left,v_right)
 
@@ -285,7 +294,7 @@ class Robot:
     '''Set the wheels' speed setpoint'''
     len=8
     data=( struct.pack('f', v_left)+struct.pack('f',v_right))
-    logging.debug(f"[move_robot] data: {data}")
+    #logging.debug(f"[move_robot] data: {data}")
     self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,len,data)
 
   def move_wheels(self,pwm_left, pwm_right) -> None:
@@ -385,13 +394,12 @@ class Robot:
         cmd = topic[len(f'control/{self.AgentName}')+1:].upper()
         # params = json.loads(message)
         self.exec(cmd, **data)
-      elif topic=="Camara_0/position/5":
+      elif topic=="Camara_0/position":
           payload=full_json.get("payload",{})
           pos=payload.get(robot_id)
-          
           self.Position[agent]= pos
           self.Pos=True
-          #print(f'position: {self.Position[agent]}')
+          print(f'position: {self.Position[agent]}')
       elif topic == "Camara_0/ArenaSize":
         self.ArenaLimitsReceived = True
         payload=full_json.get("payload",{})
@@ -438,7 +446,7 @@ class Robot:
     message=head + data
     message += b'\n'
     bytes_written= self.arduino.write(message)
-    logging.info(f"[ArduinoSerialWrite] written data:  {message}")		
+    #logging.info(f"[ArduinoSerialWrite] written data:  {message}")		
 
 if __name__ == "__main__":
   logging.info("=")

@@ -128,6 +128,7 @@ class LimitsAlgorithm:
                     d2 = self.distance(robotX, robotY, self.segmentOfTheRectangle[1])
                     #take the minimum distance
                     d = min(d1, d2)
+                    print("d: ", d)
                     if d<self.minimumSafetyDistance:
                         if d == d1:
                             self.newHeading= 2*math.pi - heading
@@ -240,8 +241,40 @@ class LimitsAlgorithm:
                     self.newHeading = -(math.pi - abs(heading))
             else:
                 print('The robot is not moving. or it is not detected')
-        return self.newHeading
+        return d, self.newHeading
        
-                  
-               
+    def checkLimitsNew(self, robotX, robotY, heading):
+        self.newHeading = heading
+        # En tu nuevo sistema: 
+        # math.cos(heading) es el movimiento en X (Hacia ABAJO)
+        # math.sin(heading) es el movimiento en Y (Hacia la DERECHA)
+        dx = math.cos(heading)
+        dy = math.sin(heading)
+
+        # 1. Movimiento Vertical (Eje X del tapete)
+        if dx > 0: # El robot baja (se acerca al final del tapete)
+            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[2]) # Muro Inferior
+            if d < self.minimumSafetyDistance:
+                self.newHeading = -heading # Rebote simple
+                return d, self.newHeading
+        elif dx < 0: # El robot sube (se acerca al origen 0,0)
+            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[0]) # Muro Superior
+            if d < self.minimumSafetyDistance:
+                self.newHeading = -heading
+                return d, self.newHeading
+
+        # 2. Movimiento Horizontal (Eje Y del tapete)
+        if dy > 0: # El robot va a la derecha
+            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[1]) # Muro Derecho
+            if d < self.minimumSafetyDistance:
+                self.newHeading = math.pi - heading
+                return d, self.newHeading
+        elif dy < 0: # El robot va a la izquierda
+            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[3]) # Muro Izquierdo
+            if d < self.minimumSafetyDistance:
+                self.newHeading = math.pi - heading
+                return d, self.newHeading
+
+        return 100, self.newHeading # Sin peligro                 
+                
 

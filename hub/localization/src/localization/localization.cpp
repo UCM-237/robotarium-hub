@@ -430,8 +430,9 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
             cornersNuevo.push_back(corners[2]);
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
-            cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);
-            //cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
+            //v::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);
+            cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
+            
             std::cout<< "tvec: "<<tvec<<std::endl;
             rvecs.push_back(rvec);
             tvecs.push_back(tvec);
