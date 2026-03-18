@@ -415,10 +415,10 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
     // objPoints.push_back(cv::Point3f(baseLength/2,-heightLength/2,0));
     // objPoints.push_back(cv::Point3f(-baseLength/2,-heightLength/2,0));
 
-    objPoints.push_back(cv::Point3f(0,0,0));
-    objPoints.push_back(cv::Point3f(baseLength,0,0));
-    objPoints.push_back(cv::Point3f(baseLength,heightLength,0));
-    objPoints.push_back(cv::Point3f(0,heightLength,0));
+    objPoints.push_back(cv::Point3f(0,0,0)); // Esquina 1 (Origen)
+    objPoints.push_back(cv::Point3f(baseLength,0,0)); // Esquina 2
+    objPoints.push_back(cv::Point3f(baseLength,heightLength,0)); // Esquina 3
+    objPoints.push_back(cv::Point3f(0,heightLength,0)); // Esquina 4
         
         
         if ((corners.size() == 4) && (this->camera_matrix.rows > 0) && (this->dist_coeffs.rows > 0))
