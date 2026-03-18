@@ -1,11 +1,11 @@
 #pragma once
-#include "ringBuffer.cpp"
+#include "../ringBuffer/ringBuffer.cpp"
 #include <iostream>
 #include <zmqpp/zmqpp.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <pthread.h>
-#include "common.h"
+#include "../commonFiles/common.h"
 using json = nlohmann::json;
 static const std::string PUBLISH_ENDPOINT = "tcp://192.168.10.1:5557";
 static const std::string SUBSCRIBE_ENDPOINT = "tcp://192.168.10.1:5556";

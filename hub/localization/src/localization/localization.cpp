@@ -327,7 +327,14 @@ cv::Scalar color(0,0,255);
                         
                 // Transformar posición del robot al sistema del arena
                 cv::Vec3d P_camera(this->tvecs[i][0], this->tvecs[i][1], this->tvecs[i][2]);
-                cv::Vec3d P_arena = this->arena_R.t() * (P_camera - this->arena_tvec);
+                //--------------------------------------------------------------
+		cv::Mat R_t=this->arena_R.t();
+                cv::Mat PCam(P_camera);
+		cv::Mat t_vec(this->arena_tvec);
+		cv::Mat result=R_t*(PCam-t_vec);
+                cv::Vec3d P_arena=result;
+		//----------------------------------------------------------------
+                //cv::Vec3d P_arena = this->arena_R.t() * (P_camera - this->arena_tvec);
                 this->data.x = P_arena[0];
                 this->data.y = P_arena[1];
                 this->data.z = P_arena[2];

@@ -9,8 +9,8 @@ all:cli
 
 # main: main.cc
 # 	$(CC) $(CFLAGS) -o main main.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
-cli: cli.cc
-	$(CC) $(CFLAGS) -o cli cli.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
+cli: src/cli.cc
+	$(CC) $(CFLAGS) -o cli src/cli.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS)
 debug: main.cc
 	$(CC) $(CFLAGS) -o main main.cc  $(CLIBS) $(OPENCVLIBS) $(ZMQLIBS) --debug
 

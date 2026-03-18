@@ -1,6 +1,6 @@
 #pragma once
-#include "common.h"
-#include "comunication.cpp"
+#include "../commonFiles/common.h"
+#include "../comunication/comunication.cpp"
 #include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
 #include <opencv2/core.hpp> //PREDEFINED_DICTIONARY

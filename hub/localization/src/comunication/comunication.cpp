@@ -110,21 +110,24 @@ void *AgentCommunication::sendArucoPosition(void *This)
     //while(arucoInfo.size()<=0);//the thread stop it until an aruco is detected
     std::string data2;
     //main code for read variables
-    std::string topic ="data";
-
+    std::string topic ;
+   
     record_data data;
     json message;
     json position;
+    json robot_pos;
     zmqpp::message_t ztopic;
     std::string jsonStr;
     zmqpp::message_t zmqMessage;
      while (true) {
     
-        if(agent->RobotariumData.x.size()>0 && agent->requestRobotariumData)
-        {
+        //if(agent->RobotariumData.x.size()>0 && agent->requestRobotariumData)
+        if(agent->RobotariumData.x.size()>0)
+	{   
+            topic="Camara_0/ArenaSize";
             message["topic"]="ArenaSize";
             message["source_id"] = "Camara_0";
-            
+	    std::cout<<"topic: "<<message["topic"]<<std::endl;            
             position["arenaSize"]["x1"] =agent->RobotariumData.x.at(0);
             position["arenaSize"]["y1"] =agent->RobotariumData.y.at(0);
             position["arenaSize"]["x2"] =agent->RobotariumData.x.at(1);
@@ -139,10 +142,13 @@ void *AgentCommunication::sendArucoPosition(void *This)
 
             newPublisher.send(topic,0);
             newPublisher.send(zmqMessage);
-            agent->requestRobotariumData = false;
+            std::cout<<"Topic: "<<topic<<std::endl;
+            std::cout<<jsonStr<<std::endl;
+            //agent->requestRobotariumData = false;
         }
-        else
-        {
+        
+        
+            
             data = agent->buffer->pop();
             std::string id = std::to_string(data.id);
             std::string x = std::to_string(data.x);
@@ -150,29 +156,29 @@ void *AgentCommunication::sendArucoPosition(void *This)
             std::string yaw = std::to_string(data.yaw);
             std::string sep = "/";
             data2=  x+ sep +y+sep+yaw;
-            std::cout<<id+sep+data2<<std::endl;
-            
-            position[id]["x"] =x;
-            position[id]["y"] =y;
-            position[id]["yaw"] =yaw;
+            //std::cout<<id+sep+data2<<std::endl;
+            topic="Camara_0"+sep+"position";
+            robot_pos[id]["x"] =x;
+            robot_pos[id]["y"] =y;
+            robot_pos[id]["yaw"] =yaw;
             
             ztopic<<topic;
             
             message["topic"]="position";
             message["source_id"] = "Camara_0";
-            message["payload"] = position;
+            message["payload"] = robot_pos;
             message["timestamp"] = 1000 * time(nullptr);
             jsonStr = message.dump();
             zmqMessage;
             
             
             zmqMessage<<jsonStr;
-            
+            std::cout<<"Topic : "<<topic<<std::endl;
+            std::cout<<jsonStr<<std::endl;
             newPublisher.send(topic);
             newPublisher.send(zmqMessage);
         
-        }
-        usleep(50*1000);
+         usleep(50*1000);
         message.clear();
         position.clear();
     }
@@ -218,3 +224,4 @@ void *AgentCommunication::listenSocket(void *This)
         }
     }
 }
+
