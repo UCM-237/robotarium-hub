@@ -151,33 +151,34 @@ void *AgentCommunication::sendArucoPosition(void *This)
             
             data = agent->buffer->pop();
             std::string id = std::to_string(data.id);
-            std::string x = std::to_string(data.x);
-            std::string y = std::to_string(data.y);
-            std::string yaw = std::to_string(data.yaw);
-            std::string sep = "/";
-            data2=  x+ sep +y+sep+yaw;
-            //std::cout<<id+sep+data2<<std::endl;
-            topic="Camara_0"+sep+"position";
-            robot_pos[id]["x"] =x;
-            robot_pos[id]["y"] =y;
-            robot_pos[id]["yaw"] =yaw;
-            
-            ztopic<<topic;
-            
-            message["topic"]="position";
-            message["source_id"] = "Camara_0";
-            message["payload"] = robot_pos;
-            message["timestamp"] = 1000 * time(nullptr);
-            jsonStr = message.dump();
-            zmqMessage;
-            
-            
-            zmqMessage<<jsonStr;
-            std::cout<<"Topic : "<<topic<<std::endl;
-            std::cout<<jsonStr<<std::endl;
-            newPublisher.send(topic);
-            newPublisher.send(zmqMessage);
-        
+            if (id == "5"){
+	            std::string x = std::to_string(data.x);
+	            std::string y = std::to_string(data.y);
+	            std::string yaw = std::to_string(data.yaw);
+	            std::string sep = "/";
+	            data2=  x+ sep +y+sep+yaw;
+	            //std::cout<<id+sep+data2<<std::endl;
+	            topic="Camara_0"+sep+"position";
+	            robot_pos[id]["x"] =x;
+	            robot_pos[id]["y"] =y;
+	            robot_pos[id]["yaw"] =yaw;
+	            
+	            ztopic<<topic;
+	            
+	            message["topic"]="position";
+	            message["source_id"] = "Camara_0";
+	            message["payload"] = robot_pos;
+	            message["timestamp"] = 1000 * time(nullptr);
+	            jsonStr = message.dump();
+	            zmqMessage;
+	            
+	            
+	            zmqMessage<<jsonStr;
+	            std::cout<<"Topic : "<<topic<<std::endl;
+	            std::cout<<jsonStr<<std::endl;
+	            newPublisher.send(topic);
+	            newPublisher.send(zmqMessage);
+	        }
          usleep(50*1000);
         message.clear();
         position.clear();
