@@ -327,7 +327,14 @@ cv::Scalar color(0,0,255);
                         
                 // Transformar posición del robot al sistema del arena
                 cv::Vec3d P_camera(this->tvecs[i][0], this->tvecs[i][1], this->tvecs[i][2]);
-                cv::Vec3d P_arena = this->arena_R.t() * (P_camera - this->arena_tvec);
+                //--------------------------------------------------------------
+		cv::Mat R_t=this->arena_R.t();
+                cv::Mat PCam(P_camera);
+		cv::Mat t_vec(this->arena_tvec);
+		cv::Mat result=R_t*(PCam-t_vec);
+                cv::Vec3d P_arena=result;
+		//----------------------------------------------------------------
+                //cv::Vec3d P_arena = this->arena_R.t() * (P_camera - this->arena_tvec);
                 this->data.x = P_arena[0];
                 this->data.y = P_arena[1];
                 this->data.z = P_arena[2];
@@ -337,7 +344,8 @@ cv::Scalar color(0,0,255);
                 cv::Rodrigues(this->rvecs[i], marker_R);
                 cv::Mat total_R = this->arena_R.t() * marker_R;
                 this->ang_yaw = atan2(total_R.at<double>(1,0), total_R.at<double>(0,0));
-                this->data.yaw = this->ang_yaw;
+                this->filtered_yaw=(this->alpha * this->ang_yaw) + ((1 - this->alpha) * this->filtered_yaw);
+                this->data.yaw = this->filtered_yaw;
 
                 this->data.id = ids.at(i);
                 // Guardar datos del robot en el buffer
@@ -430,9 +438,8 @@ bool Localization::EstimateArenaPosition(const std::vector<cv::Point2f>& corners
             cornersNuevo.push_back(corners[2]);
             std::cout<< "corners: "<<corners<<std::endl;
             cv::Mat rvec, tvec;
-            //v::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);
-            cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
-            
+            cv::solvePnP(objPoints,cornersNuevo , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_AP3P);
+            //cv::solvePnP(objPoints,corners , this->camera_matrix, this->dist_coeffs, rvec, tvec,false,cv::SOLVEPNP_IPPE_SQUARE);
             std::cout<< "tvec: "<<tvec<<std::endl;
             rvecs.push_back(rvec);
             tvecs.push_back(tvec);

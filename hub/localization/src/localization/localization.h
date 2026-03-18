@@ -1,6 +1,6 @@
 #pragma once
-#include "common.h"
-#include "comunication.cpp"
+#include "../commonFiles/common.h"
+#include "../comunication/comunication.cpp"
 #include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
 #include <opencv2/core.hpp> //PREDEFINED_DICTIONARY
@@ -54,7 +54,8 @@ class Localization
     //TODO: delete after test
     // pthread_t  _detectAruco; 
     // pthread_cond_t listBlock;
-
+    double alpha=0.2;
+    double filtered_yaw=0;
     cv::VideoCapture in_video,in_video2;
     cv::String videoInput = "0";//se selecciona la entrada de la camara
     cv::String videoInput2 = "0";
