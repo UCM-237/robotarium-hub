@@ -23,6 +23,7 @@ import OrientationControl
 from agent import Agent
 import time
 import xml.etree.ElementTree as ET
+import math
 
 # Constante pi usada para conversiones de ángulos
 PI = 3.14159
@@ -228,8 +229,72 @@ class Robot:
         robotX = float(robotData["x"])
         robotY = float(robotData["y"])
         heading = float(robotData["yaw"])
-        logging.debug(f"[Iter {iteration}] Posición: X={robotX:.3f}, Y={robotY:.3f}, YAW={heading:.3f}")
+        #logging.debug(f"[Iter {iteration}] Posición: X={robotX:.3f}, Y={robotY:.3f}, YAW={heading:.3f}")
+        '''--------------------------------------------------------------------------------------------------
         
+        El algoritmo de límites devuelve un nuevo heading que es el ángulo al que el robot debería dirigirse para evitar colisiones.
+        Calculamos el error de ángulo entre el heading actual y el nuevo heading recomendado por el algoritmo de límites. Si el error es mayor a 180 grados, ajustamos para que el robot
+        TODO: Se puede mejorar teniendo en cuenta el rumbo actual del robot y el nuevo rumbo recomendado para decidir si gira a la derecha o a la izquierda, buscando siempre la dirección de giro más corta.
+         --------------------------------------------------------------------------------------------------'''
+        v_actual = 0.5 # Velocidad lineal estimada (m/s)
+
+        dist, target_yaw, hay_peligro = self.LimitsAlgorithm.checkLimitsPredictive(robotX, robotY, heading, v_actual)
+
+        if hay_peligro and dist >= 0.2:
+          logging.warning(f"¡PELIGRO! Distancia proyectada: {dist:.3f}m. Girando a {target_yaw}")
+          self.new_heading = target_yaw
+          angleError = round((self.new_heading - heading)*180/PI)
+          if abs(angleError) > 180:
+            angleError = 360 - abs(angleError) # turn shorter way
+          
+          if heading > 3*PI/2 and self.new_heading < PI/2:
+            angleError = -angleError#turn right
+          if heading < PI/2 and self.new_heading > 3*PI/2:
+            angleError = -angleError
+          logging.info(f"Giro recomendado: {angleError}°")
+          self.turn_robot(angleError)
+        elif hay_peligro and dist < 0.2:
+            self.move_robot(0,0)
+            logging.warning(f"¡PELIGRO! Parada robot. d = {dist}")
+            time.sleep(1)
+            self.move_robot(-15,-15)
+        
+        else:
+          # Ahora puedes ver en el log cómo varía la distancia aunque no haya choque
+          logging.debug(f"Trayectoria despejada. Muro más próximo a {dist:.3f}m")
+          # Aquí podrías decidir volver a tu misión original si self.new_heading 
+          # era un valor de evasión previo
+          self.random_movement()
+        
+        '''
+        dist, wall = self.LimitsAlgorithm.checkLimitsNew(self.x, self.y)
+
+        if wall != -1:
+            logging.warning(f"¡PELIGRO! Muro {wall} detectado a {dist:.3f}m")
+            
+            if wall == 0: # MURO SUPERIOR
+                logging.info("Evitando muro superior: Girando a la derecha (90º)")
+                self.new_heading = self.yaw + (math.pi / 2) 
+                v_r=11
+                v_l=15
+            elif wall == 2: # MURO INFERIOR
+                logging.info("Evitando muro inferior: Girando a la izquierda (-90º)")
+                self.new_heading = self.yaw - (math.pi / 2)
+                v_r=15
+                v_l=11
+            elif wall == 1 or wall == 3: # LATERALES
+                logging.info("Evitando lateral: Media vuelta")
+                self.new_heading = self.yaw + math.pi
+                v_r=11
+                v_l=15
+            # Normalizar ángulo entre -pi y pi
+            self.new_heading = (self.new_heading + math.pi) % (2 * math.pi) - math.pi
+            self.move_robot(v_l,v_r)
+        else:
+            logging.debug("Posición segura. Movimiento aleatorio activado.")
+            self.random_movement()    
+        '''
+        '''
         if heading < 0:
           heading = 2*PI + heading
         
@@ -275,7 +340,7 @@ class Robot:
           self.IgnoreControlCommunication = False
           logging.debug(f"[Iter {iteration}] ✓ Posición segura. Movimiento aleatorio activado.")
           self.random_movement()
-        
+        '''
         # Esperar un poco antes de la siguiente verificación
         time.sleep(self.randomMovementInterval)
 
@@ -285,9 +350,10 @@ class Robot:
   def random_movement(self) -> None:
     '''Mueve el robot lento en linea reacta y envía comando de movimiento al robot.'''
     # Generar velocidades aleatorias entre -maxRandomSpeed y +maxRandomSpeed
-    v_left =15
-    v_right = 10
+    v_left =16
+    v_right = 9    
     logging.debug(f"[random_movement] Enviando velocidades: IZQ={v_left:.4f} m/s, DER={v_right:.4f} m/s")
+    #self.move_robot(v_left,v_right)
     self.move_robot(v_left,v_right)
 
   def move_robot(self, v_left, v_right) -> None:

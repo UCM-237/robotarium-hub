@@ -17,9 +17,10 @@ class LimitsAlgorithm:
         self.newHeading = 0
         self.segmentOfTheRectangle = []
         self.minimumSafetyDistance = minimum_safety_distance
-        self.x=[None]*5
-        self.y=[None]*5
-
+        self.x = [0.0]*5
+        self.y = [0.0]*5
+        self.segmentOfTheRectangle = []
+    
     def addLimits(self,limits):
         
         self.ArenaLimits = limits
@@ -243,38 +244,80 @@ class LimitsAlgorithm:
                 print('The robot is not moving. or it is not detected')
         return d, self.newHeading
        
-    def checkLimitsNew(self, robotX, robotY, heading):
-        self.newHeading = heading
-        # En tu nuevo sistema: 
-        # math.cos(heading) es el movimiento en X (Hacia ABAJO)
-        # math.sin(heading) es el movimiento en Y (Hacia la DERECHA)
-        dx = math.cos(heading)
-        dy = math.sin(heading)
+    def checkLimitsNew(self, robotX, robotY):
+        """
+        Calcula la distancia a los 4 muros y devuelve la más corta 
+        junto con el índice del muro afectado.
+        """
+        # Calculamos distancias a los 4 segmentos definidos en addLimits
+        # 0: Superior, 1: Derecho, 2: Inferior, 3: Izquierdo
+        distances = []
+        for i in range(4):
+            distances.append(self.distance(robotX, robotY, self.segmentOfTheRectangle[i]))
 
-        # 1. Movimiento Vertical (Eje X del tapete)
-        if dx > 0: # El robot baja (se acerca al final del tapete)
-            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[2]) # Muro Inferior
-            if d < self.minimumSafetyDistance:
-                self.newHeading = -heading # Rebote simple
-                return d, self.newHeading
-        elif dx < 0: # El robot sube (se acerca al origen 0,0)
-            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[0]) # Muro Superior
-            if d < self.minimumSafetyDistance:
-                self.newHeading = -heading
-                return d, self.newHeading
+        min_dist = min(distances)
+        wall_index = distances.index(min_dist)
 
-        # 2. Movimiento Horizontal (Eje Y del tapete)
-        if dy > 0: # El robot va a la derecha
-            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[1]) # Muro Derecho
-            if d < self.minimumSafetyDistance:
-                self.newHeading = math.pi - heading
-                return d, self.newHeading
-        elif dy < 0: # El robot va a la izquierda
-            d = self.distance(robotX, robotY, self.segmentOfTheRectangle[3]) # Muro Izquierdo
-            if d < self.minimumSafetyDistance:
-                self.newHeading = math.pi - heading
-                return d, self.newHeading
+        if min_dist < self.minimumSafetyDistance:
+            return min_dist, wall_index
+    
+        return 100, -1 # Sin peligro
 
-        return 100, self.newHeading # Sin peligro                 
-                
+    ''' Funciones mejoradas. Aproximacion proyectiva: La clave es crea
+    un punto virtual frente al robot y comprobar si ese punto está fuera de los límites o demasiado cerca de un muro'''
 
+    def checkLimitsPredictive(self, robotX, robotY, heading, velocity, look_ahead_time=0.8):
+        """
+        Calcula la distancia al muro en la trayectoria futura.
+        Devuelve: (distancia_calculada, nuevo_heading, colision_detectada)
+        """
+        # 1. Proyectamos la posición hacia adelante según el vector de dirección
+        # Usamos una velocidad mínima de seguridad para que el 'puntero' de predicción 
+        # siempre esté un poco por delante aunque el robot esté casi parado.
+        effective_velocity = max(abs(velocity), 0.1) 
+        
+        future_x = robotX + math.cos(heading) * effective_velocity * look_ahead_time
+        future_y = robotY + math.sin(heading) * effective_velocity * look_ahead_time
+
+        # 2. Obtenemos la distancia de ese punto futuro al muro más cercano
+        dist_to_wall, wall_idx = self.getClosestWall(future_x, future_y)
+
+        # 3. Determinamos si esa distancia viola el margen de seguridad
+        collision_detectada = dist_to_wall < 0.4
+        
+        if collision_detectada:
+            # Si hay peligro, calculamos el heading de evasión
+            target_heading = self.calculateEvasionHeading(heading, wall_idx)
+        else:
+            # Si no hay peligro, mantenemos el heading actual
+            target_heading = heading
+        
+        # Devolvemos la distancia real calculada a la pared futura, no 100
+        return dist_to_wall, target_heading, collision_detectada
+
+    def getClosestWall(self, x, y):
+        """Calcula distancias a los límites definidos en addLimits"""
+        # Índices: 0:Sup, 1:Der, 2:Inf, 3:Izq
+        # Nota: Asegúrate de que los signos de self.x y self.y coinciden con el ArUco
+        dists = [
+            abs(y - self.y[1]), # Superior
+            abs(x - self.x[2]), # Derecho
+            abs(y - self.y[3]), # Inferior
+            abs(x - self.x[4])  # Izquierdo
+        ]
+        min_d = min(dists)
+        return min_d, dists.index(min_d)
+
+    def calculateEvasionHeading(self, current_heading, wall_idx):
+        """
+        Lógica simple de rebote: mira hacia el lado opuesto del muro detectado.
+        """
+        # Ángulos objetivos fijos para alejar al robot de las paredes
+        # (Ajustar según orientación del tapete)
+        evasions = [
+            math.pi / 2,  # Muro 0 (Sup): Mirar hacia abajo
+            math.pi,      # Muro 1 (Der): Mirar hacia izquierda
+            -math.pi / 2, # Muro 2 (Inf): Mirar hacia arriba
+            0             # Muro 3 (Izq): Mirar hacia derecha
+        ]
+        return evasions[wall_idx]
