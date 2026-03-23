@@ -15,6 +15,8 @@
 
 #define MINPWM 110
 #define MAXPWM 255
+#define VRMIN 8.0
+#define VLMIN 5.0
 class controler
 {
     public:
@@ -26,6 +28,7 @@ class controler
         int feedForward();
         void setSetPoint(double setPoint);
         double getSetPoint();
+        double getError();
     private:
         unsigned long   currentTime, previousTime=0;;
         double          elapsedTime;

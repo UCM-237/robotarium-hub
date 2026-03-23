@@ -13,7 +13,7 @@
 
 // Constructor: Inicializa el límite de la suma del error integral para evitar saturación
 controler::controler() {
-    maxIntegralError = 14; 
+    maxIntegralError = 15; 
 }
 
 controler::~controler() {}
@@ -57,7 +57,9 @@ int controler::pid(double w) {
     }
     
     this->previousTime = this->currentTime;
-    return constrain(output,MINPWM,MAXPWM);
+    // No quiero hacer un constrain aqui porque se lo voy a sumar al FF
+    //return constrain(output,MINPWM,MAXPWM);
+    return output;
 }
 
 // Configura los coeficientes de la recta de FeedForward (PWM = A*w + B)
@@ -75,3 +77,4 @@ int controler::feedForward() {
 
 void controler::setSetPoint(double setPoint) { this->setPoint = setPoint; }
 double controler::getSetPoint() { return this->setPoint; }
+double controler::getError(){return this->error;}

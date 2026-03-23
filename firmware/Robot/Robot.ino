@@ -199,13 +199,16 @@ void serialEvent() {
  */
 void setup() {
      // Inicializa la comunicación Serie por USB para monitorización y depuración en el PC
-    Serial.begin(9600);
-    while (!Serial) {
-        ; // Espera a que el monitor serie se abra. 
-          // El LED del Arduino debería quedarse esperando aquí.
-    }
-    delay(500);
-    Serial.println("¡Ahora sí! Comunicacion Serie PK");
+     // Solo lo hago en depuracion
+     #ifdef DEBUG_ENABLED
+      Serial.begin(9600);
+      while (!Serial) {
+          ; // Espera a que el monitor serie se abra. 
+            // El LED del Arduino debería quedarse esperando aquí.
+      }
+      delay(500);
+      DEBUG_PRINTLN("¡Ahora sí! Comunicacion Serie PK");
+    #endif
     // Inicializa la configuración de pines según el hardware (MKR/Nano y tipo de puente en H)
     robot.pinSetup();
     
@@ -225,7 +228,7 @@ void setup() {
     // Inicializa la Unidad de Medición Inercial (IMU) interna para leer aceleración y rotación
     // Si la IMU no responde, el programa se detiene por seguridad para evitar errores de navegación
     /*if (!IMU.begin()) {
-      Serial.println("Failed to initialize IMU!");
+      DEBUG_PRINTLN("Failed to initialize IMU!");
       while (1); // Bucle infinito de seguridad
     }*/
 
@@ -233,15 +236,16 @@ void setup() {
     robot.fullStop();
   
     // Configuración del controlador de la rueda derecha:
-    // setControlerParam: Ajusta las constantes PID (Kp=0.15, Ki=0.01, Kd=0.00)
-    // setFeedForwardParam: Ajusta la compensación directa (Pendiente=0.0895, Offset=-5.424)
-    wheelControlerRight.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerRight.setFeedForwardParam(14.36, -46.6);
-
+    // setControlerParam: Ajusta las constantes PID (Kp=15, Ki=1, Kd=0.00)
+    // setFeedForwardParam: Ajusta la compensación directa (Pendiente=14, Offset=-24.4)
+    wheelControlerRight.setControlerParam(15.0, 1.0, 0.00);
+    wheelControlerRight.setFeedForwardParam(24.1, -155);
+  
     // Configuración del controlador de la rueda izquierda:
     // Los parámetros varían ligeramente para compensar diferencias mecánicas entre motores
-    wheelControlerLeft.setControlerParam(0.15, 0.01, 0.00);
-    wheelControlerLeft.setFeedForwardParam(14.36, -46.6);
+    // ARWEN A= 24.1, B=-155
+    wheelControlerLeft.setControlerParam(15.0, 1.0, 0.00);
+    wheelControlerLeft.setFeedForwardParam(24.1,-155);
     
 
     // Inicializa la comunicación Serie 1 (pines físicos) con la Raspberry Pi a 9600 baudios
@@ -254,24 +258,24 @@ void setup() {
     #ifdef ARDUINO_TYPE_MKR
     WiFi.begin(ssid,pass);
     while(WiFi.status() != WL_CONNECTED){
-      Serial.print(".");
+      DEBUG_PRINTLN(".");
       delay(500);
     }
-    Serial.println(".");
-    Serial.println("Conectado a Wifi");
+    DEBUG_PRINTLN(".");
+    DEBUG_PRINTLN("Conectado a Wifi");
     mqttClient.onMessage(onMqttMessage);
-    Serial.println("Conectando al broker Mqtt");
+    DEBUG_PRINTLN("Conectando al broker Mqtt");
      //Llamada para establecer conexión WiFi/MQTT (opcional)
     if(!mqttClient.connect(broker,mqttPort)){
-      Serial.print("Conexion fallida");
-      Serial.println(mqttClient.connectError());
+      DEBUG_PRINT("Conexion fallida");
+      DEBUG_PRINTLN(mqttClient.connectError());
       while(1);
     }
     const char topic[]="#";
     
     mqttClient.subscribe(topic);
-    Serial.print("Suscrito al tema: ");
-    Serial.println(topic);
+    DEBUG_PRINT("Suscrito al tema: ");
+    DEBUG_PRINTLN(topic);
     #endif
     // Mensaje de confirmación si la depuración está activa
     DEBUG_PRINTLN("setup ok"); 
@@ -307,13 +311,13 @@ void loop() {
     */
     // Validación: Solo procesa si la cabecera coincide con INIT_FLAG (112)
     if (server_operation->InitFlag == INIT_FLAG) {
-  /*    DEBUG_PRINT("operationFlag: \t");
+     DEBUG_PRINT("operationFlag: \t");
       DEBUG_PRINTLN(server_operation->InitFlag);
       DEBUG_PRINT("operation: \t");
       DEBUG_PRINTLN(server_operation->op);
       DEBUG_PRINT("RobotID: \t");
       DEBUG_PRINTLN(server_operation->id); 
-    */
+    
       // Ejecuta la función correspondiente según el código de operación (OP_MOVE, OP_STOP, etc.)
       do_operation((operation_t)server_operation->op);
     }
@@ -425,10 +429,10 @@ void loop() {
         DEBUG_PRINT(" wLeft:");
         DEBUG_PRINTLN(wLeft);
         
-      /*  Serial.print("wRight:");
-        Serial.print(wRight);
-        Serial.print(" wLeft:");
-        Serial.println(wLeft);*/
+      /*  DEBUG_PRINT("wRight:");
+        DEBUG_PRINT(wRight);
+        DEBUG_PRINT(" wLeft:");
+        DEBUG_PRINTLN(wLeft);*/
   //    }
     }
     
@@ -461,10 +465,10 @@ void loop() {
       DEBUG_PRINT(" wLeft:");
       DEBUG_PRINTLN(wLeft);
       
-      Serial.print("wRight:");
-      Serial.print(wRight);
-      Serial.print(" wLeft:");
-      Serial.println(wLeft);
+      DEBUG_PRINT("wRight:");
+      DEBUG_PRINT(wRight);
+      DEBUG_PRINT(" wLeft:");
+      DEBUG_PRINTLN(wLeft);
       }
     }
    
@@ -676,37 +680,25 @@ void op_moveRobot() {
 
   // 4. ACTUALIZACIÓN DEL CONTROLADOR:
   // Se informa a los objetos de control cuál es la nueva velocidad objetivo.
-  //wheelControlerLeft.setSetPoint(setpointWLeft);
-  //wheelControlerRight.setSetPoint(setpointWRight);
-
+  
   // 5. CÁLCULO DE POTENCIA INICIAL (FeedForward):
   // El FeedForward estima el PWM necesario basándose en la velocidad deseada 
   // antes de que el PID empiece a corregir errores.
-  PWM_Left = wheelControlerLeft.feedForward();
-  PWM_Right = wheelControlerRight.feedForward();
-
-  if(setpointWRight < 0) {
-    setpointWRight = setpointWRight*(-1);
-    backD = true;
-  } else if(setpointWRight > 0) {
-    backD = false;
-  }
-  if(setpointWLeft < 0) {
-    setpointWLeft = setpointWLeft*(-1);
-    backI = true;
-  }
-  else if(setpointWLeft>0) {
-    backI = false;
-  }
   wheelControlerLeft.setSetPoint(setpointWLeft);
   wheelControlerRight.setSetPoint(setpointWRight);
-
-  PWM_Left=wheelControlerLeft.feedForward();
-  PWM_Right=wheelControlerRight.feedForward();
+  PWM_Left = wheelControlerLeft.feedForward()+wheelControlerLeft.pid(wLeft);
+  PWM_Right = wheelControlerRight.feedForward()+wheelControlerRight.pid(wRight);
+  
   DEBUG_PRINT("PWM_Left:");
   DEBUG_PRINT(PWM_Left);
+  DEBUG_PRINT("Left FWR:");
+  DEBUG_PRINT(backI);
+
   DEBUG_PRINT(" PWM_Right:");
-  DEBUG_PRINTLN(PWM_Right);
+  DEBUG_PRINT(PWM_Right);
+  DEBUG_PRINT("Right fwr:");
+  DEBUG_PRINTLN(backD);
+  
 
   // 6. EJECUCIÓN FÍSICA:
   // Se envían las señales a los puentes en H a través de la clase robot.
@@ -770,6 +762,7 @@ void op_telemtry() {
   operation_send.id=robot.getRobotID();
   operation_send.op =(int)OP_TELEMETRY;
   short int a=1;
+  
   doubleToBytes(wLeft, &operation_send.data[0]);
   doubleToBytes(wRight, &operation_send.data[8]);
   longToBytes(PWM_Left, &operation_send.data[16]);
@@ -859,32 +852,21 @@ void op_turn_robot()
 
   // 5. BUCLE DE EJECUCIÓN (Bloqueante):
   // El robot se moverá hasta que ambas ruedas hayan alcanzado el número de pulsos objetivo.
+  //If angle is negative, turn right else turn left
   while (encoder_countRight < targetEncoderCount && encoder_countLeft < targetEncoderCount)
   {
     // Al ser booleano, lo correcto es evaluar true/false.
-    if(turnRight) 
-    {
-      // Girar a la derecha: Rueda izquierda adelante, Rueda derecha atrás
-  //If angle is negative, turn right else turn left
-  double angleInRad = ((double)angle)*M_PI/180;
-  double angleToTurn = angleInRad*(robot.getRobotDiameter())/2;
-  //Reset the encoder count
-  encoder_countRight=0;
-  encoder_countLeft=0;
-  //Set the target encoder count
-  int targetEncoderCount = int(angleToTurn/(2*M_PI*robot.getRobotWheelRadius())*MAX_ENCODER_STEPS);
-  while (encoder_countRight < targetEncoderCount && encoder_countLeft < targetEncoderCount)
-  {
+   // Girar a la derecha: Rueda izquierda adelante, Rueda derecha atrás
     if(turnRight<0)
     {
-      robot.moveLeftWheel(MINPWM, 1, false);
-      robot.moveRightWheel(MINPWM, 1, true);
+      robot.moveLeftWheel(150, 1, false);
+      robot.moveRightWheel(150, 1, true);
     }
     else
     {
       // Girar a la izquierda: Rueda izquierda atrás, Rueda derecha adelante
-      robot.moveLeftWheel(MINPWM, 1, true);
-      robot.moveRightWheel(MINPWM, 1, false);
+      robot.moveLeftWheel(150, 1, true);
+      robot.moveRightWheel(150, 1, false);
     }
   }
 
@@ -893,11 +875,10 @@ void op_turn_robot()
   robot.fullStop();
   
   // Enviamos confirmación a la Raspberry Pi de que la tarea ha terminado
-  op_done();
+  //op_done();
 }
   }
-  }
-}
+ 
 
 
 /**
@@ -1123,7 +1104,7 @@ void isrLeft() {
   timeAfterDebounceLeft = timeBeforeDebounceLeft;   
 
 }
-/* TODO: Revisar esta version mejorada no bloqueante
+/* TODO: Revisar esta version mejorada no bloqueante  
  *  void serialEvent() {
   static int index = 0; // Mantiene la posición del buffer entre llamadas a la función
 
@@ -1161,11 +1142,11 @@ void isrLeft() {
 #ifdef ARDUINO_TYPE_MKR
 
 void onMqttMessage(int messageSize){
-  Serial.print("Mensaje recibido en el topic ");
-  Serial.println(mqttClient.messageTopic());
-  Serial.print(" Tamaño: ");
-  Serial.print(messageSize);
-  Serial.print(" bytes");
+  DEBUG_PRINT("Mensaje recibido en el topic ");
+  DEBUG_PRINTLN(mqttClient.messageTopic());
+  DEBUG_PRINT(" Tamaño: ");
+  DEBUG_PRINT(messageSize);
+  DEBUG_PRINT(" bytes");
   String incoming = "";
 
     while(mqttClient.available()){
@@ -1173,20 +1154,20 @@ void onMqttMessage(int messageSize){
     }
   DeserializationError error = deserializeJson(doc, incoming);
   float x = doc["x"], y = doc["y"], yaw = doc["yaw"];
-  Serial.println();
-  Serial.print("x=");
-  Serial.print(x); 
-  Serial.print(", y=");
-  Serial.print(y); 
-  Serial.print(", yaw=");
-  Serial.println(yaw); 
+  DEBUG_PRINTLN();
+  DEBUG_PRINT("x=");
+  DEBUG_PRINT(x); 
+  DEBUG_PRINT(", y=");
+  DEBUG_PRINT(y); 
+  DEBUG_PRINT(", yaw=");
+  DEBUG_PRINTLN(yaw); 
 
   if (error) {
-    Serial.print("Error: ");
-    Serial.println(error.c_str());
+    DEBUG_PRINT("Error: ");
+    DEBUG_PRINTLN(error.c_str());
     return;
   }
-  Serial.println("--------------------------------------------------");
+  DEBUG_PRINTLN("--------------------------------------------------");
 }
 /**
  * Formatea un array de 6 bytes en una cadena hexadecimal separada por puntos.
@@ -1198,16 +1179,16 @@ void printMacAddress(byte mac[]) {
     // Si el valor es menor a 16 (un solo dígito hex), añade un '0' a la izquierda
     // para mantener el formato de dos dígitos (ej. "0A" en lugar de "A")
     if (mac[i] < 16) {
-      Serial.print("0");
+      DEBUG_PRINT("0");
     }
-    Serial.print(mac[i], HEX);
+    DEBUG_PRINT(mac[i], HEX);
     
     // Añade el separador ':' entre los pares de bytes
     if (i > 0) {
-      Serial.print(":");
+      DEBUG_PRINT(":");
     }
   }
-  Serial.println();
+  DEBUG_PRINTLN();
 }
 /**
  * Resume y muestra toda la configuración de red activa en una sola ráfaga.
@@ -1216,129 +1197,91 @@ void printMacAddress(byte mac[]) {
 void printConnectionInformation() 
 {
   // 1. Identificación de la Red
-  Serial.print("[INFO] SSID: ");
-  Serial.println(WiFi.SSID()); // Nombre de la red WiFi
+  DEBUG_PRINT("[INFO] SSID: ");
+  DEBUG_PRINTLN(WiFi.SSID()); // Nombre de la red WiFi
 
   // 2. Identificación del Router (BSSID)
   // Aquí imprimes byte por byte manualmente en lugar de usar una función auxiliar
   byte bssid[6];
   WiFi.BSSID(bssid);
-  Serial.print("[INFO] BSSID: ");
+  DEBUG_PRINT("[INFO] BSSID: ");
   // Nota: Imprime en orden inverso (de 5 a 0) para seguir el estándar de red
-  Serial.print(bssid[5], HEX); Serial.print(":");
-  Serial.print(bssid[4], HEX); Serial.print(":");
-  Serial.print(bssid[3], HEX); Serial.print(":");
-  Serial.print(bssid[2], HEX); Serial.print(":");
-  Serial.print(bssid[1], HEX); Serial.print(":");
-  Serial.println(bssid[0], HEX);
+  DEBUG_PRINT(bssid[5], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(bssid[4], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(bssid[3], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(bssid[2], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(bssid[1], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINTLN(bssid[0], HEX);
 
   // 3. Calidad de la Conexión
   long rssi = WiFi.RSSI();
-  Serial.print("[INFO] Signal Strength (RSSI): ");
-  Serial.println(rssi); // Si ves -90, el robot perderá paquetes de la Raspberry Pi
+  DEBUG_PRINT("[INFO] Signal Strength (RSSI): ");
+  DEBUG_PRINTLN(rssi); // Si ves -90, el robot perderá paquetes de la Raspberry Pi
 
   // 4. Seguridad
   byte encryption = WiFi.encryptionType();
-  Serial.print("[INFO] Encryption Type: ");
-  Serial.println(encryption, HEX);
+  DEBUG_PRINT("[INFO] Encryption Type: ");
+  DEBUG_PRINTLN(encryption, HEX);
 
   // 5. Dirección de Red (La que usarías para SSH o Socket)
   IPAddress ip = WiFi.localIP();
-  Serial.print("[INFO] IP Address: ");
-  Serial.println(ip);
+  DEBUG_PRINT("[INFO] IP Address: ");
+  DEBUG_PRINTLN(ip);
 
   // 6. Dirección Física del Robot
   byte mac[6];
   WiFi.macAddress(mac);
-  Serial.print("[INFO] MAC Address: ");
-  Serial.print(mac[5], HEX); Serial.print(":");
-  Serial.print(mac[4], HEX); Serial.print(":");
-  Serial.print(mac[3], HEX); Serial.print(":");
-  Serial.print(mac[2], HEX); Serial.print(":");
-  Serial.print(mac[1], HEX); Serial.print(":");
-  Serial.println(mac[0], HEX);
+  DEBUG_PRINT("[INFO] MAC Address: ");
+  DEBUG_PRINT(mac[5], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(mac[4], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(mac[3], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(mac[2], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINT(mac[1], HEX); DEBUG_PRINT(":");
+  DEBUG_PRINTLN(mac[0], HEX);
 }
 
 /**
  * Muestra detalles de la red WiFi a la que está conectado el robot.
  */
-void printCurrentNet() {
-  // Imprime el nombre de la red (SSID)
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // Imprime la MAC del router (BSSID)
-  // Útil si hay varios repetidores y quieres saber a cuál se conectó el robot
-=======
-// void serialEvent() {
-//   static unsigned char* read_ptr = (unsigned char*)&packetBuffer;
-//   static bool start_of_data = false;
-
-//   while (Serial1.available()) {
-//     char c = Serial1.read();
-    
-//    if (c == 'K') {  // Si se encuentra un carácter de nueva línea
-//       // Agrega un terminador nulo para indicar el final de los datos
-//       // Reinicia el puntero de datos para leer los datos desde el principio
-//       read_ptr = (unsigned char*)&packetBuffer;
-//       // Marca el final de los datos
-//       server_operation = (struct appdata *)&packetBuffer;
-//       serialCom = true;
-//       start_of_data = false;  // Reinicia el marcador del inicio de los datos
-//       DEBUG_PRINTLN(server_operation->len);
-//     } 
-//     else 
-//     {
-//       if (!start_of_data) 
-//       {  // Si no se ha empezado a recibir datos, marca el inicio
-//         start_of_data = true;
-//         read_ptr = (unsigned char*)&packetBuffer;
-//       }
-      
-//       *read_ptr++ = c;  // Almacena el byte en el buffer y avanza el puntero
-//     }
-//   }
-  
-// }
 
 void printWifiData() {
   // print your board's IP address:
   IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+  DEBUG_PRINT("IP Address: ");
+  DEBUG_PRINTLN(ip);
 
 
   // print your MAC address:
   byte mac[6];
   WiFi.macAddress(mac);
-  Serial.print("MAC address: ");
+  DEBUG_PRINT("MAC address: ");
   printMacAddress(mac);
 }
 
 void printCurrentNet() {
   // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  DEBUG_PRINT("SSID: ");
+  DEBUG_PRINTLN(WiFi.SSID());
 
   // print the MAC address of the router you're attached to:
   byte bssid[6];
   WiFi.BSSID(bssid);
-  Serial.print("BSSID: ");
+  DEBUG_PRINT("BSSID: ");
   printMacAddress(bssid);
 
   // Intensidad de la señal (RSSI - Received Signal Strength Indication)
   // Valores cercanos a -30 son excelentes, -80 es una conexión muy débil
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
-  Serial.println(rssi);
+  DEBUG_PRINT("signal strength (RSSI):");
+  DEBUG_PRINTLN(rssi);
 
   // Tipo de seguridad (WPA2, WEP, etc.) en formato hexadecimal
   // print the encryption type:
   byte encryption = WiFi.encryptionType();
-  Serial.print("Encryption Type:");
-  Serial.println(encryption, HEX);
-  Serial.println();
+  DEBUG_PRINT("Encryption Type:");
+  DEBUG_PRINTLN(encryption, HEX);
+  DEBUG_PRINTLN();
 }
 
 
@@ -1347,36 +1290,36 @@ void printCurrentNet() {
  * Esta función es bloqueante: el robot no empezará a moverse hasta estar conectado.
  */
 void connect() {
-  Serial.print("checking wifi...");
+  DEBUG_PRINT("checking wifi...");
   
   // 1. BUCLE DE CONEXIÓN WIFI
   // Intenta conectar continuamente hasta que el estado sea WL_CONNECTED
   while ( status != WL_CONNECTED) {
     status = WiFi.begin(ssid, pass); // Usa las credenciales definidas previamente
-    Serial.print(".");
+    DEBUG_PRINT(".");
     delay(1000); // Espera 1 segundo entre intentos para no saturar el chip WiFi
   }
-  Serial.println("\nconnected to WiFi!\n");
+  DEBUG_PRINTLN("\nconnected to WiFi!\n");
   
   // Muestra por el monitor serie toda la info que revisamos antes (IP, MAC, etc.)
-  Serial.print("[INFO] Connection Successful");
+  DEBUG_PRINT("[INFO] Connection Successful");
   printConnectionInformation();
-  Serial.println("-----------------------------------------------");
+  DEBUG_PRINTLN("-----------------------------------------------");
 
   // 2. CONEXIÓN AL BROKER MQTT
   // El broker es el servidor central que coordina los mensajes del enjambre
-  Serial.print("Attempting MQTT connection ....");
-  Serial.println(broker);
+  DEBUG_PRINT("Attempting MQTT connection ....");
+  DEBUG_PRINTLN(broker);
   
   if(!mqttClient.connect(broker, mqttPort))
   {
     // Si falla la conexión MQTT, el robot se detiene por seguridad (bucle infinito)
-    Serial.print("MQTT connection failed! Error code = ");
-    Serial.println(mqttClient.connectError());
+    DEBUG_PRINT("MQTT connection failed! Error code = ");
+    DEBUG_PRINTLN(mqttClient.connectError());
     while (1); 
   }
   
-  Serial.println("You're connected to the MQTT broker!");
+  DEBUG_PRINTLN("You're connected to the MQTT broker!");
 
   // 3. MENSAJE DE SALUDO (Handshake IoT)
   // Construye una cadena en formato JSON para avisar al servidor que este robot está online

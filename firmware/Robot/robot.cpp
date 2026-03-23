@@ -44,8 +44,8 @@ IN 2    9
 // Configuración de pines dinámica según el modelo de placa y puente en H
 void robot::pinSetup() {
   #ifdef ARDUINO_TYPE_MKR
-    this->pinLeftEncoder = 1;  // Pin interrupción izquierda MKR
-    this->pinRightEncoder = 4; // Pin interrupción derecha MKR
+    this->pinLeftEncoder = 0;  // Pin interrupción izquierda MKR
+    this->pinRightEncoder = 1; // Pin interrupción derecha MKR
 
     #ifdef H_BRIDGE_BLACK
       // Configuración para el Puente en H Negro (L298N o similar)
@@ -86,6 +86,8 @@ void robot::pinSetup() {
 void robot::motorSetup() {
     pinMode(this->pinENA, OUTPUT); pinMode(this->pinIN1, OUTPUT); pinMode(this->pinIN2, OUTPUT);
     pinMode(this->pinENB, OUTPUT); pinMode(this->pinIN3, OUTPUT); pinMode(this->pinIN4, OUTPUT);
+    pinMode(this->pinLeftEncoder,INPUT_PULLUP);
+    pinMode(this->pinRightEncoder,INPUT_PULLUP);
 }
 
 // Mueve una rueda hacia adelante aplicando PWM
