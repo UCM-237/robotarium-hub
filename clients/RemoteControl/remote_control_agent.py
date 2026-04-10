@@ -1,274 +1,91 @@
 # -*- coding: UTF-8 -*-
-#!/bin/python3
-import array
-from serial import Serial, SerialException, serial_for_url
-from serial.tools import list_ports
-from threading import Thread
-from threading import Event
-import logging
-import struct
-import json
-from agent import Agent
+import sys
+import tty
+import termios
+import select
 import time
-import xml.etree.ElementTree as ET
-PI = 3.14159
+from pi_agent_limits import Robot  # Importamos la clase que ya funciona
+from agent import Agent
 
+class GetKey:
+    def __init__(self):
+        self.settings = termios.tcgetattr(sys.stdin)
+    def get_key(self):
+        tty.setraw(sys.stdin.fileno())
+        rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+        if rlist:
+            key = sys.stdin.read(1)
+        else:
+            key = None
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+        return key
 
-# Configure logs
-logging.basicConfig(level=logging.INFO)
+# Creamos una clase nueva que EXTIEUNDE a la que ya funciona
+class TeleopLimits(Robot):
+    def __init__(self, agent):
+        super().__init__(agent) # Ejecuta el init original (abre serial, etc.)
+        self.gk = GetKey()
+        self.v_lin = 0.0
+        self.v_ang = 0.0
+        self.ang=0
 
-
-
-class Robot:
-  '''Encapsulates the communication with Arduino'''
-  OP_MOVE_ROBOT = 2
-  OP_STOP_ROBOT = 3
-  OP_TELEMETRY = 4
-  OP_TURN_ROBOT = 5
-  OP_SILENCE = 6
-  OP_POSITION = 7
-  OP_CONF_PID = 8
-  OP_CONF_FF = 9
-  OP_DONE = 10
-  OP_MOVE_WHEELS = 11
-  INIT_FLAG = 112
-  connected: bool = False
-  arduino: Serial = None
-  Arduinothread: Thread = None
-  ArenaRulesThread: Thread = None
-  listeners: list = None
-  auto_discovery: list = ['Arduino', 'USB2.0-Serial']
-  communicationParameters = {}
-  agentParameters = {}
-  operations = {}
- 
-
-  def __init__(self, agent: Agent) -> None:
-    self.parsers = {
-      self.OP_TELEMETRY: self.speed
-    }
-    self.operations = {
-      'MOVE': { 'id': self.OP_MOVE_ROBOT, 'method': self.move_robot },
-      'STOP': { 'id': self.OP_STOP_ROBOT, 'method': self.stop_robot },
-      'TELEMETRY': { 'id': self.OP_TELEMETRY, 'method': self.request_telemetry },
-      'TURN': { 'id': self.OP_TURN_ROBOT, 'method': self.turn_robot },
-      'SILENCE': { 'id': self.OP_SILENCE, 'method': self.silenceCommunication },
-      'POSITION': { 'id': self.OP_POSITION, 'method': self.RequestPosition },
-      'PID' : { 'id': self.OP_CONF_PID,  'method' : self.conf_PID },
-      'FF' : { 'id': self.OP_CONF_FF,  'method' : self.conf_FF },
-      'MOVE_WHEELS' : { 'id': self.OP_MOVE_WHEELS,  'method' : self.move_wheels }
-      }
-    self.Position={}
-    self.stopCommand = False
-    self.operationFromRobotDone = Event()
-    self.IgnoreControlCommunication = False
-    self.L = 14.5  # Valor de ejemplo para L
-    self.R = 3.35  # Valor de ejemplo para R
-    self.A = [[self.L/(2*self.R), 1/self.R],
-        [-self.L/(2*self.R), 1/self.R]]
-    self.SAMPLETIME=200
-    self.tval_before = 0
-    self.tval_after= 0
-    self.tval_sample = 0
-    self.AgentName
-    
-
-
-
-    self.agent = agent
-  def parseConfigurations(self):
-    tree = ET.parse('AgentConfiguration.xml')
-    root = tree.getroot()
-    AgentParameters = root.find('AgentParameters')
-    CommunicationParameters = root.find('CommunicationConfiguration')
-    
-    for agent in AgentParameters:
-      self.agentParameters[agent.tag] = agent.text
-      
-    for communicationParameter in CommunicationParameters:
-      self.communicationParameters[communicationParameter.tag] = communicationParameter.text
-    for operation in root.find('RobotOperations'):
-      self.operations[operation.tag] = operation.text
-    
-    self.AgentName = self.agentParameters['AgentName']
-    
-    
-  def connect(self) -> None:
-    '''Open a new connection with an Arduino Board.'''
-    self.ArenaRulesThread = Thread(target=self.checkArenaRules).start()
+    def run_teleop_loop(self):
+        print("\n" + "="*40)
+        print("   TELEOP ROBOTARIUM (PI_AGENT_LIMITS)")
+        print("="*40)
+        print(" W/S: Lineal | A/D: Angular | G/H: Angulo giro | Espacio: STOP")
+        print(" Q: Salir")
         
-    ports = list_ports.comports()
-    for p in ports:
-      try:
-        if not p.description in self.auto_discovery: continue
-        logging.info(f'Connecting to {p.description} in {p.device}')
-        self.arduino = serial_for_url(p.device, baudrate=9600, timeout=5, write_timeout=5)
-        self.Arduinothread = Thread(target=self.update).start()
-        self.connected = True
-        
-        break
-      except:
-        logging.info(f'Cannot connect to {p.device}, trying another port')
-    if self.arduino is None or not self.arduino.is_open:
-      logging.error('Cannot open device.')
+        try:
+            while True:
+                key = self.gk.get_key()
+                
+                if key == 'w': self.v_lin += 0.5
+                elif key == 's': self.v_lin -= 0.5
+                elif key == 'a': self.v_ang -= 0.1
+                elif key == 'd': self.v_ang += 0.1
+                elif key == 'g': self.ang +=5
+                elif key == 'h': self.ang -=5
+                elif key == ' ':
+                    self.v_lin, self.v_ang = 0.0, 0.0
+                    self.ArduinoSerialWrite(self.OP_STOP_ROBOT, 0, b'')
+                elif key == 'q':
+                    break
 
+                if key in ['w', 's', 'a','d',' ']:
+                    # Usamos el método move_robot que ya está definido en pi_agent_limits.py
+                    # Ese método ya hace el empaquetado y envío al Arduino
+                    print(f"\rV: {self.v_lin:5.2f} | W: {self.v_ang:5.2f} ", end='', flush=True)
+                    vl=self.v_lin-(13.1/2.0)*self.v_ang
+                    vr=2*self.v_lin-vl                    
+                    wl=vl/3.35
+                    wr=vr/3.35
+                    print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
+                    self.move_robot(wl,wr)
+                elif key in ['g','h']:
+                    print(f"Ang. giro: {self.ang} (grad)",end='',flush=True)
+                    self.turn_robot(self.ang)    
 
-  def update(self) -> None:
-    '''Parse data received from the robot'''
-    logging.info('Starting Arduino update Arduinothread')
+                time.sleep(0.01)
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.gk.settings)
+
+if __name__ == "__main__":
+    # 1. Configuración idéntica a pi_agent_limits.py
+    robot_class = Robot
+    robot_class.parseConfigurations(robot_class)
     
-      
-    while True:
-      try:
-        initFlag = int.from_bytes(self.arduino.read(size=4), byteorder='little')
-        if initFlag == self.INIT_FLAG:
+    # 2. Arrancamos el Agente usando nuestra NUEVA clase TeleopLimits
+    agent_instance = Agent(
+        device_class=TeleopLimits, 
+        id=robot_class.agentParameters['AgentName'],
+        ip=robot_class.communicationParameters['AgentIp'],
+        cmd_port=robot_class.communicationParameters['AgentCmdPort'],
+        data_port=robot_class.communicationParameters['AgentDataPort'],
+        hub_ip=robot_class.communicationParameters['HubIp'],
+        hub_cmd_port=robot_class.communicationParameters['HubCmdPort'],
+        hub_data_port=robot_class.communicationParameters['HubDataPort']
+    )
 
-          id = int.from_bytes(self.arduino.read(size=4), byteorder='little')
-          operation = int.from_bytes(self.arduino.read(size=4), byteorder='little')
-          len = int.from_bytes(self.arduino.read(size=4), byteorder='little')
-          data = self.arduino.read(size=len)
-          if operation == self.OP_DONE:
-            self.operationFromRobotDone.set()
-          else:
-            measurement = self.parse(operation, data)
-            logging.debug(f'Message from {id}: op={operation}, {len} bytes received, data={measurement}')
-            data={'telemetry','AGENT_ID'}
-            topic = 'telemetry'
-            self.agent.send_measurement(topic,measurement)
-          
-      except (ValueError, TypeError) as e:
-        
-        logging.debug('Ignoring invalid data from Arduino')
-        print(e)
-      
-      except SerialException as e:
-      
-        logging.info('Disconnected from Arduino.')
-        print(e)
-  
-  
-        
-          
-  def move_robot(self, v_left, v_right) -> None:
-    '''Set the wheels' speed setpoint'''
-    len=16#bytes
-    data=( struct.pack('<dd', v_left,v_right))
-    self.ArduinoSerialWrite(self.OP_MOVE_ROBOT,len,data)
-
-  def move_wheels(self,pwm_left, pwm_right) -> None:
-    '''Set the wheels' speed setpoint'''
-    len=8
-    data=(struct.pack('i', pwm_left) + struct.pack('i', pwm_right))
-    self.ArduinoSerialWrite(self.OP_MOVE_WHEELS,len,data)
-    
-  def stop_robot(self,op) -> None:
-    '''Stop the robot'''
-    len=0
-    data=(struct.pack('i', 0) + struct.pack('i', 0))
-    self.ArduinoSerialWrite(self.OP_STOP_ROBOT,len,data)
-  def request_telemetry(self,op) -> None:
-    '''Request telemetry data'''
-    len=0
-    data=(struct.pack('i', 0))
-    self.ArduinoSerialWrite(self.OP_TELEMETRY,len,data)
-    
-  def turn_robot(self, angle) -> None:
-    '''Turn the robot a given angle'''
-    #for easy implementation, the angle can be only 90, 180, 270, 360
-    len=4
-    data=(struct.pack('i', angle))
-    self.ArduinoSerialWrite(self.OP_TURN_ROBOT,len,data)
-    
-    
-  def silenceCommunication(self,op) -> None:
-    '''Stop the communication with the robot'''
-    len=0
-    data=(struct.pack('i', 0))
-    self.ArduinoSerialWrite(self.OP_SILENCE,len,data)
-  def RequestPosition(self,op) -> None:
-    '''Request the position of the robot'''
-    len=0
-    data=()
-    self.ArduinoSerialWrite(self.OP_POSITION,len,data)
-    
-  def conf_PID(self,P_right, I_right, D_right, P_left, I_left, D_left) -> None:
-
-    len=48#bytes
-    data=(struct.pack('d', P_right) +
-      struct.pack('d', I_right) +
-      struct.pack('d', D_right) +
-      struct.pack('d', P_left) +
-      struct.pack('d', I_left) +
-      struct.pack('d', D_left))
-    
-    self.ArduinoSerialWrite(self.OP_CONF_PID,len,data)
-  def conf_FF(self,FF_right, FF_left) -> None:
-    len=16
-    data=(struct.pack('d', FF_right) + struct.pack('d', FF_left))
-    self.ArduinoSerialWrite(self.OP_CONF_FF,len,data)
-    
-  def speed(self, data) -> dict:
-    '''Parse speed from binary data'''
-     # Definir el formato de deserialización
-    fmt = 'ddii'  # dos valores double (d), seguidos de dos enteros (i)
-
-    # Deserializar los datos usando struct.unpack
-    v_left, v_right, pwm_left, pwm_right = struct.unpack(fmt, data)
-    return {
-      'w_left': v_left,
-      'w_right': v_right,
-      'pwm_left': pwm_left,
-      'pwm_right': pwm_right
-    }
-  def batteryStatus(self, data) -> dict:
-    pass
-  
-  def parse(self, operation: int, data: bytes) -> dict:
-    if operation not in self.parsers:
-      raise ValueError(f'Undefined operation {operation}')
-    return self.parsers[operation](data)
-
-
-  def exec(self, operation: str, **kwargs) -> None:
-    
-    if self.stopCommand == True:
-      return
-    if operation not in self.operations:
-      raise ValueError(f'Undefined operation {operation}')
-    self.operations[operation]['method'](**kwargs)
-
-
-             
-       
-  def angularWheelSpeed(self, w_wheel, velocity_robot):
-    fila = 2
-    columna = 2
-    aux = 0
-
-    for i in range(2):#numwheels
-        w_wheel[i] = 0
-    
-    for i in range(fila):
-        for j in range(columna):
-            aux += (self.A[i][j] * velocity_robot[j])
-        
-        w_wheel[i] = aux
-
-        if w_wheel[i] < 0 and w_wheel[i] > -6:
-            w_wheel[i] = 0.0
-        elif w_wheel[i] > 0 and w_wheel[i] < 6:
-            w_wheel[i] = 0.0
-        
-        aux = 0    
-
-  def ArduinoSerialWrite(self,operation,len,data):
-    #in arduino initFlag is uint8_t, agent_id is uint8_t, operation is uint8_t, len is uint16_t
-    
-    
-    head = struct.pack('iii', self.INIT_FLAG, int(self.agentParameters['AgentId']), operation) + struct.pack('i',len)
-    message=head + data
-    message += b'\n'
-    bytes_written= self.arduino.write(message)
-		
-  
-  
+    # 3. Ejecutamos el bucle de teleoperación
+    agent_instance.device.run_teleop_loop()
