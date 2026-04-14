@@ -1,4 +1,6 @@
 #include "comunication.h"
+#include <iostream>
+#include <chrono>
 //ringBuffer AgentCommunication::buffer;  // Definition of the static member
 
 AgentCommunication::AgentCommunication()
@@ -83,6 +85,14 @@ void *AgentCommunication::sendData(void *arg)
 }
 void *AgentCommunication::sendArucoPosition(void *This)
 {
+    // 1. Definimos el intervalo para enviar el mensaje de la Arena (1s) y posicion (50ms)
+    auto intervaloArena = std::chrono::milliseconds(1000);
+    auto intervaloPos = std::chrono::milliseconds(200);
+
+    // 2. Guardamos el tiempo actual como punto de partida
+    auto ultima_ejecucionArena = std::chrono::steady_clock::now();
+    auto ultima_ejecucionPos = std::chrono::steady_clock::now();
+    
     AgentCommunication *agent = (AgentCommunication*)This;
     const std::string endpoint = "tcp://"+HUB_IP+":5555"; //5555
     // initialize the 0MQ context
@@ -123,7 +133,13 @@ void *AgentCommunication::sendArucoPosition(void *This)
     
         //if(agent->RobotariumData.x.size()>0 && agent->requestRobotariumData)
         if(agent->RobotariumData.x.size()>0)
-	{   
+	{   auto tiempo_actualArena = std::chrono::steady_clock::now();
+
+        // 3. Calculamos cuánto tiempo ha pasado
+        auto transcurridoArena = std::chrono::duration_cast<std::chrono::milliseconds>(tiempo_actualArena - ultima_ejecucionArena);
+
+        // 4. Comprobamos si ya pasó el intervalo
+        if (transcurridoArena >= intervaloArena) {
             topic="Camara_0/ArenaSize";
             message["topic"]="ArenaSize";
             message["source_id"] = "Camara_0";
@@ -140,18 +156,26 @@ void *AgentCommunication::sendArucoPosition(void *This)
             jsonStr = message.dump();
             zmqMessage<<jsonStr;
 
-            newPublisher.send(topic,0);
+            newPublisher.send(topic, ZMQ_SNDMORE);
             newPublisher.send(zmqMessage);
             std::cout<<"Topic: "<<topic<<std::endl;
-            std::cout<<jsonStr<<std::endl;
+            std::cout<<"Message: " <<jsonStr<<std::endl;
             //agent->requestRobotariumData = false;
+            topic.clear();
+            message.clear();
+            jsonStr.clear();
+            ultima_ejecucionArena = tiempo_actualArena;
         }
-        
-        
-            
+        auto tiempo_actualPos = std::chrono::steady_clock::now();
+
+        // 3. Calculamos cuánto tiempo ha pasado
+        auto transcurridoPos = std::chrono::duration_cast<std::chrono::milliseconds>(tiempo_actualPos - ultima_ejecucionPos);
+
+        // 4. Comprobamos si ya pasó el intervalo
+        if (transcurridoPos >= intervaloPos) {    
             data = agent->buffer->pop();
             std::string id = std::to_string(data.id);
-            if (id == "5"){
+            if (id == "4"){
 	            std::string x = std::to_string(data.x);
 	            std::string y = std::to_string(data.y);
 	            std::string yaw = std::to_string(data.yaw);
@@ -175,15 +199,21 @@ void *AgentCommunication::sendArucoPosition(void *This)
 	            
 	            zmqMessage<<jsonStr;
 	            std::cout<<"Topic : "<<topic<<std::endl;
-	            std::cout<<jsonStr<<std::endl;
-	            newPublisher.send(topic);
+	            std::cout<<"Message: "<<jsonStr<<std::endl;
+	            newPublisher.send(topic, ZMQ_SNDMORE);
 	            newPublisher.send(zmqMessage);
+                topic.clear();
+                message.clear();
+                jsonStr.clear();
 	        }
-         usleep(50*1000);
+            ultima_ejecucionPos = tiempo_actualPos;
+        }
         message.clear();
         position.clear();
+	    topic.clear();
+	    jsonStr.clear();
+	    }
     }
-    
     
     agent->publisher->close();
     pthread_exit(NULL);

@@ -167,24 +167,42 @@ bool Localization::FindArena()
         cv::Mat bothImages;
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
         this->image.copyTo(this->image_copy);
+        /*
         // Encontrar contornos del arena
         GaussianBlur(this->grayMat, this->grayMat, cv::Size(5, 5), 0);
         // Detectar bordes con Canny
-        cv::Canny(this->grayMat, this->grayMat, 50, 250);
+        //cv::Canny(this->grayMat, this->grayMat, 50, 250);
+        cv::Canny(this->grayMat, this->grayMat, 30, 100);
+        //cv::imshow("Canny", this->grayMat);
+        //cv::waitKey(0);
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(this->grayMat,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+        */
+        // Segun chatgpt
+        cv::Mat blurred, edges, contoursInput;
+
+        cv::GaussianBlur(this->grayMat, blurred, cv::Size(5,5), 1.5);
+        cv::Canny(blurred, edges, 30, 80);
+        //cv::imshow("Canny",edges);
+        cv::dilate(edges, edges, cv::Mat()); // opcional
+        //cv::imshow("Dilated",edges); 
+        contoursInput = edges.clone();
+
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(contoursInput, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
         
-        
-        double minContourArea = 10000;
+        double minContourArea = 1000;
         for (const auto& contour : contours) {
             double area = cv::contourArea(contour);
+            std::cout<<"Area detectada: "<<area<<std::endl;
             if (area > minContourArea) {
                
             
              std::vector<cv::Point> approx;
-            cv::approxPolyDP(contour, approx, 0.04 * cv::arcLength(contour, true), true);
-
-            if (approx.size() == 4 && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Verificar si es un rectángulo
+            cv::approxPolyDP(contour, approx, 0.065 * cv::arcLength(contour, true), true);
+            std::cout<<approx.size()<<std::endl;
+                       
+            if ((approx.size() >=3 && approx.size()<=5) && std::fabs(cv::contourArea(approx)) > minContourArea * 0.9) {  // Verificar si es un rectángulo
                 this->filteredContours.push_back(approx);
 
                 // Dibujar rectángulos en la imagen
@@ -294,7 +312,7 @@ cv::Scalar color(0,0,255);
         cvtColor(this->image,this->grayMat,cv::COLOR_BGR2GRAY);
         this->image.copyTo(frame);
         cv::threshold(this->grayMat, this->binary_image, 100, 255, cv::THRESH_BINARY);
-
+        //cv::imshow("aruco",this->binary_image);
         cv::GaussianBlur(this->grayMat, this->grayMat, cv::Size(3,3), 0.2,0.2); // Tamaño del kernel y desviación estándar
         
         //falta estimar la posicion de la camara con respecto a la arena
