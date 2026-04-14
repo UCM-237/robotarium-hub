@@ -1,6 +1,6 @@
 # ==================================================================================
 # PROYECTO: Robotarium - Sistema de Visión Cenital
-# ARCHIVO:  calibration_stitching.py
+# ARCHIVO:  stitching.py
 # FECHA:    14 de Abril, 2026
 # OBJETIVO: Generar la matriz de homografía (H) para la unión (stitching) de dos 
 #           cámaras cenitales fijas. Permite alinear el espacio de trabajo de 
@@ -20,54 +20,89 @@ import numpy as np
 points_cam_a = []
 points_cam_b = []
 
+# Tamaño máximo de ventana
+MAX_WIDTH = 1280
+MAX_HEIGHT = 720
+
+def rescale_frame(frame, max_w, max_h):
+    alto_original, ancho_original = frame.shape[:2]
+    escala = min(max_w / ancho_original, max_h / alto_original)
+    nuevo_ancho = int(ancho_original * escala)
+    nuevo_alto  = int(alto_original * escala)
+    frame_redimensionado = cv2.resize(frame, (nuevo_ancho, nuevo_alto), interpolation=cv2.INTER_AREA)
+    return frame_redimensionado, escala
+
 def select_points(event, x, y, flags, param):
+    escala = param['scale']
+    cam = param['cam']
     if event == cv2.EVENT_LBUTTONDOWN:
-        if param['cam'] == 'A':
-            points_cam_a.append((x, y))
-            print(f"Cam A - Punto {len(points_cam_a)}: ({x}, {y})")
+        x_original = int(x / escala)
+        y_original = int(y / escala)
+        if cam == 'A':
+            points_cam_a.append((x_original, y_original))
+            print(f"Cam A - Punto {len(points_cam_a)}: ({x_original}, {y_original})")
         else:
-            points_cam_b.append((x, y))
-            print(f"Cam B - Punto {len(points_cam_b)}: ({x}, {y})")
+            points_cam_b.append((x_original, y_original))
+            print(f"Cam B - Punto {len(points_cam_b)}: ({x_original}, {y_original})")
+
+def draw_points(frame_red, points, scale):
+    # Dibuja los puntos en la imagen escalada
+    for idx, (x, y) in enumerate(points):
+        x_scaled = int(x * scale)
+        y_scaled = int(y * scale)
+        cv2.circle(frame_red, (x_scaled, y_scaled), 5, (0, 0, 255), -1)
+        cv2.putText(frame_red, str(idx+1), (x_scaled + 5, y_scaled - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
 
 def calibrate():
-    # 1. Capturar un frame de cada cámara (o cargar fotos guardadas)
-    cap_a = cv2.VideoCapture(0)
+    cap_a = cv2.VideoCapture(5)
     cap_b = cv2.VideoCapture(1)
     
-    ret_a, frame_a = cap_a.read()
-    ret_b, frame_b = cap_b.read()
-    
     cv2.namedWindow("Camara A")
-    cv2.setMouseCallback("Camara A", select_points, {'cam': 'A'})
     cv2.namedWindow("Camara B")
-    cv2.setMouseCallback("Camara B", select_points, {'cam': 'B'})
-
+    
     print("Haz clic en 4 puntos correspondientes en la zona de solape.")
     print("Orden: Superior-Izquierda, Superior-Derecha, Inferior-Izquierda, Inferior-Derecha")
+    
+    escala_a = 1.0
+    escala_b = 1.0
 
     while len(points_cam_a) < 4 or len(points_cam_b) < 4:
-        cv2.imshow("Camara A", frame_a)
-        cv2.imshow("Camara B", frame_b)
+        ret_a, frame_a = cap_a.read()
+        ret_b, frame_b = cap_b.read()
+        if not ret_a or not ret_b:
+            print("Error al leer la cámara")
+            break
+
+        frame_a_red, escala_a = rescale_frame(frame_a, MAX_WIDTH, MAX_HEIGHT)
+        frame_b_red, escala_b = rescale_frame(frame_b, MAX_WIDTH, MAX_HEIGHT)
+
+        # Dibuja puntos ya seleccionados
+        draw_points(frame_a_red, points_cam_a, escala_a)
+        draw_points(frame_b_red, points_cam_b, escala_b)
+
+        cv2.setMouseCallback("Camara A", select_points, {'cam': 'A', 'scale': escala_a})
+        cv2.setMouseCallback("Camara B", select_points, {'cam': 'B', 'scale': escala_b})
+
+        cv2.imshow("Camara A", frame_a_red)
+        cv2.imshow("Camara B", frame_b_red)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # 2. Calcular la Homografía
+    cap_a.release()
+    cap_b.release()
+
+    # Calcular homografía
     pts_a = np.array(points_cam_a).astype(float)
     pts_b = np.array(points_cam_b).astype(float)
-    
-    # Buscamos la matriz que transforma puntos de B a las coordenadas de A
     H, status = cv2.findHomography(pts_b, pts_a)
-
-    # 3. Guardar la matriz para usarla en el Agente de Visión
     np.save("homography_matrix.npy", H)
     print("Calibración completada y guardada como 'homography_matrix.npy'")
 
-    # 4. Prueba rápida de unión (Stitching)
+    # Prueba rápida de unión (Stitching)
     h, w, _ = frame_a.shape
-    # Creamos un lienzo doble de ancho
     canvas = cv2.warpPerspective(frame_b, H, (w * 2, h))
     canvas[0:h, 0:w] = frame_a
-    
     cv2.imshow("Resultado Calibracion", canvas)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
