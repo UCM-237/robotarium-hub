@@ -5,7 +5,7 @@
 # OBJETIVO: Agente que procesa la unión de cámaras y envía el frame resultante
 #           al RobotariumHub para su distribución a otros agentes.
 # ==================================================================================
-import cv2 as cv2
+import cv2
 import numpy as np
 import base64
 import time
