@@ -11,12 +11,17 @@ import base64
 import time
 from agent import Agent, Device
 
+MAX_WIDHT=1280
+MAX_HEIGHT=720
+
 class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
     def __init__(self, agent: Agent) -> None:
         self.agent = agent
         # Configuración de cámaras (como tenías en tu vision_agent.py)
         self.cap_a = cv2.VideoCapture(5)
+        self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.cap_b = cv2.VideoCapture(1)
+        self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.H = np.load("homography_matrix.npy")
         
         # Parámetros de stitching
@@ -38,8 +43,9 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
             while True:
                 ret_a, frame_a = self.cap_a.read()
                 ret_b, frame_b = self.cap_b.read()
-
-                if ret_a and ret_b:
+                if not ret_a and not ret_b:
+                    continue
+                else:
                     h_a, w_a, _ = frame_a.shape
                     h_b, w_b, _ = frame_b.shape
                     # --- CALCULAR OFFSET PARA EVITAR NEGROS ---
@@ -76,16 +82,13 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         nuevo_alto = int(alto * escala)
                         return cv2.resize(frame, (nuevo_ancho, nuevo_alto), interpolation=cv2.INTER_AREA)
 
-                    canvas_red = rescale_frame(canvas, MAX_WIDTH, MAX_HEIGHT)
+                    canvas_red = rescale_frame(canvas, MAX_WIDHT, MAX_HEIGHT)
 
                     # --- MOSTRAR ---
                     cv2.imshow("Stitching Completo", canvas_red)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-                    canvas = frame_a # Supongamos que este es el resultado unido
-                    
+                    cv2.waitKey(1)
                     # Codificación
-                    _, buffer = cv2.imencode('.jpg', canvas, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 70])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
 
                     # Usar el método 'send' de tu clase Agent
@@ -95,11 +98,13 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         "height": self.total_h
                     }
                     self.agent.send("vision/stitched", payload)
+                    print("Enviada imagen")
 
                 time.sleep(0.04) # ~25 FPS
         except KeyboardInterrupt:
             self.cap_a.release()
             self.cap_b.release()
+            print("Se sale en la excepcion")
 
 # --- INSTANCIACIÓN ---
 if __name__ == "__main__":
