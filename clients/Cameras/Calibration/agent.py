@@ -38,7 +38,8 @@ class Agent:
     context = zmq.Context()
     self.control = context.socket(zmq.REQ)
     self.data = context.socket(zmq.PUB)
-    self.data.bind(f'tcp://*:{data_port}')
+    #self.data.bind(f'tcp://*:{data_port}')
+    self.data.connect(f'tcp://{self.hub_ip}:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
     self.device = device_class(agent=self)
     self.device.connect()
@@ -78,13 +79,13 @@ class Agent:
     '''Receive data from other agents'''
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
-
+    '''
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
     logging.debug('Subscribing to *')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'')
-
+    '''
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()
