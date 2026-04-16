@@ -18,6 +18,7 @@ class ArucoDevice:
         Este método es llamado automáticamente por agent.py 
         cuando llega un mensaje al tópico suscrito.
         """
+        print(f"Topic recibido: {topic}")
         if topic == "vision/stitched":
             try:
                 # 1. Convertir el string JSON a diccionario
@@ -59,8 +60,9 @@ if __name__ == "__main__":
     aruco_agent = Agent(
         device_class=ArucoDevice,
         id="ArucoTracker",
-        ip="127.0.0.1",        # Tu IP
-        hub_ip="192.168.10.1"  # IP del Hub
+        ip="192.168.10.1",        # Tu IP
+        hub_ip="192.168.10.1",  # IP del Hub
+        data_port = 5557
     )
     
     # Iniciamos el bucle pasivo

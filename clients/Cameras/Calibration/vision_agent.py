@@ -113,7 +113,8 @@ if __name__ == "__main__":
     mi_agente = Agent(
         device_class=VisionDevice, 
         id="VisionSystem01", 
-        ip="127.0.0.1",      # Tu IP local
+        ip="192.168.10.1",      # Tu IP local
+        data_port=5557,
         hub_ip="192.168.10.1" # IP del Hub
     )
 
