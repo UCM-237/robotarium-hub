@@ -27,7 +27,7 @@ class Device(Protocol):
 class Agent:
 
   def __init__(self, device_class: Device, id: str, ip: str, cmd_port: int=5555, data_port:int=5556,
-               hub_ip: str='127.0.0.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
+               hub_ip: str='192.168.10.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
     self.cmd_port = cmd_port
@@ -38,7 +38,7 @@ class Agent:
     context = zmq.Context()
     self.control = context.socket(zmq.REQ)
     self.data = context.socket(zmq.PUB)
-    self.data.bind(f'tcp://*:{data_port}')
+    self.data.connect(f'tcp://{hub_ip}:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
     self.device = device_class(agent=self)
     self.device.connect()
@@ -82,9 +82,12 @@ class Agent:
 
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
+    
+    logging.debug('Subscribing to vision')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'vision/stiched')
 
-    logging.debug('Subscribing to control')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
+    #logging.debug('Subscribing to control')
+    #self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
 
     # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
