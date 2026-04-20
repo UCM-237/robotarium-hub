@@ -6,6 +6,7 @@ from agent import Agent, Device
 
 class ArucoDevice:
     def __init__(self, agent: Agent) -> None:
+        print("Inicializando ArucoDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
@@ -26,7 +27,7 @@ class ArucoDevice:
                 
                 # 2. Extraer la imagen en Base64 y decodificarla
                 # Basado en el payload que envía tu vision_agent.py
-                img_b64 = data['payload']['image']
+                img_b64 = data['image']
                 img_bytes = base64.b64decode(img_b64)
                 
                 # 3. Convertir bytes a imagen de OpenCV
@@ -52,6 +53,7 @@ class ArucoDevice:
             import time
             time.sleep(1)
 
+
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":
     # IMPORTANTE: En agent.py, asegúrate de añadir la suscripción 
@@ -62,9 +64,9 @@ if __name__ == "__main__":
         id="ArucoTracker",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
-        data_port = 5557
+        data_port = 5560
     )
     
     # Iniciamos el bucle pasivo
-    aruco_agent.device.connect()
-    aruco_agent.device.run()
+    #aruco_agent.device.connect()
+    #aruco_agent.device.run()

@@ -27,7 +27,7 @@ class Device(Protocol):
 class Agent:
 
   def __init__(self, device_class: Device, id: str, ip: str, cmd_port: int=5555, data_port:int=5556,
-               hub_ip: str='127.0.0.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
+               hub_ip: str='192.168.10.1', hub_cmd_port: int=5555, hub_data_port: int=5556) -> None:
     self.id = id
     self.ip = ip
     self.cmd_port = cmd_port
@@ -43,7 +43,7 @@ class Agent:
     self.device = device_class(agent=self)
     self.device.connect()
     self.register()
-    
+
   def _get_data_url(self):
     return f'tcp://{self.ip}:{self.data_port}'
 
@@ -59,9 +59,9 @@ class Agent:
 
   def register(self) -> None:
     '''Register to the hub'''
-    logging.debug(f'Registering agent {self.id}')
     print(f'Registering agent')
     self.control.connect(self._get_hub_cmd_url())
+    print(self._get_data_url())
     self.control.send_json({
       'operation': 'hello',
       'source_id': self.id,
@@ -82,10 +82,14 @@ class Agent:
 
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
+    
+    logging.debug('Subscribing to vision')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'vision/stiched')
 
-    logging.debug('Subscribing to control')
-    self.hub_data.setsockopt(zmq.SUBSCRIBE, b'')
+    #logging.debug('Subscribing to control')
+    #self.hub_data.setsockopt(zmq.SUBSCRIBE, b'control/2')
 
+    # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
@@ -93,7 +97,7 @@ class Agent:
 
   def send(self, topic: str, data: dict) -> None:
     '''Send data to a topic'''
-    logging.debug(f'Agent {self.id} sends message with topic {topic}')
+    logging.info(f'Agent {self.id} is sending message with topic {topic}')    
     self.data.send_string(topic, flags=zmq.SNDMORE)
     self.data.send_json(data)
 
@@ -104,7 +108,7 @@ class Agent:
     self.data.send_string('data', flags=zmq.SNDMORE)
     self.data.send_json({
       'topic': 'measurement',
-       'payload':payload,
+      'payload':payload,
       'timestamp': 1000*time.time(),
     })
 
@@ -113,4 +117,5 @@ if __name__ == "__main__":
     end = False
     # Wait for commands
     agent = Agent()
+    agent.register()
     logging.info(f'Agent {agent.id} is listening')

@@ -10,6 +10,7 @@ import numpy as np
 import base64
 import time
 from agent import Agent, Device
+from threading import Thread
 
 MAX_WIDHT=1280
 MAX_HEIGHT=720
@@ -17,6 +18,7 @@ MAX_HEIGHT=720
 class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
     def __init__(self, agent: Agent) -> None:
         self.agent = agent
+        self.running = False
         # Configuración de cámaras (como tenías en tu vision_agent.py)
         self.cap_a = cv2.VideoCapture(5)
         self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
@@ -32,6 +34,9 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
 
     def connect(self) -> None:
         print("[INFO] Sistema de visión listo y conectado al dispositivo.")
+        #mi_agente.register()
+        self.main_thread = Thread(target=self.run, args=())
+        self.main_thread.start()
 
     def on_data(self, topic: str, message: str) -> None:
         # Aquí recibirías datos del Hub (ej. si el Hub te pide cambiar parámetros)
@@ -40,7 +45,8 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
     def run(self):
         """Bucle principal de captura y envío"""
         try:
-            while True:
+            self.running = True
+            while self.running:
                 ret_a, frame_a = self.cap_a.read()
                 ret_b, frame_b = self.cap_b.read()
                 if not ret_a and not ret_b:
@@ -98,7 +104,6 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         "height": self.total_h
                     }
                     self.agent.send("vision/stitched", payload)
-                    print("Enviada imagen")
 
                 time.sleep(0.04) # ~25 FPS
         except KeyboardInterrupt:
@@ -112,13 +117,13 @@ if __name__ == "__main__":
     # Cambia la IP por la de tu Hub
     mi_agente = Agent(
         device_class=VisionDevice, 
-        id="VisionSystem01", 
+        id="VisionSystem05", 
         ip="192.168.10.1",      # Tu IP local
-        data_port=5557,
+        data_port=5559,
         hub_ip="192.168.10.1" # IP del Hub
     )
 
     # 2. El Agente ya creó el VisionDevice internamente, lo recuperamos y lanzamos
-    vision_system = mi_agente.device
-    vision_system.connect()
-    vision_system.run()
+    # vision_system = mi_agente.device
+    #vision_system.connect()
+    # vision_system.run()

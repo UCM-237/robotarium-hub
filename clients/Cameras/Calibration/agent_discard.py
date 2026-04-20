@@ -38,12 +38,13 @@ class Agent:
     context = zmq.Context()
     self.control = context.socket(zmq.REQ)
     self.data = context.socket(zmq.PUB)
-    self.data.bind(f'tcp://*:{data_port}')
+    #self.data.bind(f'tcp://*:{data_port}')
+    self.data.connect(f'tcp://{self.hub_ip}:{data_port}')
     self.hub_data = context.socket(zmq.SUB)
     self.device = device_class(agent=self)
     self.device.connect()
     self.register()
-    
+
   def _get_data_url(self):
     return f'tcp://{self.ip}:{self.data_port}'
 
@@ -59,7 +60,6 @@ class Agent:
 
   def register(self) -> None:
     '''Register to the hub'''
-    logging.debug(f'Registering agent {self.id}')
     print(f'Registering agent')
     self.control.connect(self._get_hub_cmd_url())
     self.control.send_json({
@@ -72,20 +72,21 @@ class Agent:
     })
     response = self.control.recv_json()
     self.connected = response['result'] == 'ok'
-    Thread(target=self.listen).start()#Thread listening to the hub
+    Thread(target=self.listen).start()
 
 
   def listen(self) -> None:
     '''Receive data from other agents'''
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
-
+    '''
     logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
-    logging.debug('Subscribing to control')
+    logging.debug('Subscribing to *')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'')
-
+    '''
+    # self.hub_data.setsockopt_string(zmq.SUBSCRIBE, f'{self.id}/control')
     while True:
       topic = self.hub_data.recv_string()
       message = self.hub_data.recv_string()
@@ -93,7 +94,6 @@ class Agent:
 
   def send(self, topic: str, data: dict) -> None:
     '''Send data to a topic'''
-    logging.debug(f'Agent {self.id} sends message with topic {topic}')
     self.data.send_string(topic, flags=zmq.SNDMORE)
     self.data.send_json(data)
 
@@ -104,7 +104,7 @@ class Agent:
     self.data.send_string('data', flags=zmq.SNDMORE)
     self.data.send_json({
       'topic': 'measurement',
-       'payload':payload,
+      'payload':payload,
       'timestamp': 1000*time.time(),
     })
 
@@ -113,4 +113,5 @@ if __name__ == "__main__":
     end = False
     # Wait for commands
     agent = Agent()
+    agent.register()
     logging.info(f'Agent {agent.id} is listening')
