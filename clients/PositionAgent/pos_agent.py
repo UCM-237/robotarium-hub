@@ -3,6 +3,7 @@ import numpy as np
 import base64
 import json
 from agent import Agent, Device
+import string
 
 class ArucoDevice:
     def __init__(self, agent: Agent) -> None:
@@ -10,6 +11,13 @@ class ArucoDevice:
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        # 1. Configurar el diccionario ArUco y los parámetros de detección
+        # Usamos el diccionario 6x6 que es el estándar para robótica
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
+        self.aruco_params = cv2.aruco.DetectorParameters_create()
+        self.H = np.load("homography_matrix.npy")
+        print(self.H)
+
 
     def connect(self) -> None:
         print(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
@@ -19,7 +27,13 @@ class ArucoDevice:
         Este método es llamado automáticamente por agent.py 
         cuando llega un mensaje al tópico suscrito.
         """
-        print(f"Topic recibido: {topic}")
+        # --- Configuración del nuevo sistema ---
+        WIDTH_ARENA = 419  # cm
+        HEIGHT_ARENA = 140 # cm
+        OFFSET_X=1291.40
+        OFFSET_Y=734.74
+
+                # ---------------------------------------
         if topic == "vision/stitched":
             try:
                 # 1. Convertir el string JSON a diccionario
@@ -35,7 +49,73 @@ class ArucoDevice:
                 frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
                 if frame is not None:
-                    # Aquí es donde más adelante meterás: detect_arucos(frame)
+                    # 2. DETECCIÓN DE ARUCOS
+                    # corners: lista de esquinas de los marcadores detectados
+                    # ids: identificadores de cada marcador
+                    corners, ids, rejected = cv2.aruco.detectMarkers(
+                        frame, 
+                        self.aruco_dict, 
+                        parameters=self.aruco_params
+                    )
+                    if ids is not None:
+                        ids_flat = ids.flatten()
+                        for i, corner in enumerate(corners):
+                            # 1. Obtener puntos clave del marcador en píxeles (u, v)
+                            c = corner[0] # Esquinas: [0]=atrás-izq, [1]=atrás-der, [2]=alante-der, [3]=alante-izq (aprox)
+                            
+                            # Centro del marcador en píxeles
+                            pixel_center = np.mean(c, axis=0)
+                            
+                            # Punto frontal (media de las dos esquinas delanteras para definir el "morro")
+                            pixel_front = np.mean([c[0], c[1]], axis=0) 
+
+                            # 2. Transformar puntos de Píxeles -> Mundo Real usando la Homografía
+                            # cv2.perspectiveTransform requiere un array de forma (N, 1, 2)
+                            # Creamos un array de float32 con forma (2, 1, 2)
+                            pts = np.array([pixel_center, pixel_front], dtype='float32').reshape(-1, 1, 2)
+                            # 3. Aplicar la transformación
+                            # Si self.H es tu matriz 3x3
+                            try:
+                                real_pts = cv2.perspectiveTransform(pts, self.H)
+                                
+                                # Extraer los resultados (ahora tienen forma 2, 1, 2)
+                                real_x, real_y = real_pts[0][0]
+                                front_x, front_y = real_pts[1][0]
+
+                                # 4. Calcular ángulo
+                                x_raw, y_raw = real_pts[0][0]
+                                fx_raw, fy_raw = real_pts[1][0]
+                                # 2. Re-mapeo al nuevo origen (Esquina inferior derecha)
+                                # Invertimos los ejes restando del máximo
+                                x_new = x_raw-OFFSET_X
+                                y_new = y_raw-OFFSET_Y
+                        
+                                # 3. Cálculo del Yaw en el nuevo sistema
+                                # Calculamos el frente nuevo también para obtener el vector dirección
+                                fx_new = WIDTH_ARENA - fx_raw-OFFSET_Y
+                                fy_new = HEIGHT_ARENA - fy_raw-OFFSET_Y
+                                
+                                yaw_new = np.arctan2(fy_new - y_new, fx_new - x_new)
+                                print(f"ID {ids[i][0]}: X={x_new:.2f}, Y={y_new:.2f}, Th={yaw_new:.2f}")
+                                # 4. (Opcional) Publicar para el servidor/robots
+                                # 4. ENVÍO DE DATOS
+                                robot_id = int(ids[i][0])
+                                target_topic = f"{robot_id}/pos"
+                            
+                                payload = {
+                                    "x": round(float(x_new), 2),
+                                    "y": round(float(y_new), 2),
+                                    "yaw": round(float(yaw_new), 3)
+                                }
+                                self.agent.send(target_topic, json.dumps(payload))
+
+                            except cv2.error as e:
+                                print(f"Error en la transformación: {e}")
+
+
+                        
+                    cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+                    print(f"Marcadores detectados: {ids.flatten()}")
                     self.show_frame(frame)
                     
             except Exception as e:
