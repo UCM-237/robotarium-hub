@@ -30,10 +30,16 @@ class ArucoDevice:
         # --- Configuración del nuevo sistema ---
         WIDTH_ARENA = 419  # cm
         HEIGHT_ARENA = 140 # cm
-        OFFSET_X=1291.40
-        OFFSET_Y=734.74
-
-                # ---------------------------------------
+        #TO REVIEW
+        OFFSET_X=854.14
+        OFFSET_Y=434.92
+        
+        # Escala (Valor_Máximo_Deseado / Valor_Máximo_Raw_Detectado)
+        # X_raw_max (1191.39)
+        # Y_raw_max (basado en robot 4 arriba) approx 358
+        SCALE_X = 419.0 / 1191.39
+        SCALE_Y = -140.0 / 358.0 # Ajuste estimado según robot 4
+        # ---------------------------------------
         if topic == "vision/stitched":
             try:
                 # 1. Convertir el string JSON a diccionario
@@ -57,7 +63,9 @@ class ArucoDevice:
                         self.aruco_dict, 
                         parameters=self.aruco_params
                     )
-                    if ids is not None:
+                    if ids is None:
+                        print("No markers detected on frame")
+                    else:
                         ids_flat = ids.flatten()
                         for i, corner in enumerate(corners):
                             # 1. Obtener puntos clave del marcador en píxeles (u, v)
@@ -67,7 +75,7 @@ class ArucoDevice:
                             pixel_center = np.mean(c, axis=0)
                             
                             # Punto frontal (media de las dos esquinas delanteras para definir el "morro")
-                            pixel_front = np.mean([c[0], c[1]], axis=0) 
+                            pixel_front = np.mean([c[1], c[2]], axis=0) 
 
                             # 2. Transformar puntos de Píxeles -> Mundo Real usando la Homografía
                             # cv2.perspectiveTransform requiere un array de forma (N, 1, 2)
@@ -87,15 +95,21 @@ class ArucoDevice:
                                 fx_raw, fy_raw = real_pts[1][0]
                                 # 2. Re-mapeo al nuevo origen (Esquina inferior derecha)
                                 # Invertimos los ejes restando del máximo
-                                x_new = x_raw-OFFSET_X
-                                y_new = y_raw-OFFSET_Y
+                                x_new = (x_raw-OFFSET_X)*SCALE_X
+                                y_new = (y_raw-OFFSET_Y)*SCALE_Y
                         
                                 # 3. Cálculo del Yaw en el nuevo sistema
                                 # Calculamos el frente nuevo también para obtener el vector dirección
-                                fx_new = WIDTH_ARENA - fx_raw-OFFSET_Y
-                                fy_new = HEIGHT_ARENA - fy_raw-OFFSET_Y
+                                fx_new = (fx_raw-OFFSET_Y)*SCALE_X
+                                fy_new = (fy_raw-OFFSET_Y)*SCALE_Y
                                 
-                                yaw_new = np.arctan2(fy_new - y_new, fx_new - x_new)
+                                # 2. Calcular el ángulo en PÍXELES (aquí nunca te dará 0)
+                                # Invertimos el eje Y de la imagen porque en OpenCV crece hacia abajo
+                                dx_px = pixel_front[0] - pixel_center[0]
+                                dy_px = -(pixel_front[1] - pixel_center[1]) 
+
+                                yaw_new = np.arctan2(dy_px, dx_px)
+                                
                                 print(f"ID {ids[i][0]}: X={x_new:.2f}, Y={y_new:.2f}, Th={yaw_new:.2f}")
                                 # 4. (Opcional) Publicar para el servidor/robots
                                 # 4. ENVÍO DE DATOS
@@ -114,9 +128,9 @@ class ArucoDevice:
 
 
                         
-                    cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                    print(f"Marcadores detectados: {ids.flatten()}")
-                    self.show_frame(frame)
+                        cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+                        print(f"Marcadores detectados: {ids.flatten()}")
+                        self.show_frame(frame)
                     
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
