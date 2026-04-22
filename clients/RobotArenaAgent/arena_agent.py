@@ -251,7 +251,7 @@ if __name__ == "__main__":
         id="RobotArena",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
-        data_port = 5560
+        data_port = 5561
     )
     
     # Iniciamos el bucle pasivo
