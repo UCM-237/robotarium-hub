@@ -122,6 +122,7 @@ class ArucoDevice:
                                     "yaw": round(float(yaw_new), 3)
                                 }
                                 self.agent.send(target_topic, json.dumps(payload))
+                                print(f"Mensaje {json.dumps(payload)} enviado en topic {target_topic}")
 
                             except cv2.error as e:
                                 print(f"Error en la transformación: {e}")
@@ -129,7 +130,7 @@ class ArucoDevice:
 
                         
                         cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                        print(f"Marcadores detectados: {ids.flatten()}")
+                        #print(f"Marcadores detectados: {ids.flatten()}")
                         self.show_frame(frame)
                     
             except Exception as e:
