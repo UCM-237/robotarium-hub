@@ -31,8 +31,10 @@ class ArenaDevice:
         self.H_inv = np.linalg.inv(self.H) # Pre-calculamos la inversa para dibujar
 
         # --- CONTROL DE PUBLICACIÓN ---
-        self.Tenvio = 2.0  # Publicar cada 2 segundos
+        self.Tenvio = 5.0  # Publicar cada 2 segundos
         self.last_publish_time = 0
+        self.last_draw_time=0
+        self.DrawTime=10.0 # Dibujar cada 10s
         self.last_valid_pts = None # Memoria para estabilidad
 
     def connect(self) -> None:
@@ -165,11 +167,12 @@ class ArenaDevice:
                                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                     
                         # Opcional: Visualización para debug
-                        cv2.drawContours(frame, [approx], -1, (0, 255, 0), 3)
-                        self.draw_real_points(frame, final_pts, color=(0, 255, 0), thickness=4)
-                        cv2.imshow("Deteccion Arena", frame)
-                        cv2.waitKey(1)
-                        
+                        if (current_time  - self.last_draw_time)>self.DrawTime:
+                            cv2.drawContours(frame, [approx], -1, (0, 255, 0), 3)
+                            self.draw_real_points(frame, final_pts, color=(0, 255, 0), thickness=4)
+                            cv2.imshow("Deteccion Arena", frame)
+                            cv2.waitKey(1)
+                            self.last_draw_time=current_time    
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
     
