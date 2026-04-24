@@ -12,11 +12,12 @@ class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,0.0,0.0,0.0]
-        self.margin = 0.2
-        self.speed=10
+        self.margin = 0.1
+        self.speed=4
         self.direction=[0.707, 0.707]
-        self.robot_id=5
+        self.robot_id=6
         self.pos=[0.0,0.0,0.0]
+        self.angular_speed=1.0
 
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -44,7 +45,7 @@ class BouncerRobot:
             except Exception as e:
                 print(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
-        elif topic == "5/pos":
+        elif topic == "6/pos":
             try:
                 raw_data= json.loads(message)
                 if isinstance(raw_data, str):
@@ -80,42 +81,49 @@ class BouncerRobot:
         if curr_x <= (x_min + self.margin) and self.direction[0] < 0:
             self.direction[0] *= -1
             rebound = True
+            print(f"[BOUNCE] Rebote pared lateral curr_x={curr_x} < x_min{x_min} + margen {self.margin}")
         elif curr_x >= (x_max - self.margin) and self.direction[0] > 0:
             self.direction[0] *= -1
             rebound = True
-
+            print(f"[BOUNCE] Rebote pared lateral curr_x={curr_x} >x_max{x_max} - margen {self.margin}")
         # Rebote en Y (Paredes fondo/frente)
         if curr_y <= (y_min + self.margin) and self.direction[1] < 0:
             self.direction[1] *= -1
+            print(f"[BOUNCE] Rebote pared frontal curr_y={curr_y} < y_min {y_min} + margen {self.margin}")
             rebound = True
         elif curr_y >= (y_max - self.margin) and self.direction[1] > 0:
             self.direction[1] *= -1
+            print(f"[BOUNCE] Rebote pared frontal curr_y={curr_y} > y_min {y_max} - margen {self.margin}")
             rebound = True
 
         if rebound:
             print(f"[BOUNCE] Robot {self.robot_id} rebotó en pared. Nueva dirección: {self.direction}")
-
+        else:
+            self.direction[0]=0
+            self.direction[1]=0
+            print(f"[BOUNCE] Robot sigue recto")
+        
         # Enviar comando al robot
         # Calculamos v_x y v_y basados en la dirección y velocidad constante
-        vx = self.direction[0] * self.speed
-        vy = self.direction[1] * self.speed
+        v = (self.speed)
+        w =( self.direction[1] )* (self.angular_speed)
         
         cmd = {
-            "vx": round(float(vx), 2),
-            "vy": round(float(vy), 2)
+            "vx": round(float(v), 2),
+            "vy": round(float(w), 2)
         }
-        bouncer_agent.send("5/move", json.dumps(cmd))
-        logging.debug(f"Comando enviado -> v: {vx:.1f} | w: {vy:.1f}")
+        bouncer_agent.send("agent/6/move", { 'v': v, 'w': w })
+        logging.debug(f"Comando enviado -> v: {v:.1f} | w: {w:.1f}")
 
 # a partir de aqui es todo de recibir
 #cuando conecta
 def on_connect(client,userdata,flags,rc):
    print("conectado al broker")
    #client.subscribe("#")
-   client.subscribe("agent/5/velocity")   
-   client.subscribe("agent/5/odon")
+   client.subscribe("agent/6/velocity")   
+   client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
-   client.subscribe("5/pos")      
+   client.subscribe("6/pos")      
    #client.subscribe("agent/5/wheel")         
 
 #cuando llega el mensaje
