@@ -157,18 +157,20 @@ class ArucoDevice:
             while self.running:
                 # Si hay un frame nuevo, lo procesamos para mostrar
                 if self.current_frame is not None:
-                    # Creamos una copia local para no interferir con on_data
-                    display_frame = self.current_frame.copy()
+                    current_time=time.time()
+                    if (current_time-self.last_draw_time)>self.Tdraw:
+                        # Creamos una copia local para no interferir con on_data
+                        display_frame = self.current_frame.copy()
+                        
+                        # Dibujamos los últimos marcadores conocidos si existen
+                        if self.last_ids is not None:
+                            cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
+                        
+                        cv2.imshow(self.window_name, display_frame)
                     
-                    # Dibujamos los últimos marcadores conocidos si existen
-                    if self.last_ids is not None:
-                        cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
-                    
-                    cv2.imshow(self.window_name, display_frame)
-                
-                # El waitKey(1) permite que la ventana responda y se refresque
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                    # El waitKey(1) permite que la ventana responda y se refresque
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
         finally:
             cv2.destroyAllWindows()
 
