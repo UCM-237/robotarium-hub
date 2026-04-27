@@ -16,6 +16,16 @@ class ArucoDevice:
         # Usamos el diccionario 6x6 que es el estándar para robótica
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
+        # --- MEJORAS DE DETECCIÓN ---
+        # Reduce el tamaño de la ventana de umbralización para detectar marcadores pequeños
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 23
+        self.aruco_params.adaptiveThreshWinSizeStep =5
+        self.aruco_params.minMarkerPerimeterRate = 0.03
+
+        # Aumenta la precisión de las esquinas (Crucial para el cálculo de Yaw)
+        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.aruco_params.cornerRefinementWinSize = 5
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
         self.Tdraw=1 # Se dibuja cada 2s
@@ -61,16 +71,27 @@ class ArucoDevice:
                 # 3. Convertir bytes a imagen de OpenCV
                 np_array = np.frombuffer(img_bytes, dtype=np.uint8)
                 frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+                # Convertimos a gris
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+                # Aplicamos una ecualización de histograma para resaltar los bordes
+                # Esto ayuda mucho si la iluminación es pobre
+                gray = cv2.equalizeHist(gray)
                 if frame is not None:
                     # 2. DETECCIÓN DE ARUCOS
                     # corners: lista de esquinas de los marcadores detectados
                     # ids: identificadores de cada marcador
                     corners, ids, rejected = cv2.aruco.detectMarkers(
-                        frame, 
+                        gray, 
                         self.aruco_dict, 
                         parameters=self.aruco_params
                     )
+                    # --- TRUCO DE DEBUG ---
+
+                    # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
+                    cv2.imshow("debug_window",frame)
+                    cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
+                    cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
                     else:

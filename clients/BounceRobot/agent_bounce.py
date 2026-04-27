@@ -12,8 +12,8 @@ class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,0.0,0.0,0.0]
-        self.margin = 0.1
-        self.speed=4
+        self.margin = 0.2
+        self.speed=8.5
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
@@ -113,7 +113,7 @@ class BouncerRobot:
             "vy": round(float(w), 2)
         }
         bouncer_agent.send("agent/6/move", { 'v': v, 'w': w })
-        logging.debug(f"Comando enviado -> v: {v:.1f} | w: {w:.1f}")
+        #logging.debug(f"Comando enviado -> v: {v:.1f} | w: {w:.1f}")
 
 # a partir de aqui es todo de recibir
 #cuando conecta
