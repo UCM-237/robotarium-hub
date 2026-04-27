@@ -4,6 +4,7 @@ import base64
 import json
 from agent import Agent, Device
 import string
+import time
 
 class ArucoDevice:
     def __init__(self, agent: Agent) -> None:
@@ -16,8 +17,23 @@ class ArucoDevice:
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.H = np.load("homography_matrix.npy")
-        print(self.H)
-
+        # 2. Configuración de los tiempos de envio
+        self.Tdraw=2 # Se dibuja cada 2s
+        # 3. --- Configuración del nuevo sistema ---
+        self.WIDTH_ARENA = 419  # cm
+        self.HEIGHT_ARENA = 140 # cm
+        #TO REVIEW
+        self.OFFSET_X=854.14
+        self. OFFSET_Y=434.92
+        
+        # Escala (Valor_Máximo_Deseado / Valor_Máximo_Raw_Detectado)
+        # X_raw_max (1191.39)
+        # Y_raw_max (basado en robot 4 arriba) approx 358
+        self.SCALE_X = 419.0 / 1191.39
+        self.SCALE_Y = -140.0 / 358.0 # Ajuste estimado según robot 4
+        self.last_draw_time=0
+        
+        self.frame_to_show=None
 
     def connect(self) -> None:
         print(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
@@ -27,18 +43,6 @@ class ArucoDevice:
         Este método es llamado automáticamente por agent.py 
         cuando llega un mensaje al tópico suscrito.
         """
-        # --- Configuración del nuevo sistema ---
-        WIDTH_ARENA = 419  # cm
-        HEIGHT_ARENA = 140 # cm
-        #TO REVIEW
-        OFFSET_X=854.14
-        OFFSET_Y=434.92
-        
-        # Escala (Valor_Máximo_Deseado / Valor_Máximo_Raw_Detectado)
-        # X_raw_max (1191.39)
-        # Y_raw_max (basado en robot 4 arriba) approx 358
-        SCALE_X = 419.0 / 1191.39
-        SCALE_Y = -140.0 / 358.0 # Ajuste estimado según robot 4
         # ---------------------------------------
         if topic == "vision/stitched":
             try:
@@ -95,13 +99,13 @@ class ArucoDevice:
                                 fx_raw, fy_raw = real_pts[1][0]
                                 # 2. Re-mapeo al nuevo origen (Esquina inferior derecha)
                                 # Invertimos los ejes restando del máximo
-                                x_new = (x_raw-OFFSET_X)*SCALE_X
-                                y_new = (y_raw-OFFSET_Y)*SCALE_Y
+                                x_new = (x_raw-self.OFFSET_X)*self.SCALE_X
+                                y_new = (y_raw-self.OFFSET_Y)*self.SCALE_Y
                         
                                 # 3. Cálculo del Yaw en el nuevo sistema
                                 # Calculamos el frente nuevo también para obtener el vector dirección
-                                fx_new = (fx_raw-OFFSET_Y)*SCALE_X
-                                fy_new = (fy_raw-OFFSET_Y)*SCALE_Y
+                                fx_new = (fx_raw-self.OFFSET_Y)*self.SCALE_X
+                                fy_new = (fy_raw-self.OFFSET_Y)*self.SCALE_Y
                                 
                                 # 2. Calcular el ángulo en PÍXELES (aquí nunca te dará 0)
                                 # Invertimos el eje Y de la imagen porque en OpenCV crece hacia abajo
@@ -128,25 +132,41 @@ class ArucoDevice:
                                 print(f"Error en la transformación: {e}")
 
 
-                        
-                        cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                        #print(f"Marcadores detectados: {ids.flatten()}")
-                        self.show_frame(frame)
+                        current_time =time.time()
+                        if (current_time-self.last_draw_time)>self.Tdraw:
+                            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+                            #print(f"Marcadores detectados: {ids.flatten()}")
+                            self.frame_to_show= frame
+                            self.last_draw_time=current_time
                     
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
 
-    def show_frame(self, frame):
+    '''def show_frame(self, frame):
         cv2.imshow(self.window_name, frame)
         # IMPORTANTE: waitKey es vital para que la ventana se refresque
-        cv2.waitKey(1)
+        cv2.waitKey(1)'''
 
     def run(self):
-        # Este agente es pasivo, solo reacciona a on_data
-        # Mantenemos el hilo principal vivo
-        while True:
-            import time
-            time.sleep(1)
+        """
+        Este método corre en el hilo principal y gestiona la visualización.
+        """
+        print(f"[INFO] {self.agent.id} en ejecución (Presiona 'q' para salir)")
+        try:
+            while self.running:
+                if self.frame_to_show is not None:
+                    cv2.imshow(self.window_name, self.frame_to_show)
+                    self.frame_to_show = None # Limpiamos el buffer
+                
+                # waitKey es esencial aquí. 10ms es suficiente para fluidez.
+                if cv2.waitKey(10) & 0xFF == ord('q'):
+                    self.running = False
+                    break
+        except KeyboardInterrupt:
+            pass
+        finally:
+            cv2.destroyAllWindows()
+            print("Cerrando Agente...")
 
 
 # --- LANZAMIENTO DEL AGENTE ---
