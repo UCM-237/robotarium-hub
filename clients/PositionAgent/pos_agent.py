@@ -18,7 +18,11 @@ class ArucoDevice:
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
-        self.Tdraw=2 # Se dibuja cada 2s
+        self.Tdraw=1 # Se dibuja cada 2s
+        self.current_frame = None
+        self.last_corners = None
+        self.last_ids = None
+        self.running = True
         # 3. --- Configuración del nuevo sistema ---
         self.WIDTH_ARENA = 419  # cm
         self.HEIGHT_ARENA = 140 # cm
@@ -71,6 +75,9 @@ class ArucoDevice:
                         print("No markers detected on frame")
                     else:
                         ids_flat = ids.flatten()
+                        self.current_frame = frame
+                        self.last_corners = corners
+                        self.last_ids = ids
                         for i, corner in enumerate(corners):
                             # 1. Obtener puntos clave del marcador en píxeles (u, v)
                             c = corner[0] # Esquinas: [0]=atrás-izq, [1]=atrás-der, [2]=alante-der, [3]=alante-izq (aprox)
@@ -132,42 +139,38 @@ class ArucoDevice:
                                 print(f"Error en la transformación: {e}")
 
 
-                        current_time =time.time()
-                        if (current_time-self.last_draw_time)>self.Tdraw:
-                            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                            #print(f"Marcadores detectados: {ids.flatten()}")
-                            self.frame_to_show= frame
-                            self.last_draw_time=current_time
+                        
+ 
                     
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
 
-    '''def show_frame(self, frame):
-        cv2.imshow(self.window_name, frame)
-        # IMPORTANTE: waitKey es vital para que la ventana se refresque
-        cv2.waitKey(1)'''
+  
 
     def run(self):
         """
         Este método corre en el hilo principal y gestiona la visualización.
         """
-        print(f"[INFO] {self.agent.id} en ejecución (Presiona 'q' para salir)")
+        
+        print(f"[INFO] {self.agent.id} visualizando...")
         try:
             while self.running:
-                if self.frame_to_show is not None:
-                    cv2.imshow(self.window_name, self.frame_to_show)
-                    self.frame_to_show = None # Limpiamos el buffer
+                # Si hay un frame nuevo, lo procesamos para mostrar
+                if self.current_frame is not None:
+                    # Creamos una copia local para no interferir con on_data
+                    display_frame = self.current_frame.copy()
+                    
+                    # Dibujamos los últimos marcadores conocidos si existen
+                    if self.last_ids is not None:
+                        cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
+                    
+                    cv2.imshow(self.window_name, display_frame)
                 
-                # waitKey es esencial aquí. 10ms es suficiente para fluidez.
-                if cv2.waitKey(10) & 0xFF == ord('q'):
-                    self.running = False
+                # El waitKey(1) permite que la ventana responda y se refresque
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-        except KeyboardInterrupt:
-            pass
         finally:
             cv2.destroyAllWindows()
-            print("Cerrando Agente...")
-
 
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":
@@ -184,4 +187,4 @@ if __name__ == "__main__":
     
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
-    #aruco_agent.device.run()
+    aruco_agent.device.run()
