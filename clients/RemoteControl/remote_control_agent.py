@@ -67,21 +67,21 @@ class Teleoperator:
         print("\n" + "="*40)
         print("   TELEOP ROBOTARIUM (PI_AGENT_LIMITS)")
         print("="*40)
-        print(" W/S: Lineal | A/D: Angular | G/H: Angulo giro | Espacio: STOP")
+        print(" W/S +- vlineal | A/D: Angular | G/H: Angulo giro | Espacio: STOP")
         print(" Q: Salir")
         
         try:
             while True:
                 key = self.gk.get_key()
                 
-                if key == 'w': self.v_lin += 0.5
-                elif key == 's': self.v_lin -= 0.5
-                elif key == 'a': self.v_ang -= 0.1
-                elif key == 'd': self.v_ang += 0.1
+                if key == 'w': self.v += 0.5
+                elif key == 's': self.v -= 0.5
+                elif key == 'a': self.w -= 0.1
+                elif key == 'd': self.w += 0.1
                 elif key == 'g': self.ang +=5
                 elif key == 'h': self.ang -=5
                 elif key == ' ':
-                    self.v_lin, self.v_ang = 0.0, 0.0
+                    self.v, self.w = 0.0, 0.0
                    
                 elif key == 'q':
                     break
@@ -89,9 +89,9 @@ class Teleoperator:
                 if key in ['w', 's', 'a','d',' ']:
                     # Usamos el método move_robot que ya está definido en pi_agent_limits.py
                     # Ese método ya hace el empaquetado y envío al Arduino
-                    print(f"\rV: {self.v_lin:5.2f} | W: {self.v_ang:5.2f} ", end='', flush=True)
-                    vl=self.v_lin-(13.1/2.0)*self.v_ang
-                    vr=2*self.v_lin-vl                    
+                    print(f"\rV: {self.v:5.2f} | W: {self.w:5.2f} ", end='', flush=True)
+                    vl=self.v-(13.1/2.0)*self.w
+                    vr=2*self.v-vl                    
                     wl=vl/3.35
                     wr=vr/3.35
                     print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     teleop_agent= Agent(
       device_class=Teleoperator,
       id='TeleopAgent',
-      ip='192.168.10.1',
+      ip='192.168.10.73',
       data_port = 5565,
       hub_ip='192.168.10.1'
     )
@@ -126,3 +126,4 @@ if __name__ == "__main__":
     client.connect(BROKER, PUERTO, 60)
     client.loop_start()
     logging.info(f"Agent {teleop_agent.id} en marcha")
+    teleop_agent.device.run_teleop_loop()
