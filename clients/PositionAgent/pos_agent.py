@@ -16,9 +16,23 @@ class ArucoDevice:
         # Usamos el diccionario 6x6 que es el estándar para robótica
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
+        # --- MEJORAS DE DETECCIÓN ---
+        # Reduce el tamaño de la ventana de umbralización para detectar marcadores pequeños
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 23
+        self.aruco_params.adaptiveThreshWinSizeStep =5
+        self.aruco_params.minMarkerPerimeterRate = 0.03
+
+        # Aumenta la precisión de las esquinas (Crucial para el cálculo de Yaw)
+        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.aruco_params.cornerRefinementWinSize = 5
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
-        self.Tdraw=2 # Se dibuja cada 2s
+        self.Tdraw=1 # Se dibuja cada 2s
+        self.current_frame = None
+        self.last_corners = None
+        self.last_ids = None
+        self.running = True
         # 3. --- Configuración del nuevo sistema ---
         self.WIDTH_ARENA = 419  # cm
         self.HEIGHT_ARENA = 140 # cm
@@ -57,20 +71,34 @@ class ArucoDevice:
                 # 3. Convertir bytes a imagen de OpenCV
                 np_array = np.frombuffer(img_bytes, dtype=np.uint8)
                 frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+                # Convertimos a gris
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+                # Aplicamos una ecualización de histograma para resaltar los bordes
+                # Esto ayuda mucho si la iluminación es pobre
+                gray = cv2.equalizeHist(gray)
                 if frame is not None:
                     # 2. DETECCIÓN DE ARUCOS
                     # corners: lista de esquinas de los marcadores detectados
                     # ids: identificadores de cada marcador
                     corners, ids, rejected = cv2.aruco.detectMarkers(
-                        frame, 
+                        gray, 
                         self.aruco_dict, 
                         parameters=self.aruco_params
                     )
+                    # --- TRUCO DE DEBUG ---
+
+                    # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
+                    cv2.imshow("debug_window",frame)
+                    cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
+                    cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
                     else:
                         ids_flat = ids.flatten()
+                        self.current_frame = frame
+                        self.last_corners = corners
+                        self.last_ids = ids
                         for i, corner in enumerate(corners):
                             # 1. Obtener puntos clave del marcador en píxeles (u, v)
                             c = corner[0] # Esquinas: [0]=atrás-izq, [1]=atrás-der, [2]=alante-der, [3]=alante-izq (aprox)
@@ -132,42 +160,40 @@ class ArucoDevice:
                                 print(f"Error en la transformación: {e}")
 
 
-                        current_time =time.time()
-                        if (current_time-self.last_draw_time)>self.Tdraw:
-                            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                            #print(f"Marcadores detectados: {ids.flatten()}")
-                            self.frame_to_show= frame
-                            self.last_draw_time=current_time
+                        
+ 
                     
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
 
-    '''def show_frame(self, frame):
-        cv2.imshow(self.window_name, frame)
-        # IMPORTANTE: waitKey es vital para que la ventana se refresque
-        cv2.waitKey(1)'''
+  
 
     def run(self):
         """
         Este método corre en el hilo principal y gestiona la visualización.
         """
-        print(f"[INFO] {self.agent.id} en ejecución (Presiona 'q' para salir)")
+        
+        print(f"[INFO] {self.agent.id} visualizando...")
         try:
             while self.running:
-                if self.frame_to_show is not None:
-                    cv2.imshow(self.window_name, self.frame_to_show)
-                    self.frame_to_show = None # Limpiamos el buffer
-                
-                # waitKey es esencial aquí. 10ms es suficiente para fluidez.
-                if cv2.waitKey(10) & 0xFF == ord('q'):
-                    self.running = False
-                    break
-        except KeyboardInterrupt:
-            pass
+                # Si hay un frame nuevo, lo procesamos para mostrar
+                if self.current_frame is not None:
+                    current_time=time.time()
+                    if (current_time-self.last_draw_time)>self.Tdraw:
+                        # Creamos una copia local para no interferir con on_data
+                        display_frame = self.current_frame.copy()
+                        
+                        # Dibujamos los últimos marcadores conocidos si existen
+                        if self.last_ids is not None:
+                            cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
+                        
+                        cv2.imshow(self.window_name, display_frame)
+                    
+                    # El waitKey(1) permite que la ventana responda y se refresque
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
         finally:
             cv2.destroyAllWindows()
-            print("Cerrando Agente...")
-
 
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":
@@ -184,4 +210,4 @@ if __name__ == "__main__":
     
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
-    #aruco_agent.device.run()
+    aruco_agent.device.run()
