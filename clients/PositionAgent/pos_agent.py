@@ -11,7 +11,7 @@ class ArucoDevice:
         print("Inicializando ArucoDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        #cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         # 1. Configurar el diccionario ArUco y los parámetros de detección
         # Usamos el diccionario 6x6 que es el estándar para robótica
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
@@ -89,9 +89,9 @@ class ArucoDevice:
                     # --- TRUCO DE DEBUG ---
 
                     # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
-                    cv2.imshow("debug_window",frame)
+                    '''cv2.imshow("debug_window",frame)
                     cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
-                    cv2.waitKey(1)
+                    cv2.waitKey(1)'''
                     if ids is None:
                         print("No markers detected on frame")
                     else:
@@ -153,7 +153,7 @@ class ArucoDevice:
                                     "y": round(float(y_new), 2),
                                     "yaw": round(float(yaw_new), 3)
                                 }
-                                self.agent.send(target_topic, json.dumps(payload))
+                                self.agent.send(target_topic,payload)
                                 print(f"Mensaje {json.dumps(payload)} enviado en topic {target_topic}")
 
                             except cv2.error as e:
