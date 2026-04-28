@@ -23,10 +23,11 @@ class BouncerRobot:
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
         self.safety_distance = 0.2 
+        self.is_turning=False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
-
+        
 
     def init_logger(self):
         with open(self.log_file, mode='w', newline='') as file:
@@ -80,8 +81,9 @@ class BouncerRobot:
                 if isinstance(raw_data, str):
                         raw_data = json.loads(raw_data)
                 
-                self.pos=raw_data
-                
+                self.pos[0]=float(raw_data.get('x'))
+                self.pos[1]=float(raw_data.get('y'))
+                self.pos[2]=float(raw_data.get('yaw'))
                 self.check_collision_and_move()
             except Exception as e:
                 print(f"Error al descodificar: {e}")
