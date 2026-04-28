@@ -2,6 +2,10 @@ import json
 import numpy as np
 from agent import Agent
 import logging
+import math
+import csv
+from datetime import datetime
+import time
 #necesario para recibir por mqtt
 import paho.mqtt.client as mqtt
 BROKER = "192.168.10.1"
@@ -13,11 +17,36 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,0.0,0.0,0.0]
         self.margin = 0.1
-        self.speed=4
+        self.speed=10.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
+        self.safety_distance = 0.2 
+        # --- Configuración del Logger ---
+        self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        self.init_logger()
+
+
+    def init_logger(self):
+        with open(self.log_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            # Cabecera con todos los datos que pediste
+            writer.writerow([
+                "timestamp", "x", "y", "theta", 
+                "x_min", "x_max", "y_min", "y_max", 
+                "dist_to_wall", "decision_v", "decision_w"
+            ])
+    def log_data(self, x, y, theta, dist, v, w):
+        with open(self.log_file, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                time.time(), x, y, theta,
+                self.boundaries[0], self.boundaries[1], 
+                self.boundaries[2], self.boundaries[3],
+                round(dist, 3), v, w
+            ])
+
 
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -52,68 +81,64 @@ class BouncerRobot:
                         raw_data = json.loads(raw_data)
                 
                 self.pos=raw_data
-                print(self.pos)
-                self.update_behavior()
+                
+                self.check_collision_and_move()
             except Exception as e:
                 print(f"Error al descodificar: {e}")
 
 
   
         
-    def update_behavior(self):
-        if not self.boundaries:
-            return
+    def get_distance_to_wall(self, x, y, theta):
+            # Distancias a las 4 paredes (asumiendo tatami rectangular)
+            # Basado en: x + d*cos(theta) = x_limit  =>  d = (x_limit - x) / cos(theta)
+            
+            distances = []
+            cos_t = math.cos(theta)
+            sin_t = math.sin(theta)
 
-        # Extraer límites (asumiendo rectángulo ordenado: 0:SI, 1:SD, 2:ID, 3:II)
-        # Usamos los valores extremos para simplificar el rebote
-        x_min = self.boundaries[0]
-        x_max = self.boundaries[1]
-        y_min = self.boundaries[0]
-        y_max = self.boundaries[2]
+            # Paredes verticales (X min y max)
+            if abs(cos_t) > 1e-6:
+                distances.append((self.boundaries[0] - x) / cos_t) # x_min
+                distances.append((self.boundaries[1] - x) / cos_t) # x_max
+            
+            # Paredes horizontales (Y min y max)
+            if abs(sin_t) > 1e-6:
+                distances.append((self.boundaries[2] - y) / sin_t) # y_min
+                distances.append((self.boundaries[3] - y) / sin_t) # y_max
 
-        curr_x = self.pos['x']
-        curr_y = self.pos['y']
+            # Solo nos interesan distancias positivas (hacia adelante)
+            logging.info(f"Distances to borders: {distances}")
+            positives = [d for d in distances if d > 0]
+            return min(positives) if positives else float('inf')
 
-        # LOGICA DE REBOTE
-        rebound = False
+    def check_collision_and_move(self):
+        x, y, theta = self.pos
+        dist = self.get_distance_to_wall(x, y, theta)
+        v=0.0
+        w=0.0
 
-        # Rebote en X (Paredes laterales)
-        if curr_x <= (x_min + self.margin) and self.direction[0] < 0:
-            self.direction[0] *= -1
-            rebound = True
-            print(f"[BOUNCE] Rebote pared lateral curr_x={curr_x} < x_min{x_min} + margen {self.margin}")
-        elif curr_x >= (x_max - self.margin) and self.direction[0] > 0:
-            self.direction[0] *= -1
-            rebound = True
-            print(f"[BOUNCE] Rebote pared lateral curr_x={curr_x} >x_max{x_max} - margen {self.margin}")
-        # Rebote en Y (Paredes fondo/frente)
-        if curr_y <= (y_min + self.margin) and self.direction[1] < 0:
-            self.direction[1] *= -1
-            print(f"[BOUNCE] Rebote pared frontal curr_y={curr_y} < y_min {y_min} + margen {self.margin}")
-            rebound = True
-        elif curr_y >= (y_max - self.margin) and self.direction[1] > 0:
-            self.direction[1] *= -1
-            print(f"[BOUNCE] Rebote pared frontal curr_y={curr_y} > y_min {y_max} - margen {self.margin}")
-            rebound = True
+        if dist < self.safety_distance and not self.is_turning:
+            # Iniciamos maniobra de giro: v=0, w=velocidad_giro
+            self.is_turning = True
+            v=0.0
+            w=1.5
+            
+        elif self.is_turning and dist > self.safety_distance * 1.5:
+            # Ya estamos apuntando a sitio seguro
+            self.is_turning = False
+            v=self.speed
+            w=0.0
+        elif not self.is_turning:
+            v=self.speed
+            w=0.0
 
-        if rebound:
-            print(f"[BOUNCE] Robot {self.robot_id} rebotó en pared. Nueva dirección: {self.direction}")
-        else:
-            self.direction[0]=0
-            self.direction[1]=0
-            print(f"[BOUNCE] Robot sigue recto")
-        
-        # Enviar comando al robot
-        # Calculamos v_x y v_y basados en la dirección y velocidad constante
-        v = (self.speed)
-        w =( self.direction[1] )* (self.angular_speed)
-        
-        cmd = {
-            "vx": round(float(v), 2),
-            "vy": round(float(w), 2)
-        }
-        bouncer_agent.send("agent/6/move", { 'v': v, 'w': w })
-        logging.debug(f"Comando enviado -> v: {v:.1f} | w: {w:.1f}")
+        self.log_data(x, y, theta, dist, v, w)
+
+        self.send_move(v,w)
+
+    def send_move(self, v, w):
+        bouncer_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})
 
 # a partir de aqui es todo de recibir
 #cuando conecta
