@@ -11,7 +11,7 @@ class ArenaDevice:
         print("Inicializando ArenaDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        #cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         # 1. Configurar el diccionario ArUco y los parámetros de detección
         # Usamos el diccionario 6x6 que es el estándar para robótica
         self.H = np.load("homography_matrix.npy")
@@ -160,19 +160,19 @@ class ArenaDevice:
                                 }
                                 self.agent.send(target_topic, json.dumps(payload))
                                 self.last_publish_time=current_time
-                                print(f"[INFO] Límites publicados (Frecuencia: {self.Tenvio}s)")
+                                print(f"[INFO] Límites publicados {final_pts} (Frecuencia: {self.Tenvio}s)")
                         # Feedback visual de los índices para debug
-                        for idx, p in enumerate(ordered_pts):
+                        '''for idx, p in enumerate(ordered_pts):
                             cv2.putText(frame, str(idx), (int(approx[idx][0][0]), int(approx[idx][0][1])), 
                                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    
+                    	'''
                         # Opcional: Visualización para debug
-                        if (current_time  - self.last_draw_time)>self.DrawTime:
+                        '''if (current_time  - self.last_draw_time)>self.DrawTime:
                             cv2.drawContours(frame, [approx], -1, (0, 255, 0), 3)
                             self.draw_real_points(frame, final_pts, color=(0, 255, 0), thickness=4)
                             cv2.imshow("Deteccion Arena", frame)
                             cv2.waitKey(1)
-                            self.last_draw_time=current_time    
+                            self.last_draw_time=current_time    '''
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
     

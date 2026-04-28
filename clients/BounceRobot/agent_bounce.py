@@ -17,17 +17,17 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,0.0,0.0,0.0]
         self.margin = 0.1
-        self.speed=10.0
+        self.speed=15.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 0.2 
-        self.is_turning=False
+        self.safety_distance = 10.0 
+        self.is_turning =False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
-        
+
 
     def init_logger(self):
         with open(self.log_file, mode='w', newline='') as file:
@@ -76,8 +76,10 @@ class BouncerRobot:
                 print(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
         elif topic == "6/pos":
+            
             try:
                 raw_data= json.loads(message)
+                print(raw_data)
                 if isinstance(raw_data, str):
                         raw_data = json.loads(raw_data)
                 
@@ -125,19 +127,26 @@ class BouncerRobot:
             self.is_turning = True
             v=0.0
             w=1.5
-            
+            logging.info("Peligro: comienza a girar")            
         elif self.is_turning and dist > self.safety_distance * 1.5:
             # Ya estamos apuntando a sitio seguro
             self.is_turning = False
             v=self.speed
             w=0.0
+            logging.info("Retorno a zona segura")
         elif not self.is_turning:
             v=self.speed
             w=0.0
+            logging.info("Zona segura")
+        else:
+            w=1.5
+            v=0
+            logging.info("Girando")
 
         self.log_data(x, y, theta, dist, v, w)
 
         self.send_move(v,w)
+        logging.info(f"Enviada v: {v} w: {w}")
 
     def send_move(self, v, w):
         bouncer_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})
