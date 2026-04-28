@@ -20,9 +20,9 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
         self.agent = agent
         self.running = False
         # Configuración de cámaras (como tenías en tu vision_agent.py)
-        self.cap_a = cv2.VideoCapture(5)
+        self.cap_a = cv2.VideoCapture(2)
         self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
-        self.cap_b = cv2.VideoCapture(1)
+        self.cap_b = cv2.VideoCapture(0)
         self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.H = np.load("homography_matrix.npy")
         
@@ -91,8 +91,8 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                     canvas_red = rescale_frame(canvas, MAX_WIDHT, MAX_HEIGHT)
 
                     # --- MOSTRAR ---
-                    cv2.imshow("Stitching Completo", canvas_red)
-                    cv2.waitKey(1)
+                    #cv2.imshow("Stitching Completo", canvas_red)
+                    #cv2.waitKey(1)
                     # Codificación
                     _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 70])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
