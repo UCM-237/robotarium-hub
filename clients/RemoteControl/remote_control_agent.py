@@ -4,8 +4,19 @@ import tty
 import termios
 import select
 import time
-from pi_agent_limits import Robot  # Importamos la clase que ya funciona
 from agent import Agent
+import json
+import numpy as np
+from agent import Agent
+import logging
+import math
+import csv
+from datetime import datetime
+#necesario para recibir por mqtt
+import paho.mqtt.client as mqtt
+BROKER = "192.168.10.1"
+PUERTO = 1883
+
 
 class GetKey:
     def __init__(self):
@@ -21,14 +32,37 @@ class GetKey:
         return key
 
 # Creamos una clase nueva que EXTIEUNDE a la que ya funciona
-class TeleopLimits(Robot):
-    def __init__(self, agent):
-        super().__init__(agent) # Ejecuta el init original (abre serial, etc.)
+class Teleoperator:
+    def __init__(self, agent: Agent) -> None:
+        '''The constructor optionally receive a list of listeners'''
+        self.v =0.0
+        self.w =0.0
+        self.robot_id=6
+        # --- Configuración del Logger ---
+        self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        self.init_logger()
         self.gk = GetKey()
-        self.v_lin = 0.0
-        self.v_ang = 0.0
-        self.ang=0
 
+    def init_logger(self):
+        with open(self.log_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            # Cabecera con todos los datos que pediste
+            writer.writerow([
+                "timestamp", "v", "w"
+            ])
+    def log_data(self, x, y, theta, dist, v, w):
+        with open(self.log_file, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                time.time(), self.v, self.w
+            ])
+
+
+    def connect(self) -> None:
+        '''Establish a connection with the hardware'''
+
+    def on_data(self, topic: str, message: str) -> None:
+        '''Handle incoming data'''
     def run_teleop_loop(self):
         print("\n" + "="*40)
         print("   TELEOP ROBOTARIUM (PI_AGENT_LIMITS)")
@@ -48,7 +82,7 @@ class TeleopLimits(Robot):
                 elif key == 'h': self.ang -=5
                 elif key == ' ':
                     self.v_lin, self.v_ang = 0.0, 0.0
-                    self.ArduinoSerialWrite(self.OP_STOP_ROBOT, 0, b'')
+                   
                 elif key == 'q':
                     break
 
@@ -61,31 +95,34 @@ class TeleopLimits(Robot):
                     wl=vl/3.35
                     wr=vr/3.35
                     print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
-                    self.move_robot(wl,wr)
+                    self.send_move(wl,wr)
                 elif key in ['g','h']:
                     print(f"Ang. giro: {self.ang} (grad)",end='',flush=True)
-                    self.turn_robot(self.ang)    
+                    self.send_move_ang(self.ang)    
 
                 time.sleep(0.01)
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.gk.settings)
+    def send_move(self, v, w):
+        teleop_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})   
+    def send_move_ang(self, ang):
+        teleop_agent.send(f"agent/{self.robot_id}/turn", {'ang': ang})   
 
 if __name__ == "__main__":
-    # 1. Configuración idéntica a pi_agent_limits.py
-    robot_class = Robot
-    robot_class.parseConfigurations(robot_class)
-    
-    # 2. Arrancamos el Agente usando nuestra NUEVA clase TeleopLimits
-    agent_instance = Agent(
-        device_class=TeleopLimits, 
-        id=robot_class.agentParameters['AgentName'],
-        ip=robot_class.communicationParameters['AgentIp'],
-        cmd_port=robot_class.communicationParameters['AgentCmdPort'],
-        data_port=robot_class.communicationParameters['AgentDataPort'],
-        hub_ip=robot_class.communicationParameters['HubIp'],
-        hub_cmd_port=robot_class.communicationParameters['HubCmdPort'],
-        hub_data_port=robot_class.communicationParameters['HubDataPort']
+      # Configuración del Agente
+    teleop_agent= Agent(
+      device_class=Teleoperator,
+      id='TeleopAgent',
+      ip='192.168.10.1',
+      data_port = 5565,
+      hub_ip='192.168.10.1'
     )
+    
+    #MQTT_agent.register()
+    logging.info(f'Agent {teleop_agent.id} is listening')
 
-    # 3. Ejecutamos el bucle de teleoperación
-    agent_instance.device.run_teleop_loop()
+    # Configuración MQTT
+    client = mqtt.Client()
+    client.connect(BROKER, PUERTO, 60)
+    client.loop_start()
+    logging.info(f"Agent {teleop_agent.id} en marcha")
