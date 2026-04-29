@@ -154,7 +154,8 @@ class ArucoDevice:
                                 payload = {
                                     "x": round(float(x_new), 2),
                                     "y": round(float(y_new), 2),
-                                    "yaw": round(float(yaw_new), 3)
+                                    "yaw": round(float(yaw_new), 3),
+                                    "timestamp": time.time()
                                 }
                                 self.agent.send(target_topic,payload)
                                 print(f"Mensaje {json.dumps(payload)} enviado en topic {target_topic}")
