@@ -17,7 +17,7 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,0.0,0.0,0.0]
         self.margin = 0.1
-        self.speed=15.0
+        self.speed=6.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
@@ -152,9 +152,12 @@ class BouncerRobot:
             logging.info("Girando")
 
         self.log_data(x, y, theta, dist, v, w)
-
-        self.send_move(v,w)
-        logging.info(f"Enviada v: {v} w: {w}")
+        vl=v-(13.1/2.0)*w
+        vr=2*v-vl                    
+        wl=vl/3.35
+        wr=vr/3.35
+        self.send_move(wl,wr)
+        logging.info(f"Enviada v: {wl} w: {wr}")
 
     def send_move(self, v, w):
         bouncer_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})
