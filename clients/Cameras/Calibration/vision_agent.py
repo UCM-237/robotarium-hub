@@ -110,7 +110,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                     }
                     self.agent.send("vision/stitched", payload)
 
-                time.sleep(0.04) # ~25 FPS
+                time.sleep(0.001) # ~25 FPS
         except KeyboardInterrupt:
             self.cap_a.release()
             self.cap_b.release()
