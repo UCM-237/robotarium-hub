@@ -5,12 +5,16 @@ import json
 from agent import Agent, Device
 import string
 import time
+import argparse
+
 
 class ArenaDevice:
     def __init__(self, agent: Agent) -> None:
         print("Inicializando ArenaDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
+        self.gui = True # Por defecto True, se cambiará desde el main
+        self.running = True
         #cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         # 1. Configurar el diccionario ArUco y los parámetros de detección
         # Usamos el diccionario 6x6 que es el estándar para robótica
@@ -161,18 +165,17 @@ class ArenaDevice:
                                 self.agent.send(target_topic, json.dumps(payload))
                                 self.last_publish_time=current_time
                                 print(f"[INFO] Límites publicados {final_pts} (Frecuencia: {self.Tenvio}s)")
-                        # Feedback visual de los índices para debug
-                        '''for idx, p in enumerate(ordered_pts):
-                            cv2.putText(frame, str(idx), (int(approx[idx][0][0]), int(approx[idx][0][1])), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    	'''
+                      
                         # Opcional: Visualización para debug
-                        '''if (current_time  - self.last_draw_time)>self.DrawTime:
+                        if self.gui:
+                            # Solo ejecutamos el dibujo y el imshow si gui es True
                             cv2.drawContours(frame, [approx], -1, (0, 255, 0), 3)
-                            self.draw_real_points(frame, final_pts, color=(0, 255, 0), thickness=4)
+                            # Feedback visual de los índices para debug
+                            for idx, p in enumerate(ordered_pts):
+                                cv2.putText(frame, str(idx), (int(approx[idx][0][0]), int(approx[idx][0][1])), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                             cv2.imshow("Deteccion Arena", frame)
                             cv2.waitKey(1)
-                            self.last_draw_time=current_time    '''
             except Exception as e:
                 print(f"[ERROR] Error al procesar frame: {e}")
     
@@ -209,11 +212,8 @@ class ArenaDevice:
         cv2.waitKey(1)
 
     def run(self):
-        # Este agente es pasivo, solo reacciona a on_data
-        # Mantenemos el hilo principal vivo
-        while True:
-            import time
-            time.sleep(1)
+        while self.running:
+            time.sleep(1) # Duerme un segundo completo, ya que el trabajo real ocurre en on_data
 
     def filter_close_points(self,points, min_dist=130.0):
         """
@@ -248,15 +248,20 @@ class ArenaDevice:
 if __name__ == "__main__":
     # IMPORTANTE: En agent.py, asegúrate de añadir la suscripción 
     # al tópico 'vision/stitched' en el método listen()
-    
-    aruco_agent = Agent(
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--no-gui', action='store_true', help="Modo consola")
+    args = parser.parse_args()
+
+    arena_agent = Agent(
         device_class=ArenaDevice,
         id="RobotArena",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
         data_port = 5561
     )
-    
+    arena_agent.device.gui = not args.no_gui # Seteamos el modo
+    arena_agent.device.run()
+
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
     #aruco_agent.device.run()

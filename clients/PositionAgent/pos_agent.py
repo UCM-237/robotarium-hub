@@ -5,6 +5,8 @@ import json
 from agent import Agent, Device
 import string
 import time
+import argparse
+
 
 class ArucoDevice:
     def __init__(self, agent: Agent) -> None:
@@ -49,6 +51,7 @@ class ArucoDevice:
         
         self.frame_to_show=None
 
+  
     def connect(self) -> None:
         print(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
 
@@ -168,38 +171,36 @@ class ArucoDevice:
 
   
 
-    def run(self):
-        """
-        Este método corre en el hilo principal y gestiona la visualización.
-        """
-        
-        print(f"[INFO] {self.agent.id} visualizando...")
+    def run(self, gui=True):
+        print(f"[INFO] {self.agent.id} ejecutándose (GUI: {gui})")
         try:
             while self.running:
-                # Si hay un frame nuevo, lo procesamos para mostrar
-                if self.current_frame is not None:
-                    current_time=time.time()
-                    if (current_time-self.last_draw_time)>self.Tdraw:
-                        # Creamos una copia local para no interferir con on_data
+                if gui and self.current_frame is not None:
+                    current_time = time.time()
+                    if (current_time - self.last_draw_time) > self.Tdraw:
                         display_frame = self.current_frame.copy()
-                        
-                        # Dibujamos los últimos marcadores conocidos si existen
                         if self.last_ids is not None:
                             cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
-                        
                         cv2.imshow(self.window_name, display_frame)
+                        self.last_draw_time = current_time
                     
-                    # El waitKey(1) permite que la ventana responda y se refresque
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
+                else:
+                    # Modo consola: solo dormimos para no saturar la CPU
+                    time.sleep(0.1)
         finally:
-            cv2.destroyAllWindows()
+            if gui: cv2.destroyAllWindows()
 
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":
     # IMPORTANTE: En agent.py, asegúrate de añadir la suscripción 
     # al tópico 'vision/stitched' en el método listen()
     
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--no-gui', action='store_true', help="Ejecutar sin ventana de video")
+    args = parser.parse_args()
+
     aruco_agent = Agent(
         device_class=ArucoDevice,
         id="ArucoTracker",
@@ -210,4 +211,4 @@ if __name__ == "__main__":
     
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
-    aruco_agent.device.run()
+    aruco_agent.device.run(gui=not args.no_gui)
