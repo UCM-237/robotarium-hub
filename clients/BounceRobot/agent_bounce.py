@@ -94,28 +94,36 @@ class BouncerRobot:
   
         
     def get_distance_to_wall(self, x, y, theta):
-            # Distancias a las 4 paredes (asumiendo tatami rectangular)
-            # Basado en: x + d*cos(theta) = x_limit  =>  d = (x_limit - x) / cos(theta)
+        # 1. Límites actuales (centímetros)
+        x_min, x_max = self.boundaries[0], self.boundaries[1]
+        y_min, y_max = self.boundaries[2], self.boundaries[3]
+
+        # 2. Distancias Euclidianas "puras" (¿A cuánto estoy de las bandas?)
+        d_left = x - x_min
+        d_right = x_max - x
+        d_top = y - y_min
+        d_bottom = y_max - y
+        logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
+        # 3. Dirección del movimiento
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
+
+        # 4. Lógica de peligro:
+        # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
+        danger_distances = []
             
-            distances = []
-            cos_t = math.cos(theta)
-            sin_t = math.sin(theta)
+        if cos_t < 0: danger_distances.append(d_left)   # Se mueve a la izquierda
+        if cos_t > 0: danger_distances.append(d_right)  # Se mueve a la derecha
+        if sin_t < 0: danger_distances.append(d_top)    # Se mueve hacia arriba
+        if sin_t > 1e-6: danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
 
-            # Paredes verticales (X min y max)
-            if abs(cos_t) > 1e-6:
-                distances.append((self.boundaries[0] - x) / cos_t) # x_min
-                distances.append((self.boundaries[1] - x) / cos_t) # x_max
+        logging.info(f"Distancias reales a paredes de interés: {danger_distances}")
             
-            # Paredes horizontales (Y min y max)
-            if abs(sin_t) > 1e-6:
-                distances.append((self.boundaries[2] - y) / sin_t) # y_min
-                distances.append((self.boundaries[3] - y) / sin_t) # y_max
-
-            # Solo nos interesan distancias positivas (hacia adelante)
-            logging.info(f"Distances to borders: {distances}")
-            positives = [d for d in distances if d > 0]
-            return min(positives) if positives else float('inf')
-
+        # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
+        real_positives = [max(0, d) for d in danger_distances]
+            
+        return min(real_positives) if real_positives else float('inf')
+    
     def check_collision_and_move(self):
         x, y, theta = self.pos
         dist = self.get_distance_to_wall(x, y, theta)
