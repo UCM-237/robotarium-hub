@@ -18,6 +18,8 @@ class BouncerRobot:
         self.boundaries=[0.0,0.0,0.0,0.0]
         self.margin = 0.1
         self.speed=6.0
+        self.v=25.0
+        self.w=1.5
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
@@ -47,10 +49,9 @@ class BouncerRobot:
                 self.boundaries[2], self.boundaries[3],
                 round(dist, 3), v, w
             ])
-
-
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
+
 
     def on_data(self, topic: str, message: str) -> None:
         '''Handle incoming data'''
@@ -87,8 +88,8 @@ class BouncerRobot:
                 self.pos[1]=float(raw_data.get('y'))
                 self.pos[2]=float(raw_data.get('yaw'))
                 current_time = time.time()
-                sent_time = raw_data.get("ts", current_time)
-    
+                sent_time = raw_data.get("timestamp")
+   
                 latency = (current_time - sent_time) * 1000 # Latencia en ms
     
                 # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
@@ -115,6 +116,12 @@ class BouncerRobot:
         d_top = y - y_min
         d_bottom = y_max - y
         logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
+                    
+        return [d_left,d_right,d_top,d_bottom]
+    
+    def check_collision_and_move(self):
+        x, y, theta = self.pos
+        [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
         # 3. Dirección del movimiento
         cos_t = math.cos(theta)
         sin_t = math.sin(theta)
@@ -129,46 +136,39 @@ class BouncerRobot:
         if sin_t > 1e-6: danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
 
         logging.info(f"Distancias reales a paredes de interés: {danger_distances}")
-            
-        # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
-        real_positives = [max(0, d) for d in danger_distances]
-            
-        return min(real_positives) if real_positives else float('inf')
-    
-    def check_collision_and_move(self):
-        x, y, theta = self.pos
-        dist = self.get_distance_to_wall(x, y, theta)
-        v=0.0
-        w=0.0
-
-        if dist < self.safety_distance and not self.is_turning:
-            # Iniciamos maniobra de giro: v=0, w=velocidad_giro
-            self.is_turning = True
-            v=0.0
-            w=1.5
-            logging.info("Peligro: comienza a girar")            
-        elif self.is_turning and dist > self.safety_distance * 1.5:
-            # Ya estamos apuntando a sitio seguro
-            self.is_turning = False
-            v=self.speed
-            w=0.0
-            logging.info("Retorno a zona segura")
-        elif not self.is_turning:
-            v=self.speed
-            w=0.0
-            logging.info("Zona segura")
+        if danger_distances is  None and not self.is_turning:
+           v=sel.speed
+           w=0.0
+           self.is_turning=False
+           logging.info("Zona segura")
+        elif np.min(danger_distances)<=self.safety_distance and not self.is_turning:
+           self.is_turning=True
+           v=0.0
+           w=self.w
+           logging.info("Iniciando giro")
+        elif np.min(danger_distances)<=self.safety_distance and self.is_turning:
+           v=0.0
+           w=self.w
+           logging.info("Continuando giro")
+        elif np.min(danger_distances)>self.safety_distance:
+           self.is_turning=False
+           v=self.v
+           w=0.0
+           logging.info("Zona segura")
         else:
-            w=1.5
-            v=0
-            logging.info("Girando")
-
-        self.log_data(x, y, theta, dist, v, w)
+           v=0.0
+           w=0.0
+           logging.info("Caso indeterminado")
+        # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
+        
+        self.log_data(x, y, theta, np.min(danger_distances), v, w)
         vl=v-(13.1/2.0)*w
         vr=2*v-vl                    
         wl=vl/3.35
         wr=vr/3.35
         self.send_move(wl,wr)
         logging.info(f"Enviada v: {wl} w: {wr}")
+
 
     def send_move(self, v, w):
         bouncer_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})
@@ -178,8 +178,8 @@ class BouncerRobot:
 def on_connect(client,userdata,flags,rc):
    print("conectado al broker")
    #client.subscribe("#")
-   client.subscribe("agent/6/velocity")   
-   client.subscribe("agent/6/odon")
+   #client.subscribe("agent/6/velocity")   
+   #client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
    client.subscribe("6/pos")      
    #client.subscribe("agent/5/wheel")         

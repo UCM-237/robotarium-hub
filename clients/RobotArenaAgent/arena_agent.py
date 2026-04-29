@@ -35,7 +35,7 @@ class ArenaDevice:
         self.H_inv = np.linalg.inv(self.H) # Pre-calculamos la inversa para dibujar
 
         # --- CONTROL DE PUBLICACIÓN ---
-        self.Tenvio = 5.0  # Publicar cada 2 segundos
+        self.Tenvio = 60.0  # Publicar cada 2 segundos
         self.last_publish_time = 0
         self.last_draw_time=0
         self.DrawTime=10.0 # Dibujar cada 10s

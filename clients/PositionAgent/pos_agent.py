@@ -13,6 +13,7 @@ class ArucoDevice:
         print("Inicializando ArucoDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
+        self.missed_frames = 0
         #cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         # 1. Configurar el diccionario ArUco y los parámetros de detección
         # Usamos el diccionario 6x6 que es el estándar para robótica
@@ -21,12 +22,12 @@ class ArucoDevice:
         # --- MEJORAS DE DETECCIÓN ---
         # Reduce el tamaño de la ventana de umbralización para detectar marcadores pequeños
         self.aruco_params.adaptiveThreshWinSizeMin = 3
-        self.aruco_params.adaptiveThreshWinSizeMax = 23
-        self.aruco_params.adaptiveThreshWinSizeStep =5
+        self.aruco_params.adaptiveThreshWinSizeMax = 31
+        self.aruco_params.adaptiveThreshWinSizeStep =3
         self.aruco_params.minMarkerPerimeterRate = 0.03
 
         # Aumenta la precisión de las esquinas (Crucial para el cálculo de Yaw)
-        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
         self.aruco_params.cornerRefinementWinSize = 5
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
@@ -97,7 +98,11 @@ class ArucoDevice:
                     cv2.waitKey(1)'''
                     if ids is None:
                         print("No markers detected on frame")
+                        self.missed_frames+=1
+                        if self.missed_frames %10 ==0:
+                            logging.warning(f"Ojo {self.missed_frames} frames sin ver robots")
                     else:
+                        self.missed_frames = 1
                         ids_flat = ids.flatten()
                         self.current_frame = frame
                         self.last_corners = corners
