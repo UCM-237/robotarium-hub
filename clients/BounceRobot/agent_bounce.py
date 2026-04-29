@@ -27,7 +27,7 @@ class BouncerRobot:
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
-
+        self.last_pos_time = 0.0
 
     def init_logger(self):
         with open(self.log_file, mode='w', newline='') as file:
@@ -86,6 +86,17 @@ class BouncerRobot:
                 self.pos[0]=float(raw_data.get('x'))
                 self.pos[1]=float(raw_data.get('y'))
                 self.pos[2]=float(raw_data.get('yaw'))
+                current_time = time.time()
+                sent_time = raw_data.get("ts", current_time)
+    
+                latency = (current_time - sent_time) * 1000 # Latencia en ms
+    
+                # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
+                if hasattr(self, 'last_pos_time'):
+                    freq = 1.0 / (current_time - self.last_pos_time)
+                    logging.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+    
+                self.last_pos_time = current_time
                 self.check_collision_and_move()
             except Exception as e:
                 print(f"Error al descodificar: {e}")
