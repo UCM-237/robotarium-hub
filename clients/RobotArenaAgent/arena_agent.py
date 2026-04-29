@@ -112,8 +112,8 @@ class ArenaDevice:
                                 for p in transformed:
                                     xr, yr = p[0]
                                     # Convertimos de float32 de numpy a float nativo de Python
-                                    x_cm = float(xr - self.OFFSET_X)
-                                    y_cm = float(abs(yr - self.OFFSET_Y))
+                                    x_cm = float(xr - self.OFFSET_X)*self.SCALE_X
+                                    y_cm = float((yr - self.OFFSET_Y))*self.SCALE_Y
                                     # Estructura limpia para JSON
                                     pts_real.append({"x": round(x_cm, 2), "y": round(y_cm, 2)})
                                     pts_cm.append([x_cm, y_cm])    
