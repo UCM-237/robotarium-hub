@@ -99,7 +99,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         cv2.imshow("Stitching", canvas_red)
                         cv2.waitKey(1)
                     # Codificación
-                    _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 95])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
 
                     # Usar el método 'send' de tu clase Agent
