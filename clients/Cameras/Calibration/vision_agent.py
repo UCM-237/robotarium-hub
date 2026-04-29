@@ -5,6 +5,8 @@
 # OBJETIVO: Agente que procesa la unión de cámaras y envía el frame resultante
 #           al RobotariumHub para su distribución a otros agentes.
 # ==================================================================================
+import argparse
+
 import cv2
 import numpy as np
 import base64
@@ -19,12 +21,14 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
     def __init__(self, agent: Agent) -> None:
         self.agent = agent
         self.running = False
+        self.gui = True
         # Configuración de cámaras (como tenías en tu vision_agent.py)
         self.cap_a = cv2.VideoCapture(2)
         self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.cap_b = cv2.VideoCapture(0)
         self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.H = np.load("homography_matrix.npy")
+        
         
         # Parámetros de stitching
         self.total_w = 1280 # Ajusta según tus cámaras
@@ -91,8 +95,9 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                     canvas_red = rescale_frame(canvas, MAX_WIDHT, MAX_HEIGHT)
 
                     # --- MOSTRAR ---
-                    #cv2.imshow("Stitching Completo", canvas_red)
-                    #cv2.waitKey(1)
+                    if self.gui:
+                        cv2.imshow("Stitching", canvas_red)
+                        cv2.waitKey(1)
                     # Codificación
                     _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 70])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
@@ -113,9 +118,14 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
 
 # --- INSTANCIACIÓN ---
 if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--no-gui', action='store_true', help="Ejecutar sin ventana de video")
+    args = parser.parse_args()
+
     # 1. Instanciamos el Agente (esto hace el registro 'hello' automáticamente)
     # Cambia la IP por la de tu Hub
-    mi_agente = Agent(
+    agente_vision = Agent(
         device_class=VisionDevice, 
         id="VisionSystem05", 
         ip="192.168.10.1",      # Tu IP local
@@ -123,7 +133,6 @@ if __name__ == "__main__":
         hub_ip="192.168.10.1" # IP del Hub
     )
 
-    # 2. El Agente ya creó el VisionDevice internamente, lo recuperamos y lanzamos
-    # vision_system = mi_agente.device
-    #vision_system.connect()
-    # vision_system.run()
+    agente_vision.device.gui = not args.no_gui # Seteamos el modo de visualización
+
+  
