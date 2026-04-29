@@ -21,17 +21,19 @@ class ArucoDevice:
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         # --- MEJORAS DE DETECCIÓN ---
         # Reduce el tamaño de la ventana de umbralización para detectar marcadores pequeños
-        self.aruco_params.adaptiveThreshWinSizeMin = 3
-        self.aruco_params.adaptiveThreshWinSizeMax = 31
-        self.aruco_params.adaptiveThreshWinSizeStep =3
-        self.aruco_params.minMarkerPerimeterRate = 0.03
+        self.aruco_params.adaptiveThreshWinSizeMin = 8
+        self.aruco_params.adaptiveThreshWinSizeMax = 15
+        self.aruco_params.adaptiveThreshWinSizeStep =2
+        self.aruco_params.minMarkerPerimeterRate = 0.01
+        self.aruco_params.adaptiveThreshConstant =12
+        self.aruco_params.polygonalApproxAccuracyRate=0.05
 
         # Aumenta la precisión de las esquinas (Crucial para el cálculo de Yaw)
         self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
         self.aruco_params.cornerRefinementWinSize = 5
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
-        self.Tdraw=1 # Se dibuja cada 2s
+        self.Tdraw=0.1 # Se dibuja cada 2s
         self.current_frame = None
         self.last_corners = None
         self.last_ids = None
@@ -52,7 +54,6 @@ class ArucoDevice:
         
         self.frame_to_show=None
 
-  
     def connect(self) -> None:
         print(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
 
@@ -77,10 +78,13 @@ class ArucoDevice:
                 frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
                 # Convertimos a gris
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                gray=clahe.apply(gray)
+
 
                 # Aplicamos una ecualización de histograma para resaltar los bordes
                 # Esto ayuda mucho si la iluminación es pobre
-                gray = cv2.equalizeHist(gray)
+                #gray = cv2.equalizeHist(gray)
                 if frame is not None:
                     # 2. DETECCIÓN DE ARUCOS
                     # corners: lista de esquinas de los marcadores detectados
@@ -93,14 +97,16 @@ class ArucoDevice:
                     # --- TRUCO DE DEBUG ---
 
                     # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
-                    '''cv2.imshow("debug_window",frame)
+                    
                     cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
-                    cv2.waitKey(1)'''
+                    cv2.aruco.drawDetectedMarkers(frame,corners,ids,borderColor=(0,255,0))
+                    cv2.imshow("debug_window",frame)
+                    cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
                         self.missed_frames+=1
                         if self.missed_frames %10 ==0:
-                            logging.warning(f"Ojo {self.missed_frames} frames sin ver robots")
+                            print(f"Ojo {self.missed_frames} frames sin ver robots")
                     else:
                         self.missed_frames = 1
                         ids_flat = ids.flatten()
@@ -178,7 +184,7 @@ class ArucoDevice:
   
 
     def run(self, gui=True):
-        print(f"[INFO] {self.agent.id} ejecutándose (GUI: {gui})")
+        '''print(f"[INFO] {self.agent.id} ejecutándose (GUI: {gui})")
         try:
             while self.running:
                 if gui and self.current_frame is not None:
@@ -196,7 +202,7 @@ class ArucoDevice:
                     # Modo consola: solo dormimos para no saturar la CPU
                     time.sleep(0.1)
         finally:
-            if gui: cv2.destroyAllWindows()
+            if gui: cv2.destroyAllWindows()'''
 
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":

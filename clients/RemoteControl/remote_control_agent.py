@@ -113,7 +113,7 @@ if __name__ == "__main__":
     teleop_agent= Agent(
       device_class=Teleoperator,
       id='TeleopAgent',
-      ip='192.168.10.73',
+      ip='192.168.10.1',
       data_port = 5565,
       hub_ip='192.168.10.1'
     )
