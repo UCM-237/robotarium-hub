@@ -80,11 +80,12 @@ class ArenaDevice:
 
                     # 2. CANNY EDGE DETECTION
                     # Umbrales: 50 (mínimo) y 150 (máximo). Ajusta si ves demasiadas o pocas líneas.
-                    edged = cv2.Canny(blurred, 50, 150)
-
+                    edged = cv2.Canny(blurred, 20, 180)
+                    
                     # 3. DILATACIÓN (Engrosamos los bordes detectados para cerrar posibles huecos en la cinta)
-                    kernel = np.ones((3, 3), np.uint8)
+                    kernel = np.ones((5, 5), np.uint8)
                     dilated = cv2.dilate(edged, kernel, iterations=1)
+                    
                         # 4. BUSCAR EL RECTÁNGULO DEL TATAMI
                     contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     
@@ -115,26 +116,33 @@ class ArenaDevice:
                                     x_cm = float(xr - self.OFFSET_X)*self.SCALE_X
                                     y_cm = float((yr - self.OFFSET_Y))*self.SCALE_Y
                                     # Estructura limpia para JSON
+                                    # --- NUEVO FILTRO DE COORDENADAS ---
+                                    # Ignoramos puntos que estén muy fuera de los límites lógicos (ruido de cámara)
+                                    if x_cm < -10 or y_cm < -10:
+                                        continue 
+# -----------------------------------
                                     pts_real.append({"x": round(x_cm, 2), "y": round(y_cm, 2)})
                                     pts_cm.append([x_cm, y_cm])    
                                 # --- FILTRO DE PIQUITOS ---
                                 # Fusionamos puntos que estén a menos de 20cm
                                 clean_pts = self.filter_close_points(pts_cm)
-                                #print(f"Puntos tras filtro {clean_pts}")
+                                print(f"Puntos tras filtro {clean_pts}")
                                 # Convertimos la lista a un numpy array con el tipo correcto (float32)
                                 contour_array = np.array(clean_pts, dtype='float32')
-                        
+
                                 # Ahora cv2.contourArea no fallará
                                 detected_area = cv2.contourArea(contour_array)
                                 
                                 # ¿Se parece al área de 419x140?
                                 area_diff = abs(detected_area - self.REAL_AREA) / self.REAL_AREA
-                                #print(f"Detected area {detected_area}; area diff {area_diff}")
+                                print(f"Detected area {detected_area}; area diff {area_diff}")
                                 if detected_area>10000:
                                     # ¡HEMOS ENCONTRADO EL TATAMI REAL!
                                     # Los marcadores ArUco tienen un área de ~100-200 cm2, 
                                     # jamás pasarán este filtro de 58,000 cm2.
-                                    break                        
+                                    break
+                                else:
+                                    clean_pts=[]                        
                     if clean_pts:
                         # Ordenar puntos: Superior-Izquierda, Superior-Derecha, Inf-Der, Inf-Izq
                         # Esto facilita mucho el cálculo de distancias a las "paredes"
