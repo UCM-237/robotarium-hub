@@ -69,23 +69,26 @@ class ArenaDevice:
                     # 2. Procesamiento para detectar el tatami
                     # 1. RECORTAR RUIDO EXTERIOR (ROI)
                     # Si la pared está en los bordes, ignoramos un margen de píxeles
-                    h, w = frame.shape[:2]
+                    
                     margin = 40 # píxeles de margen para ignorar paredes
-                    roi = frame[0:h-margin, 0:w]
-                
-                    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-
+                    
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    
                     # El desenfoque es CRÍTICO para Canny, elimina ruido de píxeles sueltos
                     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
 
                     # 2. CANNY EDGE DETECTION
                     # Umbrales: 50 (mínimo) y 150 (máximo). Ajusta si ves demasiadas o pocas líneas.
                     edged = cv2.Canny(blurred, 20, 180)
-                    
+                    h, w = edged.shape[:2]
+                    edged[0:margin,:]=0
+                    edged[h-margin:h,:]=0
+
                     # 3. DILATACIÓN (Engrosamos los bordes detectados para cerrar posibles huecos en la cinta)
                     kernel = np.ones((5, 5), np.uint8)
                     dilated = cv2.dilate(edged, kernel, iterations=1)
-                    
+                    cv2.imshow("Dilated borders", dilated)
+                    cv2.waitKey(1)
                         # 4. BUSCAR EL RECTÁNGULO DEL TATAMI
                     contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     
@@ -106,6 +109,8 @@ class ArenaDevice:
                             if len(approx) >= 4:
                                 # Transformamos los 4 puntos al mundo real (cm)
                                 pts_px = approx.astype('float32').reshape(-1, 1, 2)
+
+
                                 transformed = cv2.perspectiveTransform(pts_px, self.H)
                                 
                                 pts_cm = []
