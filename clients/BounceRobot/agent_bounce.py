@@ -23,6 +23,8 @@ class BouncerRobot:
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
+        self.odom=[0.0,0.0]
+        self.estimate=[0.0,0.0,0.0]
         self.angular_speed=1.0
         self.safety_distance = 10.0 
         self.is_turning =False
@@ -30,6 +32,8 @@ class BouncerRobot:
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
         self.last_pos_time = 0.0
+        self.last_estimate_time=0.0
+        self.delay=0.0
 
     def init_logger(self):
         with open(self.log_file, mode='w', newline='') as file:
@@ -59,7 +63,7 @@ class BouncerRobot:
         if topic == "arena/boundaries":
             try:
                 raw_data = json.loads(message)
-                if isinstance(raw_data, str):
+                if isinstance(raw_check_collision_and_movedata, str):
                     raw_data = json.loads(raw_data)
                 
                 puntos = raw_data["points"]
@@ -87,6 +91,11 @@ class BouncerRobot:
                 self.pos[0]=float(raw_data.get('x'))
                 self.pos[1]=float(raw_data.get('y'))
                 self.pos[2]=float(raw_data.get('yaw'))
+                #Actualizamos la estima
+                self.estimate[0]=self.pos[0]
+                self.estimate[1]=self.pos[1]
+                self.estimate[2]=self.pos[2]
+
                 current_time = time.time()
                 sent_time = raw_data.get("timestamp")
    
@@ -101,10 +110,41 @@ class BouncerRobot:
                 self.check_collision_and_move()
             except Exception as e:
                 print(f"Error al descodificar: {e}")
+        # 3. Recibir odometria del robot (vienen del agent)
+        elif topic == "6/odom":
+            
+            try:
+                raw_data= json.loads(message)
+                print(raw_data)
+                if isinstance(raw_data, str):
+                        raw_data = json.loads(raw_data)
+                
+                self.odom[0]=float(raw_data.get('lineal'))
+                self.odom[1]=float(raw_data.get('angular'))
+                current_time = time.time()
+                sent_time = raw_data.get("timestamp")
+   
+                latency = (current_time - sent_time) * 1000 # Latencia en ms
+    
+                # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
+                if hasattr(self, 'last_pos_time'):
+                    freq = 1.0 / (current_time - self.last_pos_time)
+                    logging.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+    
+                self.last_pos_time = current_time
+                self.update_estimate()
+            except Exception as e:
+                print(f"Error al descodificar: {e}")
 
+    def update_estimate(self):
+        #Actualizamos la estima con el modelo cinematico, los datos de velocidad de odometria y la ultima pos
+        current_time=time.time()
+        delta_time=current_time-self.last_estimate_time
+        self.estimate[2]+=self.odom[1]*delta_time
+        self.estimate[0]+=self.odom[0]*math.cos(self.estimate[2])*delta_time
+        self.estimate[1]+=self.odom[0]*math.sin(self.estimate[2])*delta_time
+        self.last_estimate_time=current_time
 
-  
-        
     def get_distance_to_wall(self, x, y, theta):
         # 1. Límites actuales (centímetros)
         x_min, x_max = self.boundaries[0], self.boundaries[1]
@@ -120,6 +160,7 @@ class BouncerRobot:
         return [d_left,d_right,d_top,d_bottom]
     
     def check_collision_and_move(self):
+        if (self.delay>1.0)
         x, y, theta = self.pos
         [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
         # 3. Dirección del movimiento
@@ -181,7 +222,8 @@ def on_connect(client,userdata,flags,rc):
    #client.subscribe("agent/6/velocity")   
    #client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
-   client.subscribe("6/pos")      
+   client.subscribe("6/pos")
+   client.subscribe("6/odom")    
    #client.subscribe("agent/5/wheel")         
 
 #cuando llega el mensaje
