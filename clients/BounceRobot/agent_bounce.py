@@ -9,6 +9,8 @@ import time
 #necesario para recibir por mqtt
 import paho.mqtt.client as mqtt
 import threading
+from queue import Queue # Para comunicar hilos de forma segura
+
 BROKER = "192.168.10.1"
 PUERTO = 1883
 
@@ -22,11 +24,12 @@ class BouncerRobot:
         self.v=25.0
         self.w=1.5
         self.direction=[0.707, 0.707]
-        self.robot_id=6
+        self.robot_id=9
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
         self.safety_distance = 10.0 
         self.is_turning =False
+        self.command_queue = Queue() # Cola para enviar comandos al agente
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
@@ -123,7 +126,7 @@ class BouncerRobot:
             except Exception as e:
                 print(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
-        elif topic == "6/pos":
+        elif topic == f"{self.robot_id}/pos":
             
             try:
                 raw_data= json.loads(message)
@@ -150,7 +153,7 @@ class BouncerRobot:
                 
             except Exception as e:
                 print(f"Error al descodificar: {e}")
-        elif topic == "agent/6/wheel":
+        elif topic == f"agent/{self.robot_id}/wheel":
             try:
                 raw_data = json.loads(message)
                 if isinstance(raw_data, str):
@@ -174,7 +177,7 @@ class BouncerRobot:
             
             if time_since_vision > 1.5 and time_since_odom > 1.5:
                 logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
-                self.send_move(0, 0)
+                self.command_queue.put({'v': 0.0, 'w': 0.0})
             else:
                 # 2. EJECUCIÓN DE LA LÓGICA
                 # pos_logic ahora decidirá qué posición usar
@@ -257,7 +260,7 @@ class BouncerRobot:
         vr=2*v-vl                    
         wl=vl/3.35
         wr=vr/3.35
-        self.send_move(wl,wr)
+        self.command_queue.put({'v': wl, 'w': wr})
         logging.info(f"Enviada v: {wl} w: {wr}")
 
 
@@ -272,8 +275,8 @@ def on_connect(client,userdata,flags,rc):
    #client.subscribe("agent/6/velocity")   
    #client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
-   client.subscribe("agent/6/pos")      
-   client.subscribe("agent/6/wheel")         
+   client.subscribe(f"agent/{client.robot_id}/pos")      
+   client.subscribe(f"agent/{client.robot_id}/wheel")         
 
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
@@ -292,21 +295,32 @@ if __name__ == "__main__":
       hub_ip='192.168.10.1'
     )
     
-    #MQTT_agent.register()
-    logging.info(f'Agent {bouncer_agent.id} is listening')
-
-    # Configuración MQTT
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.connect(BROKER, PUERTO, 60)
-    client.loop_start()
-    logging.info(f"Agent {bouncer_agent.id} en marcha")
-
     t = threading.Thread(target=bouncer_agent.device.run)
     t.daemon = True # Se cierra cuando cierres el programa principal
     t.start()
     
     # El agente se queda escuchando MQTT
-    bouncer_agent.listen()
+    #bouncer_agent.listen()
+    
+    #MQTT_agent.register()
+    logging.info(f'Agent {bouncer_agent.id} is listening')
+    def mqtt_and_dispatch():
+        # Configurar MQTT aquí...
+        # client.loop_start() 
+        client = mqtt.Client()
+        client.on_connect = on_connect
+        client.on_message = on_message
+        client.connect(BROKER, PUERTO, 60)
+        client.loop_start()
+        logging.info(f"Agent {bouncer_agent.id} en marcha")
+        while True:
+            if not BouncerRobot.command_queue.empty():
+                cmd = BouncerRobot.command_queue.get()
+                BouncerRobot.send(f"agent/{bouncer_agent.robot_id}/move", cmd)
+            time.sleep(0.01)
+
+    mqtt_and_dispatch()
+    # Configuración MQTT
+    
+
     
