@@ -118,11 +118,14 @@ class ArenaDevice:
                                     # Estructura limpia para JSON
                                     # --- NUEVO FILTRO DE COORDENADAS ---
                                     # Ignoramos puntos que estén muy fuera de los límites lógicos (ruido de cámara)
-                                    if x_cm < -10 or y_cm < -10:
-                                        continue 
-# -----------------------------------
-                                    pts_real.append({"x": round(x_cm, 2), "y": round(y_cm, 2)})
-                                    pts_cm.append([x_cm, y_cm])    
+                                    if x_cm > -10 and y_cm > -10:
+                                        pts_real.append({"x": round(x_cm, 2), "y": round(y_cm, 2)})
+                                        pts_cm.append([x_cm, y_cm])    
+                                
+                                if len(pts_cm) < 4:
+                                    print(f"Puntos detectados insuficientes tras filtro de coordenadas: {pts_cm}")
+                                    continue # Necesitamos al menos 4 puntos para un rectángulo válido
+
                                 # --- FILTRO DE PIQUITOS ---
                                 # Fusionamos puntos que estén a menos de 20cm
                                 clean_pts = self.filter_close_points(pts_cm)
