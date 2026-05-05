@@ -19,16 +19,21 @@ class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,350.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
-        self.margin = 10.0
-        self.speed = 6.0
+        self.margin = 8.0
+        self.speed = 12.0
+        self.fsm = "avanza"
         self.v=55.0
-        self.w=1.5
+        self.w=2.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 40.0 
+        self.safety_distance = 30.0 
         self.is_turning =False
+        self.turning_time=5.0
+        self.time_in_turning=0
+        self.control_time=0.1 #ms
+        self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -99,7 +104,7 @@ class BouncerRobot:
         self.estimate[0] += dx
         self.estimate[1] += dy
         self.estimate[2] += dtheta # Normalizar si es necesario
-        logging.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
+        #logging.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
         self.last_odom_time = current_time
 
 
@@ -160,7 +165,7 @@ class BouncerRobot:
                 if isinstance(raw_data, str):
                     
                     raw_data = json.loads(raw_data)
-                logging.info(f"Datos {raw_data}")
+                #logging.info(f"Datos {raw_data}")
                 wl = float(raw_data.get('Wleft'))
                 wr = float(raw_data.get('Wright'))
                 self.on_odom_received(wl, wr)
@@ -178,7 +183,7 @@ class BouncerRobot:
             time_since_odom = ahora - self.last_odom_time
             
             if time_since_vision > 2.5 and time_since_odom > 2.5:
-                logging.warning("SISTEMA DESCONECTADO: Parandox robot por seguridad")
+                logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
                 self.command_queue.put({'v': 0.0, 'w': 0.0})
             else:
                 # 2. EJECUCIÓN DE LA LÓGICA
@@ -207,78 +212,94 @@ class BouncerRobot:
     def check_collision_and_move(self):
         ahora = time.time()
         
-        # DECISIÓN DE POSICIÓN
-        # Prioridad 1: Visión (si es reciente < 0.5s)
-        if (ahora - self.last_pos_time) < 0.5:
-            x, y, theta = self.pos
-            self.status = "VISION"
-        # Prioridad 2: Estima por odometría
-        else:
+        if (ahora-self.last_time)>self.control_time:
+            # DECISIÓN DE POSICIÓN
+            # Prioridad 1: Visión (si es reciente < 0.5s)
+            if (ahora - self.last_pos_time) < 0.5:
+                x, y, theta = self.pos
+                self.status = "VISION"
+            # Prioridad 2: Estima por odometría
+            else:
 
-            x, y, theta = self.estimate
-            self.status = "ESTIMA"
-        # 2. Obtener distancias a paredes
-        [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
-        wall_distances=[d_left,d_right,d_top,d_bottom]
-        # 3. Dirección del movimiento
-        cos_t = math.cos(theta)
-        sin_t = math.sin(theta)
-	
-        # 4. Lógica de peligro:
-        # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
-        danger_distances = []
-            
-        if cos_t < 0: 
-           danger_distances.append(d_left)   # Se mueve a la izquierda
-           logging.info("Hacia la izquierda")
-        if cos_t > 0: 
-           danger_distances.append(d_right)  # Se mueve a la derecha
-           logging.info("Hacia la derecha")
-        if sin_t < 0: 
-           danger_distances.append(d_top)    # Se mueve hacia arriba
-           logging.info("Hacia arriba")
-        if sin_t > 1e-6: 
-           danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
-           logging.info("Hacia abajo")
-
-        danger_distances=wall_distances
-        logging.info(f"Distancias reales a paredes de interés: {wall_distances}")
-        if danger_distances is  None and not self.is_turning:
-           v=self.speed
-           w=0.0
-           self.is_turning=False
-           logging.info("Zona segura")
-        elif np.min(danger_distances)<=self.safety_distance and not self.is_turning:
-           self.is_turning=True
-           v=0.0
-           w=self.w
-           logging.info("Iniciando giro")
-        elif np.min(danger_distances)<=self.safety_distance and self.is_turning:
-           v=0.0
-           w=self.w
-           logging.info("Continuando giro")
-        elif np.min(danger_distances)>self.safety_distance:
-           self.is_turning=False
-           v=self.v
-           w=0.0
-           logging.info("Zona segura")
-        else:
-           v=0.0
-           w=0.0
-           logging.info("Caso indeterminado")
-        # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
-        if np.min(danger_distances)<=self.margin:
-           v=0.0
-           w=0.0
-           logging.info("Peligro. Parada")
+                x, y, theta = self.estimate
+                self.status = "ESTIMA"
+            # 2. Obtener distancias a paredes
+            [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
+            wall_distances=[d_left,d_right,d_top,d_bottom]
+            # 3. Dirección del movimiento
+            cos_t = math.cos(theta)
+            sin_t = math.sin(theta)
         
-        self.log_data(x, y, theta, np.min(danger_distances), v, w)
-        vl=v-(13.1/2.0)*w
-        vr=2*v-vl                    
-        wl=vl/3.35
-        wr=vr/3.35
-        self.command_queue.put({'v': wl, 'w': wr})
-        #logging.info(f"Enviada v: {wl} w: {wr}")
+            # 4. Lógica de peligro:
+            # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
+            danger_distances = []
+                
+            if cos_t < 0: 
+                danger_distances.append(d_left)   # Se mueve a la izquierda
+                logging.info("Hacia la izquierda")
+            if cos_t > 0: 
+                danger_distances.append(d_right)  # Se mueve a la derecha
+                logging.info("Hacia la derecha")
+            if sin_t < 0: 
+                danger_distances.append(d_top)    # Se mueve hacia arriba
+                logging.info("Hacia arriba")
+            if sin_t > 1e-6: 
+                danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
+                logging.info("Hacia abajo")
+
+            danger_distances=wall_distances
+            #logging.info(f"Distancias reales a paredes de interés: {wall_distances}")
+            if danger_distances is  None and not self.is_turning:
+                v=self.speed
+                w=0.0
+                self.is_turning=False
+                logging.info("Zona segura")
+            elif np.min(danger_distances)<=self.safety_distance and not self.is_turning:
+                self.is_turning=True
+                v=0.0
+                w=self.w
+                logging.info("Iniciando giro")
+            elif np.min(danger_distances)<=self.safety_distance and self.is_turning and self.time_in_turning < self.turning_time:
+                v=0.0
+                self.time_in_turning+=time.time()*0.000000001
+                w=self.w
+                logging.info(f"Continuando giro. Tiempo de giro {self.time_in_turning}")
+            elif self.is_turning and self.time_in_turning >= self.turning_time:
+                v=-self.speed
+                w=0.0
+                self.is_turning=False
+                self.time_in_turning=0.0
+                logging.info("Giro terminado")
+            elif np.min(danger_distances)>self.safety_distance:
+                self.is_turning=False
+                v=self.v
+                w=0.0
+                logging.info("Zona segura")
+            else:
+                v=0.0
+                w=0.0
+                logging.info("Caso indeterminado")
+            #FSM Avanza, Gira, Parado
+            '''if self.fsm=="Avanza" and np.min(wall_distances)<=self.margin:
+            self.fsm="Para"
+            elif self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
+            self.fsm="Gira"
+            elif self.fsm=="Para" and 
+            '''  
+            # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
+            if np.min(danger_distances)<=1:
+                v=-self.speed
+                w=0.0
+                logging.info("Peligro. Parada")
+            
+            self.log_data(x, y, theta, np.min(danger_distances), v, w)
+            vl=v-(13.1/2.0)*w
+            vr=2*v-vl                    
+            wl=vl/3.35
+            wr=vr/3.35
+            self.command_queue.put({'v': wl, 'w': wr})
+            logging.info(f"Enviada v: {wl} w: {wr}")
+            self.last_time=ahora
 
 
     def send_move(self, v, w):
@@ -298,8 +319,8 @@ def on_connect(client,userdata,flags,rc):
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
     print("topic:", msg.topic)
-    print("Mensaje:", msg.payload.decode()) 
-    print("------")
+    #print("Mensaje:", msg.payload.decode()) 
+    #print("------")
       
 # Configuración del Agente
 if __name__ == "__main__":
