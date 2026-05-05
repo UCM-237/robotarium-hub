@@ -114,7 +114,7 @@ if __name__ == "__main__":
       device_class=Teleoperator,
       id='TeleopAgent',
       ip='192.168.10.1',
-      data_port = 5565,
+      data_port = 5566,
       hub_ip='192.168.10.1'
     )
     

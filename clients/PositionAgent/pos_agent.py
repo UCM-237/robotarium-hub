@@ -17,20 +17,26 @@ class ArucoDevice:
         #cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         # 1. Configurar el diccionario ArUco y los parámetros de detección
         # Usamos el diccionario 6x6 que es el estándar para robótica
-        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        #self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         # --- MEJORAS DE DETECCIÓN ---
         # Reduce el tamaño de la ventana de umbralización para detectar marcadores pequeños
-        self.aruco_params.adaptiveThreshWinSizeMin = 8
-        self.aruco_params.adaptiveThreshWinSizeMax = 15
-        self.aruco_params.adaptiveThreshWinSizeStep =2
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 25
+        self.aruco_params.adaptiveThreshWinSizeStep =5
         self.aruco_params.minMarkerPerimeterRate = 0.01
-        self.aruco_params.adaptiveThreshConstant =12
+        self.aruco_params.markerBorderBits =1 
+        self.aruco_params.adaptiveThreshConstant =7
         self.aruco_params.polygonalApproxAccuracyRate=0.05
-
+        self.aruco_params.perspectiveRemovePixelPerCell = 4
+        self.aruco_params.minMarkerDistanceRate = 0.05
         # Aumenta la precisión de las esquinas (Crucial para el cálculo de Yaw)
         self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
         self.aruco_params.cornerRefinementWinSize = 5
+        self.aruco_params.errorCorrectionRate = 0.8
+        self.aruco_params.cornerRefinementMaxIterations = 30
+        self.aruco_params.cornerRefinementMinAccuracy = 0.1
         self.H = np.load("homography_matrix.npy")
         # 2. Configuración de los tiempos de envio
         self.Tdraw=0.1 # Se dibuja cada 2s
@@ -89,6 +95,10 @@ class ArucoDevice:
                     # 2. DETECCIÓN DE ARUCOS
                     # corners: lista de esquinas de los marcadores detectados
                     # ids: identificadores de cada marcador
+                    #Justo antes de detectMarkers, aplica un umbral manual para testear
+                    # Esto te permitirá ver si el ArUco se está "emborronando"
+                    _, testing_thresh = cv2.threshold(gray, 150, 180, cv2.THRESH_BINARY)
+                    cv2.imshow("Test Umbral", testing_thresh) # Si aquí el ArUco se ve todo negro o todo blanco, ahí está el problema
                     corners, ids, rejected = cv2.aruco.detectMarkers(
                         gray, 
                         self.aruco_dict, 
@@ -104,6 +114,7 @@ class ArucoDevice:
                     cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
+                        print(len(rejected))
                         self.missed_frames+=1
                         if self.missed_frames %10 ==0:
                             print(f"Ojo {self.missed_frames} frames sin ver robots")
