@@ -18,16 +18,16 @@ PUERTO = 1883
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
-        self.boundaries=[0.0,0.0,0.0,0.0]
-        self.margin = 0.1
-        self.speed=6.0
-        self.v=25.0
+        self.boundaries=[0.0,350.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
+        self.margin = 10.0
+        self.speed = 6.0
+        self.v=55.0
         self.w=1.5
         self.direction=[0.707, 0.707]
-        self.robot_id=9
+        self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 10.0 
+        self.safety_distance = 40.0 
         self.is_turning =False
         self.command_queue = Queue() # Cola para enviar comandos al agente
         # --- Configuración del Logger ---
@@ -146,7 +146,7 @@ class BouncerRobot:
                 # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
                 if hasattr(self, 'last_pos_time'):
                     freq = 1.0 / (current_time - self.last_pos_time)
-                    logging.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+                    #logging.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
     
                 self.last_pos_time = current_time
                 self.check_collision_and_move()
@@ -154,13 +154,15 @@ class BouncerRobot:
             except Exception as e:
                 print(f"Error al descodificar: {e}")
         elif topic == f"agent/{self.robot_id}/wheel":
+            
             try:
                 raw_data = json.loads(message)
                 if isinstance(raw_data, str):
+                    
                     raw_data = json.loads(raw_data)
-                
-                wl = float(raw_data.get('WLeft'))
-                wr = float(raw_data.get('WRight'))
+                logging.info(f"Datos {raw_data}")
+                wl = float(raw_data.get('Wleft'))
+                wr = float(raw_data.get('Wright'))
                 self.on_odom_received(wl, wr)
             except Exception as e:
                 print(f"Error al decodificar odometría: {e}")
@@ -175,8 +177,8 @@ class BouncerRobot:
             time_since_vision = ahora - self.last_pos_time
             time_since_odom = ahora - self.last_odom_time
             
-            if time_since_vision > 1.5 and time_since_odom > 1.5:
-                logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+            if time_since_vision > 2.5 and time_since_odom > 2.5:
+                logging.warning("SISTEMA DESCONECTADO: Parandox robot por seguridad")
                 self.command_queue.put({'v': 0.0, 'w': 0.0})
             else:
                 # 2. EJECUCIÓN DE LA LÓGICA
@@ -197,6 +199,7 @@ class BouncerRobot:
         d_right = x_max - x
         d_top = y - y_min
         d_bottom = y_max - y
+        logging.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
         logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
                     
         return [d_left,d_right,d_top,d_bottom]
@@ -211,25 +214,35 @@ class BouncerRobot:
             self.status = "VISION"
         # Prioridad 2: Estima por odometría
         else:
+
             x, y, theta = self.estimate
             self.status = "ESTIMA"
         # 2. Obtener distancias a paredes
         [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
-        
+        wall_distances=[d_left,d_right,d_top,d_bottom]
         # 3. Dirección del movimiento
         cos_t = math.cos(theta)
         sin_t = math.sin(theta)
-
+	
         # 4. Lógica de peligro:
         # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
         danger_distances = []
             
-        if cos_t < 0: danger_distances.append(d_left)   # Se mueve a la izquierda
-        if cos_t > 0: danger_distances.append(d_right)  # Se mueve a la derecha
-        if sin_t < 0: danger_distances.append(d_top)    # Se mueve hacia arriba
-        if sin_t > 1e-6: danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
+        if cos_t < 0: 
+           danger_distances.append(d_left)   # Se mueve a la izquierda
+           logging.info("Hacia la izquierda")
+        if cos_t > 0: 
+           danger_distances.append(d_right)  # Se mueve a la derecha
+           logging.info("Hacia la derecha")
+        if sin_t < 0: 
+           danger_distances.append(d_top)    # Se mueve hacia arriba
+           logging.info("Hacia arriba")
+        if sin_t > 1e-6: 
+           danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
+           logging.info("Hacia abajo")
 
-        logging.info(f"Distancias reales a paredes de interés: {danger_distances}")
+        danger_distances=wall_distances
+        logging.info(f"Distancias reales a paredes de interés: {wall_distances}")
         if danger_distances is  None and not self.is_turning:
            v=self.speed
            w=0.0
@@ -254,6 +267,10 @@ class BouncerRobot:
            w=0.0
            logging.info("Caso indeterminado")
         # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
+        if np.min(danger_distances)<=self.margin:
+           v=0.0
+           w=0.0
+           logging.info("Peligro. Parada")
         
         self.log_data(x, y, theta, np.min(danger_distances), v, w)
         vl=v-(13.1/2.0)*w
@@ -261,7 +278,7 @@ class BouncerRobot:
         wl=vl/3.35
         wr=vr/3.35
         self.command_queue.put({'v': wl, 'w': wr})
-        logging.info(f"Enviada v: {wl} w: {wr}")
+        #logging.info(f"Enviada v: {wl} w: {wr}")
 
 
     def send_move(self, v, w):
@@ -275,8 +292,8 @@ def on_connect(client,userdata,flags,rc):
    #client.subscribe("agent/6/velocity")   
    #client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
-   client.subscribe(f"agent/{client.robot_id}/pos")      
-   client.subscribe(f"agent/{client.robot_id}/wheel")         
+   client.subscribe("agent/6/pos")      
+   client.subscribe("agent/6/wheel")         
 
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
@@ -314,9 +331,10 @@ if __name__ == "__main__":
         client.loop_start()
         logging.info(f"Agent {bouncer_agent.id} en marcha")
         while True:
-            if not BouncerRobot.command_queue.empty():
-                cmd = BouncerRobot.command_queue.get()
-                BouncerRobot.send(f"agent/{bouncer_agent.robot_id}/move", cmd)
+            if not bouncer_agent.device.command_queue.empty():
+                cmd = bouncer_agent.device.command_queue.get()
+                #logging.info(f"sending {cmd}")
+                bouncer_agent.send(f"agent/{bouncer_agent.device.robot_id}/move", cmd)
             time.sleep(0.01)
 
     mqtt_and_dispatch()

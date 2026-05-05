@@ -26,9 +26,17 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
         self.cap_a = cv2.VideoCapture(2)
         #self.cap_a.set(cv2.CAP_PROP_BRIGHTNESS,200)
         self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
+        self.cap_a.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        self.cap_a.set(cv2.CAP_PROP_EXPOSURE, -7)
+        self.cap_a.set(cv2.CAP_PROP_BRIGHTNESS, 100) # Un valor medio/bajo
+        
         self.cap_b = cv2.VideoCapture(0)
         #self.cap_b.set(cv2.CAP_PROP_BRIGHTNESS,80)
         self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
+        self.cap_b.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        self.cap_b.set(cv2.CAP_PROP_EXPOSURE, -7)
+        # 3. Opcional: Bajar el brillo si la exposición no es suficiente
+        self.cap_b.set(cv2.CAP_PROP_BRIGHTNESS, 100)
         self.H = np.load("homography_matrix.npy")
         
         
@@ -46,7 +54,8 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
 
     def on_data(self, topic: str, message: str) -> None:
         # Aquí recibirías datos del Hub (ej. si el Hub te pide cambiar parámetros)
-        print(f"[RECV] Dato recibido en tópico {topic}")
+        #print(f"[RECV] Dato recibido en tópico {topic}")
+        self.running=True
 
     def run(self):
         """Bucle principal de captura y envío"""
@@ -102,6 +111,8 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         cv2.waitKey(1)
                     # Codificación
                     _, buffer = cv2.imencode('.jpg', canvas_red, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                    #Cambio a PNG va de 0 a 9 (siendo 0 sin compresión y más rápido)
+                    #_, buffer = cv2.imencode('.png', canvas_red, [cv2.IMWRITE_PNG_COMPRESSION, 0])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
 
                     # Usar el método 'send' de tu clase Agent

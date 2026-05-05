@@ -87,8 +87,8 @@ class ArenaDevice:
                     # 3. DILATACIÓN (Engrosamos los bordes detectados para cerrar posibles huecos en la cinta)
                     kernel = np.ones((5, 5), np.uint8)
                     dilated = cv2.dilate(edged, kernel, iterations=1)
-                    cv2.imshow("Dilated borders", dilated)
-                    cv2.waitKey(1)
+                    #cv2.imshow("Dilated borders", dilated)
+                    #cv2.waitKey(1)
                         # 4. BUSCAR EL RECTÁNGULO DEL TATAMI
                     contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     
@@ -99,7 +99,7 @@ class ArenaDevice:
                         # Solo miramos contornos que tengan un tamaño razonable en la imagen
                         # para ignorar marcadores ArUco pequeños.
                         sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
-
+                        clean_pts=[]
                         for c in sorted_contours:
                             peri = cv2.arcLength(c, True)
                             approx = cv2.approxPolyDP(c, 0.02 * peri, True)
