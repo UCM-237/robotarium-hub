@@ -14,6 +14,14 @@ from queue import Queue # Para comunicar hilos de forma segura
 BROKER = "192.168.10.1"
 PUERTO = 1883
 
+'''TODO: Implementar lógica de rebote basada en distancias a paredes. El robot debería "rebotar" (girar) cuando se acerque demasiado a una pared, y luego volver a avanzar.
+Que lo haga en la dirección opuesta a la pared más cercana. Para esto, el robot debe calcular su distancia a cada pared (usando su posición y los límites del tatami) y decidir hacia dónde girar. Además, implementar un sistema de "estados" (FSM) para manejar las transiciones entre avanzar, girar y parar. Por ejemplo:
+- Estado "Avanza": El robot se mueve hacia adelante. Si detecta que se acerca a una pared (distancia < umbral), cambia al estado "Gira".
+- Estado "Gira": El robot gira en la dirección opuesta a la pared más cercana durante un tiempo determinado o hasta que alcance una distancia segura. Luego vuelve al estado "Avanza".
+- Estado "Para": Si el robot detecta que está demasiado cerca de una pared (distancia < umbral crítico), se detiene completamente para evitar colisiones. Permanece en este estado hasta que la distancia vuelva a ser segura, momento en el cual puede volver a "Avanza".
+TODO: Mejorar la lógica de decisión para considerar no solo la distancia a las paredes, sino también la dirección del movimiento. Por ejemplo, si el robot se está moviendo hacia una pared, esa pared debería tener más peso en la decisión de rebote que una pared que está detrás del robot. Esto se puede lograr calculando el ángulo entre la dirección del movimiento y la dirección hacia cada pared, y ajustando el umbral de distancia en función de este ángulo.
+TODO: Mejorar la fusión de datos entre la posición por visión y la estima por odometría. En lugar de simplemente priorizar la visión cuando está disponible, se podría implementar un filtro de Kalman o un sistema de ponderación que combine ambas fuentes de información para obtener una estimación más robusta de la posición del robot. Esto ayudaría a mitigar los efectos de la latencia en la visión y los errores acumulativos en la odometría, proporcionando una base más sólida para la lógica de rebote y navegación. 
+'''
 
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
@@ -32,6 +40,7 @@ class BouncerRobot:
         self.is_turning =False
         self.turning_time=5.0
         self.time_in_turning=0
+        self.t_retrocediendo=0
         self.control_time=0.1 #ms
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
@@ -232,7 +241,7 @@ class BouncerRobot:
         
             # 4. Lógica de peligro:
             # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
-            danger_distances = []
+            '''danger_distances = []
                 
             if cos_t < 0: 
                 danger_distances.append(d_left)   # Se mueve a la izquierda
@@ -278,21 +287,46 @@ class BouncerRobot:
             else:
                 v=0.0
                 w=0.0
-                logging.info("Caso indeterminado")
+                logging.info("Caso indeterminado")'''
             #FSM Avanza, Gira, Parado
-            '''if self.fsm=="Avanza" and np.min(wall_distances)<=self.margin:
-            self.fsm="Para"
-            elif self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
-            self.fsm="Gira"
-            elif self.fsm=="Para" and 
-            '''  
-            # Si d < 0, significa que YA se salió. Devolvemos 0 para forzar rebote inmediato
-            if np.min(danger_distances)<=1:
+            if self.fsm=="Avanza" and np.min(wall_distances)<=self.margin:
+                self.fsm="Retrocede"
+                self.t_retrocediendo=ahora
+            elif self.fsm=="Retrocede" and self.t_retrocediendo>=2.0:
+                self.fsm="Gira"
+                self.time_in_turning=ahora
+                self.t_retrocediendo=0
+            elif self.fsm=="Gira" and self.time_in_turning>=self.turning_time:
+                self.fsm="Avanza"
+                self.turning_time=np.random.uniform(1.0,3.0)
+                self.time_in_turning=0.0
+            else:
+                self.fsm="Parada"
+            logging.info(f"Distancias a paredes: {wall_distances} | FSM: {self.fsm}")   
+            if self.fsm=="Avanza":
+                v=self.speed
+                w=0.0
+                logging.info("FSM: Avanzando")
+            elif self.fsm=="Retrocede":
                 v=-self.speed
                 w=0.0
-                logging.info("Peligro. Parada")
-            
-            self.log_data(x, y, theta, np.min(danger_distances), v, w)
+                logging.info("FSM: Retrocediendo")
+                self.t_retrocediendo+=time.time()*0.000000001
+            elif self.fsm=="Gira":
+                v=0.0
+                w=self.w
+                logging.info("FSM: Girando")
+                self.time_in_turning+=time.time()*0.000000001
+            elif self.fsm=="Parada":
+                v=0.0
+                w=0.0
+                logging.info("FSM: Parado")
+            else:
+                v=0.0
+                w=0.0
+                logging.info("FSM: Caso indeterminado")
+                 
+            self.log_data(x, y, theta,wall_distances, v, w)
             vl=v-(13.1/2.0)*w
             vr=2*v-vl                    
             wl=vl/3.35
