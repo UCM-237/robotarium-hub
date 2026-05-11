@@ -236,59 +236,56 @@ class BouncerRobot:
             [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
             wall_distances=[d_left,d_right,d_top,d_bottom]
             # 3. Dirección del movimiento
-            cos_t = math.cos(theta)
-            sin_t = math.sin(theta)
-        
-            # 4. Lógica de peligro:
-            # Solo consideramos que una distancia es "peligrosa" si el robot se dirige hacia ella
-            '''danger_distances = []
-                
-            if cos_t < 0: 
-                danger_distances.append(d_left)   # Se mueve a la izquierda
-                logging.info("Hacia la izquierda")
-            if cos_t > 0: 
-                danger_distances.append(d_right)  # Se mueve a la derecha
-                logging.info("Hacia la derecha")
-            if sin_t < 0: 
-                danger_distances.append(d_top)    # Se mueve hacia arriba
-                logging.info("Hacia arriba")
-            if sin_t > 1e-6: 
-                danger_distances.append(d_bottom) # Se mueve hacia abajo (tu eje Y)
-                logging.info("Hacia abajo")
+            # theta viene en radianes del ArUco (asegúrate de la conversión si viene en grados)
+ 
+            vy = math.cos(theta)
+            vx = -math.sin(theta)
+   
+            # 4. Lógica de "Pared de Impacto Inminente"
+            # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
+            distancia_critica = self.safety_distance
+            target_wall = None
 
-            danger_distances=wall_distances
-            #logging.info(f"Distancias reales a paredes de interés: {wall_distances}")
-            if danger_distances is  None and not self.is_turning:
-                v=self.speed
-                w=0.0
-                self.is_turning=False
-                logging.info("Zona segura")
-            elif np.min(danger_distances)<=self.safety_distance and not self.is_turning:
-                self.is_turning=True
-                v=0.0
-                w=self.w
-                logging.info("Iniciando giro")
-            elif np.min(danger_distances)<=self.safety_distance and self.is_turning and self.time_in_turning < self.turning_time:
-                v=0.0
-                self.time_in_turning+=time.time()*0.000000001
-                w=self.w
-                logging.info(f"Continuando giro. Tiempo de giro {self.time_in_turning}")
-            elif self.is_turning and self.time_in_turning >= self.turning_time:
-                v=-self.speed
-                w=0.0
-                self.is_turning=False
-                self.time_in_turning=0.0
-                logging.info("Giro terminado")
-            elif np.min(danger_distances)>self.safety_distance:
-                self.is_turning=False
-                v=self.v
-                w=0.0
-                logging.info("Zona segura")
-            else:
-                v=0.0
-                w=0.0
-                logging.info("Caso indeterminado")'''
-            #FSM Avanza, Gira, Parado
+            if vx < -0.1 and d_left < distancia_critica:
+                target_wall = "IZQUIERDA"
+            elif vx > 0.1 and d_right < distancia_critica:
+                target_wall = "DERECHA"
+            elif vy > 0.1 and d_bottom < distancia_critica: # Depende de si tu eje Y crece hacia abajo
+                target_wall = "ABAJO"
+            elif vy < -0.1 and d_top < distancia_critica:
+                target_wall = "ARRIBA"
+
+            # 5. FSM Mejorada con reflexión de ángulo
+            if self.fsm == "Avanza" and target_wall is not None:
+                self.fsm = "Gira"
+                self.last_wall_hit = target_wall
+                # Calculamos el ángulo de reflexión
+                if target_wall in ["IZQUIERDA", "DERECHA"]:
+                    self.target_theta = -theta # Reflexión en eje vertical
+                else:
+                    self.target_theta = math.pi - theta # Reflexión en eje horizontal
+                
+                logging.info(f"Colisión con {target_wall}. Orientación: {theta:.2f} -> Target: {self.target_theta:.2f}")
+
+            # 6. Ejecución de estados
+            if self.fsm == "Avanza":
+                v = self.speed
+                w = 0.0
+            elif self.fsm == "Gira":
+                # Girar hasta que la orientación actual coincida con target_theta
+                error_angular = self.target_theta - theta
+                # Normalizar error entre -pi y pi
+                error_angular = (error_angular + math.pi) % (2 * math.pi) - math.pi
+                
+                if abs(error_angular) < 0.1: # Margen de llegada al ángulo
+                    self.fsm = "Avanza"
+                    v = self.speed
+                    w = 0.0
+                else:
+                    v = 0.0
+                    w = self.w if error_angular > 0 else -self.w
+            '''
+                    #FSM Avanza, Gira, Parado
             if self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
                 self.fsm="Retrocede"
                 self.t_retrocediendo=ahora
@@ -324,6 +321,8 @@ class BouncerRobot:
                 w=0.0
                 logging.info("FSM: Caso indeterminado")
                  
+
+        '''
             self.log_data(x, y, theta,wall_distances, v, w)
             vl=v-(13.1/2.0)*w
             vr=2*v-vl                    
