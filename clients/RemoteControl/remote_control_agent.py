@@ -37,7 +37,7 @@ class Teleoperator:
         '''The constructor optionally receive a list of listeners'''
         self.v =0.0
         self.w =0.0
-        self.robot_id=6
+        self.robot_id=8
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
@@ -114,7 +114,7 @@ if __name__ == "__main__":
       device_class=Teleoperator,
       id='TeleopAgent',
       ip='192.168.10.1',
-      data_port = 5566,
+      data_port = 5569,
       hub_ip='192.168.10.1'
     )
     

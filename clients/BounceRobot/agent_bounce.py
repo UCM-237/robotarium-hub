@@ -28,15 +28,15 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,350.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 8.0
-        self.speed = 12.0
-        self.fsm = "avanza"
+        self.speed = 30.0
+        self.fsm = "Avanza"
         self.v=55.0
-        self.w=2.0
+        self.w=5.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 30.0 
+        self.safety_distance = 40.0 
         self.is_turning =False
         self.turning_time=5.0
         self.time_in_turning=0
@@ -76,7 +76,7 @@ class BouncerRobot:
                 time.time(), x, y, theta,
                 self.estimate[0], self.estimate[1], self.estimate[2], self.status,
                 self.boundaries[0], self.boundaries[1], self.boundaries[2], self.boundaries[3],
-                round(dist, 3), v, w
+                round(dist[0], 3), round(dist[1], 3),round(dist[2], 3),round(dist[3], 3),v, w
             ])
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -174,7 +174,7 @@ class BouncerRobot:
                 if isinstance(raw_data, str):
                     
                     raw_data = json.loads(raw_data)
-                #logging.info(f"Datos {raw_data}")
+                
                 wl = float(raw_data.get('Wleft'))
                 wr = float(raw_data.get('Wright'))
                 self.on_odom_received(wl, wr)
@@ -213,7 +213,7 @@ class BouncerRobot:
         d_right = x_max - x
         d_top = y - y_min
         d_bottom = y_max - y
-        logging.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
+        #logging.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
         logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
                     
         return [d_left,d_right,d_top,d_bottom]
@@ -289,34 +289,32 @@ class BouncerRobot:
                 w=0.0
                 logging.info("Caso indeterminado")'''
             #FSM Avanza, Gira, Parado
-            if self.fsm=="Avanza" and np.min(wall_distances)<=self.margin:
+            if self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
                 self.fsm="Retrocede"
                 self.t_retrocediendo=ahora
-            elif self.fsm=="Retrocede" and self.t_retrocediendo>=2.0:
+            elif self.fsm=="Retrocede" and (ahora-self.t_retrocediendo)>=1.0 or np.min(wall_distances)>self.safety_distance:
                 self.fsm="Gira"
                 self.time_in_turning=ahora
                 self.t_retrocediendo=0
-            elif self.fsm=="Gira" and self.time_in_turning>=self.turning_time:
+            elif self.fsm=="Gira" and (ahora-self.time_in_turning)>=self.turning_time:
                 self.fsm="Avanza"
-                self.turning_time=np.random.uniform(1.0,3.0)
+                self.turning_time=np.random.rand()*2.0
                 self.time_in_turning=0.0
-            else:
-                self.fsm="Parada"
+
             logging.info(f"Distancias a paredes: {wall_distances} | FSM: {self.fsm}")   
             if self.fsm=="Avanza":
                 v=self.speed
                 w=0.0
                 logging.info("FSM: Avanzando")
             elif self.fsm=="Retrocede":
-                v=-self.speed
+                v=-self.speed*0.5
                 w=0.0
-                logging.info("FSM: Retrocediendo")
-                self.t_retrocediendo+=time.time()*0.000000001
+                
+                logging.info(f"FSM: Retrocediendo | t={ahora-self.t_retrocediendo}")
             elif self.fsm=="Gira":
                 v=0.0
-                w=self.w
-                logging.info("FSM: Girando")
-                self.time_in_turning+=time.time()*0.000000001
+                w=self.w              
+                logging.info(f"FSM: Girando | t={ahora-self.time_in_turning} | tgiro= {self.turning_time}")
             elif self.fsm=="Parada":
                 v=0.0
                 w=0.0
@@ -332,7 +330,7 @@ class BouncerRobot:
             wl=vl/3.35
             wr=vr/3.35
             self.command_queue.put({'v': wl, 'w': wr})
-            logging.info(f"Enviada v: {wl} w: {wr}")
+            #logging.info(f"Enviada v: {wl} w: {wr}")
             self.last_time=ahora
 
 
@@ -363,7 +361,7 @@ if __name__ == "__main__":
       device_class=BouncerRobot,
       id='Bouncer Robot',
       ip='192.168.10.1',
-      data_port = 5562,
+      data_port = 5563,
       hub_ip='192.168.10.1'
     )
     
