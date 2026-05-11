@@ -98,7 +98,7 @@ class ArucoDevice:
                     #Justo antes de detectMarkers, aplica un umbral manual para testear
                     # Esto te permitirá ver si el ArUco se está "emborronando"
                     _, testing_thresh = cv2.threshold(gray, 150, 180, cv2.THRESH_BINARY)
-                    cv2.imshow("Test Umbral", testing_thresh) # Si aquí el ArUco se ve todo negro o todo blanco, ahí está el problema
+                    #cv2.imshow("Test Umbral", testing_thresh) # Si aquí el ArUco se ve todo negro o todo blanco, ahí está el problema
                     corners, ids, rejected = cv2.aruco.detectMarkers(
                         gray, 
                         self.aruco_dict, 
@@ -108,10 +108,10 @@ class ArucoDevice:
 
                     # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
                     
-                    cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
-                    cv2.aruco.drawDetectedMarkers(frame,corners,ids,borderColor=(0,255,0))
-                    cv2.imshow("debug_window",frame)
-                    cv2.waitKey(1)
+                    #cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
+                    #cv2.aruco.drawDetectedMarkers(frame,corners,ids,borderColor=(0,255,0))
+                    #cv2.imshow("debug_window",frame)
+                    #cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
                         print(len(rejected))
