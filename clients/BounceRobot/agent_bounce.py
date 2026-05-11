@@ -31,12 +31,12 @@ class BouncerRobot:
         self.speed = 30.0
         self.fsm = "Avanza"
         self.v=55.0
-        self.w=5.0
+        self.w=3.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 40.0 
+        self.safety_distance = 20.0 
         self.is_turning =False
         self.turning_time=5.0
         self.time_in_turning=0
@@ -233,7 +233,7 @@ class BouncerRobot:
                 x, y, theta = self.estimate
                 self.status = "ESTIMA"
             # 2. Obtener distancias a paredes
-            [d_left, d_right, d_top,d_bottom] = self.get_distance_to_wall(x, y, theta)
+            [d_left, d_right, d_bottom ,d_top] = self.get_distance_to_wall(x, y, theta)
             wall_distances=[d_left,d_right,d_top,d_bottom]
             # 3. Dirección del movimiento
             # theta viene en radianes del ArUco (asegúrate de la conversión si viene en grados)
@@ -254,7 +254,7 @@ class BouncerRobot:
                 target_wall = "ABAJO"
             elif vy < -0.1 and d_top < distancia_critica:
                 target_wall = "ARRIBA"
-
+            logging.info(target_wall)
             # 5. FSM Mejorada con reflexión de ángulo
             if self.fsm == "Avanza" and target_wall is not None:
                 self.fsm = "Gira"
@@ -276,14 +276,15 @@ class BouncerRobot:
                 error_angular = self.target_theta - theta
                 # Normalizar error entre -pi y pi
                 error_angular = (error_angular + math.pi) % (2 * math.pi) - math.pi
-                
-                if abs(error_angular) < 0.1: # Margen de llegada al ángulo
+                logging.info(f"Error angular {error_angular}")
+                if abs(error_angular) < 0.4: # Margen de llegada al ángulo
                     self.fsm = "Avanza"
                     v = self.speed
                     w = 0.0
                 else:
                     v = 0.0
                     w = self.w if error_angular > 0 else -self.w
+            logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
             '''
                     #FSM Avanza, Gira, Parado
             if self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
@@ -329,7 +330,7 @@ class BouncerRobot:
             wl=vl/3.35
             wr=vr/3.35
             self.command_queue.put({'v': wl, 'w': wr})
-            #logging.info(f"Enviada v: {wl} w: {wr}")
+            logging.info(f"Enviada v: {wl} w: {wr}")
             self.last_time=ahora
 
 
