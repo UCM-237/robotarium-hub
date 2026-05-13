@@ -26,7 +26,7 @@ TODO: Mejorar la fusión de datos entre la posición por visión y la estima por
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
-        self.boundaries=[0.0,350.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
+        self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 8.0
         self.speed = 30.0
         self.fsm = "Avanza"
@@ -36,10 +36,7 @@ class BouncerRobot:
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 20.0 
-        self.is_turning =False
-        self.turning_time=5.0
-        self.time_in_turning=0
+        self.safety_distance = 60.0 
         self.t_retrocediendo=0
         self.control_time=0.1 #ms
         self.last_time=0
@@ -48,9 +45,12 @@ class BouncerRobot:
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
         self.last_pos_time = 0.0
-        
+        self.stop_duration = 0.5  # Tiempo de parada en segundos
+        self.stop_start_time = 0
+        self.retrocede_duration = 0.5
+        self.retrocede_start_time = 0
         self.estimate = [0.0, 0.0, 0.0] # [xe, ye, thetae] - Estima por odometría
-        
+        self.target_theta=0.0
         # Parámetros físicos del robot (deben coincidir con robot.h)
         self.wheel_radius = 3.35 # cm
         self.robot_width = 14.5  # cm (distancia entre ruedas)
@@ -118,6 +118,7 @@ class BouncerRobot:
 
 
     def on_data(self, topic: str, message: str) -> None:
+        #logging.debug(f"Incoming data. Topic {topic}, mensaje {message}")
         '''Handle incoming data'''
         # 1. Recibir límites del tatami (vienen del arena_agent)
         if topic == "arena/boundaries":
@@ -144,7 +145,7 @@ class BouncerRobot:
             
             try:
                 raw_data= json.loads(message)
-                print(raw_data)
+                #print(raw_data)
                 if isinstance(raw_data, str):
                         raw_data = json.loads(raw_data)
                 
@@ -211,8 +212,8 @@ class BouncerRobot:
         # 2. Distancias Euclidianas "puras" (¿A cuánto estoy de las bandas?)
         d_left = x - x_min
         d_right = x_max - x
-        d_top = y - y_min
-        d_bottom = y_max - y
+        d_bottom = y - y_min
+        d_top = y_max - y
         #logging.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
         logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
                     
@@ -233,97 +234,67 @@ class BouncerRobot:
                 x, y, theta = self.estimate
                 self.status = "ESTIMA"
             # 2. Obtener distancias a paredes
-            [d_left, d_right, d_bottom ,d_top] = self.get_distance_to_wall(x, y, theta)
+            [d_left, d_right, d_top ,d_bottom] = self.get_distance_to_wall(x, y, theta)
             wall_distances=[d_left,d_right,d_top,d_bottom]
             # 3. Dirección del movimiento
             # theta viene en radianes del ArUco (asegúrate de la conversión si viene en grados)
  
             vy = math.cos(theta)
             vx = -math.sin(theta)
-   
+            logging.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
             # 4. Lógica de "Pared de Impacto Inminente"
             # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
             distancia_critica = self.safety_distance
             target_wall = None
-
-            if vx < -0.1 and d_left < distancia_critica:
+            angle_limit=0.5
+            if vx < -angle_limit and d_left < distancia_critica:
                 target_wall = "IZQUIERDA"
-            elif vx > 0.1 and d_right < distancia_critica:
+            elif vx > angle_limit and d_right < distancia_critica:
                 target_wall = "DERECHA"
-            elif vy > 0.1 and d_bottom < distancia_critica: # Depende de si tu eje Y crece hacia abajo
-                target_wall = "ABAJO"
-            elif vy < -0.1 and d_top < distancia_critica:
+            elif vy > angle_limit and d_top < distancia_critica: # Depende de si tu eje Y crece hacia abajo
                 target_wall = "ARRIBA"
+            elif vy < -angle_limit and d_bottom < distancia_critica:
+                target_wall = "ABAJO"
             logging.info(target_wall)
             # 5. FSM Mejorada con reflexión de ángulo
-            if self.fsm == "Avanza" and target_wall is not None:
-                self.fsm = "Gira"
-                self.last_wall_hit = target_wall
-                # Calculamos el ángulo de reflexión
-                if target_wall in ["IZQUIERDA", "DERECHA"]:
-                    self.target_theta = -theta # Reflexión en eje vertical
-                else:
-                    self.target_theta = math.pi - theta # Reflexión en eje horizontal
-                
-                logging.info(f"Colisión con {target_wall}. Orientación: {theta:.2f} -> Target: {self.target_theta:.2f}")
-
-            # 6. Ejecución de estados
             if self.fsm == "Avanza":
-                v = self.speed
-                w = 0.0
+                if target_wall is not None:
+                    self.fsm = "PARANDO_PARA_RETROCEDER"
+                    self.stop_start_time = ahora
+                v, w = self.speed, 0.0
+
+            elif self.fsm == "PARANDO_PARA_RETROCEDER":
+                v, w = 0.0, 0.0
+                if (ahora - self.stop_start_time) >= self.stop_duration:
+                    self.fsm = "Retrocede"
+                    self.retrocede_start_time = ahora
+
+            elif self.fsm == "Retrocede":
+                v, w = -20.0, 0.0
+                # Retrocede por tiempo o hasta que el sensor de distancia sea crítico
+                if (ahora - self.retrocede_start_time) >= self.retrocede_duration:
+                    self.fsm = "PARANDO_PARA_GIRAR"
+                    self.stop_start_time = ahora
+
+            elif self.fsm == "PARANDO_PARA_GIRAR":
+                v, w = 0.0, 0.0
+                if (ahora - self.stop_start_time) >= self.stop_duration:
+                    self.fsm = "Gira"
+                    # Calculamos ángulo de reflexión aquí una sola vez
+                    if self.last_wall_hit in ["IZQUIERDA", "DERECHA"]:
+                        self.target_theta = -theta
+                    else:
+                        self.target_theta = math.pi - theta
+
             elif self.fsm == "Gira":
-                # Girar hasta que la orientación actual coincida con target_theta
-                error_angular = self.target_theta - theta
-                # Normalizar error entre -pi y pi
-                error_angular = (error_angular + math.pi) % (2 * math.pi) - math.pi
-                logging.info(f"Error angular {error_angular}")
-                if abs(error_angular) < 0.4: # Margen de llegada al ángulo
+                error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
+                if abs(error_angular) < 0.3: # Umbral más fino
                     self.fsm = "Avanza"
-                    v = self.speed
-                    w = 0.0
+                    v, w = 0.0, 0.0
                 else:
                     v = 0.0
                     w = self.w if error_angular > 0 else -self.w
             logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
-            '''
-                    #FSM Avanza, Gira, Parado
-            if self.fsm=="Avanza" and np.min(wall_distances)<=self.safety_distance:
-                self.fsm="Retrocede"
-                self.t_retrocediendo=ahora
-            elif self.fsm=="Retrocede" and (ahora-self.t_retrocediendo)>=1.0 or np.min(wall_distances)>self.safety_distance:
-                self.fsm="Gira"
-                self.time_in_turning=ahora
-                self.t_retrocediendo=0
-            elif self.fsm=="Gira" and (ahora-self.time_in_turning)>=self.turning_time:
-                self.fsm="Avanza"
-                self.turning_time=np.random.rand()*2.0
-                self.time_in_turning=0.0
-
-            logging.info(f"Distancias a paredes: {wall_distances} | FSM: {self.fsm}")   
-            if self.fsm=="Avanza":
-                v=self.speed
-                w=0.0
-                logging.info("FSM: Avanzando")
-            elif self.fsm=="Retrocede":
-                v=-self.speed*0.5
-                w=0.0
-                
-                logging.info(f"FSM: Retrocediendo | t={ahora-self.t_retrocediendo}")
-            elif self.fsm=="Gira":
-                v=0.0
-                w=self.w              
-                logging.info(f"FSM: Girando | t={ahora-self.time_in_turning} | tgiro= {self.turning_time}")
-            elif self.fsm=="Parada":
-                v=0.0
-                w=0.0
-                logging.info("FSM: Parado")
-            else:
-                v=0.0
-                w=0.0
-                logging.info("FSM: Caso indeterminado")
-                 
-
-        '''
             self.log_data(x, y, theta,wall_distances, v, w)
             vl=v-(13.1/2.0)*w
             vr=2*v-vl                    
@@ -345,9 +316,9 @@ def on_connect(client,userdata,flags,rc):
    #client.subscribe("agent/6/velocity")   
    #client.subscribe("agent/6/odon")
    client.subscribe("arena/boundaries")     
-   client.subscribe("agent/6/pos")      
-   client.subscribe("agent/6/wheel")         
-
+   client.subscribe("6/pos")      
+   client.subscribe("agent/6/wheel")
+   
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
     print("topic:", msg.topic)
@@ -376,7 +347,6 @@ if __name__ == "__main__":
     logging.info(f'Agent {bouncer_agent.id} is listening')
     def mqtt_and_dispatch():
         # Configurar MQTT aquí...
-        # client.loop_start() 
         client = mqtt.Client()
         client.on_connect = on_connect
         client.on_message = on_message

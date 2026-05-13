@@ -89,13 +89,13 @@ class Teleoperator:
                 if key in ['w', 's', 'a','d',' ']:
                     # Usamos el método move_robot que ya está definido en pi_agent_limits.py
                     # Ese método ya hace el empaquetado y envío al Arduino
-                    print(f"\rV: {self.v:5.2f} | W: {self.w:5.2f} ", end='', flush=True)
+                    print(f"\r V: {self.v:5.2f} | W: {self.w:5.2f} ", end='', flush=True)
                     vl=self.v-(13.1/2.0)*self.w
                     vr=2*self.v-vl                    
                     wl=vl/3.35
                     wr=vr/3.35
-                    print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
-                    self.send_move(wl,wr)
+                    #print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
+                    self.send_move(vl,vr)
                 elif key in ['g','h']:
                     print(f"Ang. giro: {self.ang} (grad)",end='',flush=True)
                     self.send_move_ang(self.ang)    
@@ -114,7 +114,7 @@ if __name__ == "__main__":
       device_class=Teleoperator,
       id='TeleopAgent',
       ip='192.168.10.1',
-      data_port = 5569,
+      data_port = 5572,
       hub_ip='192.168.10.1'
     )
     
