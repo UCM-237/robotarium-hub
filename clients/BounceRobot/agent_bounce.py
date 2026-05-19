@@ -10,6 +10,8 @@ import time
 import paho.mqtt.client as mqtt
 import threading
 from queue import Queue # Para comunicar hilos de forma segura
+from enum import Enum
+
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -22,14 +24,22 @@ Que lo haga en la dirección opuesta a la pared más cercana. Para esto, el robo
 TODO: Mejorar la lógica de decisión para considerar no solo la distancia a las paredes, sino también la dirección del movimiento. Por ejemplo, si el robot se está moviendo hacia una pared, esa pared debería tener más peso en la decisión de rebote que una pared que está detrás del robot. Esto se puede lograr calculando el ángulo entre la dirección del movimiento y la dirección hacia cada pared, y ajustando el umbral de distancia en función de este ángulo.
 TODO: Mejorar la fusión de datos entre la posición por visión y la estima por odometría. En lugar de simplemente priorizar la visión cuando está disponible, se podría implementar un filtro de Kalman o un sistema de ponderación que combine ambas fuentes de información para obtener una estimación más robusta de la posición del robot. Esto ayudaría a mitigar los efectos de la latencia en la visión y los errores acumulativos en la odometría, proporcionando una base más sólida para la lógica de rebote y navegación. 
 '''
-
+class RobotState(Enum):
+    AVANZA = 1
+    GIRA = 2
+    PARA = 3
+    PARANDO_PARA_RETROCEDER = 4
+    RETROCEDE = 5
+    PARANDO_PARA_GIRAR = 6
+    ESPERANDO_GIRO = 7
+    
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 20.0
         self.speed = 20.0
-        self.fsm = "Avanza"
+        self.fsm = RobotState.AVANZA
         self.last_wall_hit=None
         self.v=35.0
         self.w=3.0
@@ -42,6 +52,7 @@ class BouncerRobot:
         self.control_time=0.05 #ms
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
+        self.giro_terminado=False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
@@ -191,10 +202,7 @@ class BouncerRobot:
                 op=raw_data.get("op")
                 if status == "done" and op == "turn":
                     logging.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
-                    if self.fsm== "Esperando_giro":
-                        self.fsm= "Avanza" # Desbloqueamos el robot
-                        logging.info(f"FSM: {self.fsm}")
-                    logging.info("Estado devuelto a AVANZA.")
+                    self.giro_terminado = True
             except Exception as e:
                 logging.error(f"Error al decodificar feedback: {e}")
 
@@ -202,21 +210,22 @@ class BouncerRobot:
         """Bucle de control independiente que corre a ~20Hz"""
         while True:
             ahora = time.time()
+            if (ahora-self.last_time) >= self.control_time:
+                # 1. VERIFICACIÓN DE SEGURIDAD (WATCHDOG)
+                # Si hace más de 1.5 segundos que no sabemos nada del robot...
+                time_since_vision = ahora - self.last_pos_time
+                time_since_odom = ahora - self.last_odom_time
+                
+                if time_since_vision > 2.5 and time_since_odom > 2.5:
+                    logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                    self.command_queue.put({'v': 0.0, 'w': 0.0})
+                else:
+                    # 2. EJECUCIÓN DE LA LÓGICA
+                    # pos_logic ahora decidirá qué posición usar
+                    x,y,theta=self.check_position_estimate()
+                    self.actualizar_fsm(x,y,theta)
+                self.last_time=ahora
             
-            # 1. VERIFICACIÓN DE SEGURIDAD (WATCHDOG)
-            # Si hace más de 1.5 segundos que no sabemos nada del robot...
-            time_since_vision = ahora - self.last_pos_time
-            time_since_odom = ahora - self.last_odom_time
-            
-            if time_since_vision > 2.5 and time_since_odom > 2.5:
-                logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
-                self.command_queue.put({'v': 0.0, 'w': 0.0})
-            else:
-                # 2. EJECUCIÓN DE LA LÓGICA
-                # pos_logic ahora decidirá qué posición usar
-                self.check_collision_and_move()
-            
-            time.sleep(0.05) # 20 Hz
 
   
         
@@ -235,100 +244,120 @@ class BouncerRobot:
                     
         return [d_left,d_right,d_top,d_bottom]
     
-    def check_collision_and_move(self):
-        ahora = time.time()
-        v,w=0.0,0.0
-        if (ahora-self.last_time)>self.control_time:
-            # DECISIÓN DE POSICIÓN
-            # Prioridad 1: Visión (si es reciente < 0.5s)
-            if (ahora - self.last_pos_time) < 0.5:
-                x, y, theta = self.pos
-                self.status = "VISION"
-            # Prioridad 2: Estima por odometría
-            else:
-
-                x, y, theta = self.estimate
-                self.status = "ESTIMA"
-            # 2. Obtener distancias a paredes
-            [d_left, d_right, d_top ,d_bottom] = self.get_distance_to_wall(x, y, theta)
-            wall_distances=[d_left,d_right,d_top,d_bottom]
-            # 3. Dirección del movimiento
-            # theta viene en radianes del ArUco (asegúrate de la conversión si viene en grados)
+    def actualizar_fsm(self,x,y,theta):
+        [d_left, d_right, d_top ,d_bottom] = self.get_distance_to_wall(x, y, theta)
+        wall_distances=[d_left,d_right,d_top,d_bottom]
+        # 3. Dirección del movimiento
+        # theta viene en radianes del ArUco (asegúrate de la conversión si viene en grados)
  
-            vy = math.cos(theta)
-            vx = -math.sin(theta)
-            logging.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
-            # 4. Lógica de "Pared de Impacto Inminente"
-            # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
-            distancia_critica = self.safety_distance
-            target_wall = None
-            angle_limit=self.angle_limit
-            if vx < -angle_limit and d_left < distancia_critica:
-                target_wall = "IZQUIERDA"
-            elif vx > angle_limit and d_right < distancia_critica:
-                target_wall = "DERECHA"
-            elif vy > angle_limit and d_top < distancia_critica: # Depende de si tu eje Y crece hacia abajo
-                target_wall = "ARRIBA"
-            elif vy < -angle_limit and d_bottom < distancia_critica:
-                target_wall = "ABAJO"
-            logging.info(target_wall)
-            # 5. FSM Mejorada con reflexión de ángulo
-            if self.fsm == "Avanza":
-                if target_wall is not None:
-                    self.fsm = "Parando_para_retroceder"
-                    self.stop_start_time = ahora
-                v, w = self.speed, 0.0
+        vy = math.cos(theta)
+        vx = -math.sin(theta)
+        logging.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
+        # 4. Lógica de "Pared de Impacto Inminente"
+        # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
+        distancia_critica = self.safety_distance
+        target_wall = None
+        if vx < -self.angle_limit and d_left < distancia_critica:
+            target_wall = "IZQUIERDA"
+        elif vx > self.angle_limit and d_right < distancia_critica:
+            target_wall = "DERECHA"
+        elif vy > self.angle_limit and d_top < distancia_critica: # Depende de si tu eje Y crece hacia abajo
+            target_wall = "ARRIBA"
+        elif vy < -self.angle_limit and d_bottom < distancia_critica:
+            target_wall = "ABAJO"
+        logging.info(target_wall)
+        # 5. FSM Mejorada con reflexión de ángulo
+        if self.fsm == RobotState.AVANZA:
+            if target_wall is not None:
+                self.fsm = RobotState.PARANDO_PARA_RETROCEDER
+                self.stop_start_time = time.time()
+            
 
-            elif self.fsm == "Parando_para_retroceder":
-                v, w = 0.0, 0.0
-                if (ahora - self.stop_start_time) >= self.stop_duration:
-                    self.fsm = "Retrocede"
-                    self.retrocede_start_time = ahora
+            elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
+    
+                if (time.time() - self.stop_start_time) >= self.stop_duration:
+                    self.fsm = RobotState.RETROCEDE
+                    self.retrocede_start_time = time.time()
 
-            elif self.fsm == "Retrocede":
-                v, w = -20.0, 0.0
+            elif self.fsm == RobotState.RETROCEDE:
                 # Retrocede por tiempo o hasta que el sensor de distancia sea crítico
-                if (ahora - self.retrocede_start_time) >= self.retrocede_duration:
-                    self.fsm = "Parando_para_girar"
-                    self.stop_start_time = ahora
+                if (time.time() - self.retrocede_start_time) >= self.retrocede_duration:
+                    self.fsm = RobotState.PARANDO_PARA_GIRAR
+                    self.stop_start_time = time.time()
 
-            elif self.fsm == "Parando_para_girar":
-                v, w = 0.0, 0.0
-                if (ahora - self.stop_start_time) >= self.stop_duration:
-                    self.fsm = "Gira"
+            elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
+                if (time.time() - self.stop_start_time) >= self.stop_duration:
+                    self.fsm = RobotState.GIRA
+                    self.giro_terminado=False
                     # Calculamos ángulo de reflexión aquí una sola vez
                     if self.last_wall_hit in ["IZQUIERDA", "DERECHA"]:
                         self.target_theta = -theta
                     else:
                         self.target_theta = math.pi - theta
 
-            elif self.fsm == "Gira":
+            elif self.fsm == RobotState.GIRA:
                 error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
                 if abs(error_angular) < 0.2: # Umbral más fino
-                    self.fsm = "Avanza"
-                    v, w = 0.0, 0.0
+                    self.fsm = RobotState.AVANZA
                 else:
-                    v = 0.0
-                    w = self.w if error_angular > 0 else -self.w
-            logging.info(f"FSM: {self.fsm}")
-            if self.fsm== "Gira":
-                comando_giro = {'op': 'turn', 'angle': self.target_theta}
-                logging.info(f"FSM: {self.fsm}, ang. : {self.target_theta:.2f} rad a la cola.")
-                self.command_queue.put({'angle': self.target_theta})
-                self.fsm ="Esperando_giro"
-            elif self.fsm =="Esperando_giro":
-                logging.info(f"FSM: {self.fsm}")
-            else:
-                #logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
-                self.log_data(x, y, theta,wall_distances, v, w)
-                vl=v-(13.1/2.0)*w
-                vr=2*v-vl                    
-                wl=vl/3.35
-                wr=vr/3.35
-                self.command_queue.put({'v': wl, 'w': wr})
-                logging.info(f"Enviada v: {wl} w: {wr}")
-            self.last_time=ahora
-            self.last_wall_hit=target_wall
+                    self.fsm = RobotState.ESPERANDO_GIRO
+            elif self.fsm == RobotState.ESPERANDO_GIRO:
+                if self.giro_terminado==True
+                    self.fsm= RobotState.AVANZA
+                
+        # 6. Decisión de velocidad basada en FSM
+        if self.fsm== RobotState.AVANZA:
+            v = self.speed
+            w = 0.0
+            self.log_data(x, y, theta,wall_distances, v, w)
+            wl=v/3.35
+            wr=v/3.35
+            self.command_queue.put({'v': wl, 'w': wr})
+            
+        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
+            v = 0.0
+            w = 0.0
+            self.log_data(x, y, theta,wall_distances, v, w)
+            wl=v/3.35
+            wr=v/3.35
+            self.command_queue.put({'v': wl, 'w': wr})
+            
+        elif self.fsm == RobotState.RETROCEDE:
+            v = -self.speed / 2.0
+            w = 0.0
+            self.log_data(x, y, theta,wall_distances, v, w)
+            wl=v/3.35
+            wr=v/3.35
+            self.command_queue.put({'v': wl, 'w': wr})
+            
+        elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
+            v = 0.0
+            w = 0.0
+            self.log_data(x, y, theta,wall_distances, v, w)
+            wl=v/3.35
+            wr=v/3.35
+            self.command_queue.put({'v': wl, 'w': wr})
+            
+        elif self.fsm == RobotState.GIRA:
+            comando_giro = {'op': 'turn', 'angle': self.target_theta}
+            self.command_queue.put({'angle': self.target_theta})
+        self.last_wall_hit=target_wall
+            
+    def check_position_estimate(self):
+        ahora = time.time()
+        # DECISIÓN DE POSICIÓN
+        # Prioridad 1: Visión (si es reciente < 0.5s)
+        if (ahora - self.last_pos_time) < 0.5:
+            x, y, theta = self.pos
+            self.status = "VISION"
+            # Prioridad 2: Estima por odometría
+        else:
+
+            x, y, theta = self.estimate
+            self.status = "ESTIMA"
+            
+        return x, y, theta
+            
 
 
     def send_move(self, v, w):
