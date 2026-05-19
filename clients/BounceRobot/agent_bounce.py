@@ -30,6 +30,7 @@ class BouncerRobot:
         self.margin = 8.0
         self.speed = 30.0
         self.fsm = "Avanza"
+        self.last_wall_hit=None
         self.v=55.0
         self.w=3.0
         self.direction=[0.707, 0.707]
@@ -181,7 +182,21 @@ class BouncerRobot:
                 self.on_odom_received(wl, wr)
             except Exception as e:
                 print(f"Error al decodificar odometría: {e}")
-    
+        elif topic == f"agent/{self.robot_id}/feedback":
+            try:
+                raw_data = json.loads(message)
+                if isinstance(raw_data, str):
+                    raw_data = json.loads(raw_data)
+                status=raw_data.get("status")                
+                op=raw_data.get("op")
+                if status == "done" and op == "turn":
+                    logging.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
+                    if self.state == "ESPERANDO_HARDWARE":
+                        self.state = "AVANZA" # Desbloqueamos el robot
+                    logging.info("Estado devuelto a AVANZA.")
+            except Exception as e:
+                logging.error(f"Error al decodificar feedback: {e}")
+
     def run(self):
         """Bucle de control independiente que corre a ~20Hz"""
         while True:
@@ -221,7 +236,7 @@ class BouncerRobot:
     
     def check_collision_and_move(self):
         ahora = time.time()
-        
+        v,w=0.0,0.0
         if (ahora-self.last_time)>self.control_time:
             # DECISIÓN DE POSICIÓN
             # Prioridad 1: Visión (si es reciente < 0.5s)
@@ -294,15 +309,24 @@ class BouncerRobot:
                 else:
                     v = 0.0
                     w = self.w if error_angular > 0 else -self.w
-            logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
-            self.log_data(x, y, theta,wall_distances, v, w)
-            vl=v-(13.1/2.0)*w
-            vr=2*v-vl                    
-            wl=vl/3.35
-            wr=vr/3.35
-            self.command_queue.put({'v': wl, 'w': wr})
-            logging.info(f"Enviada v: {wl} w: {wr}")
+            if self.fsm== "Gira":
+                comando_giro = {'op': 'turn', 'angle': self.target_theta}
+                logging.info(f"FSM: {self.fsm}, ang. : {self.target_theta:.2f} rad a la cola.")
+                self.command_queue.put(comando_giro)
+                self.fsm ="Esperando Giro"
+            elif self.fsm =="Esperando Giro":
+                logging.info(f"FSM: {self.fsm}")
+            else:
+                logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
+                self.log_data(x, y, theta,wall_distances, v, w)
+                vl=v-(13.1/2.0)*w
+                vr=2*v-vl                    
+                wl=vl/3.35
+                wr=vr/3.35
+                self.command_queue.put({'v': wl, 'w': wr})
+                logging.info(f"Enviada v: {wl} w: {wr}")
             self.last_time=ahora
+            self.last_wall_hit=target_wall
 
 
     def send_move(self, v, w):
@@ -318,13 +342,15 @@ def on_connect(client,userdata,flags,rc):
    client.subscribe("arena/boundaries")     
    client.subscribe("6/pos")      
    client.subscribe("agent/6/wheel")
+   client.subscribe("agent/6/feedback")
    
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
-    print("topic:", msg.topic)
+    #print("topic:", msg.topic)
     #print("Mensaje:", msg.payload.decode()) 
     #print("------")
-      
+    pass
+
 # Configuración del Agente
 if __name__ == "__main__":
    # Configuración del Agente
@@ -353,13 +379,31 @@ if __name__ == "__main__":
         client.connect(BROKER, PUERTO, 60)
         client.loop_start()
         logging.info(f"Agent {bouncer_agent.id} en marcha")
+        logging.info(f"Agente {bouncer_agent.id} y despachador en marcha.")
+    
+        # 3. Hilo Principal: Despachador de la cola hacia ZeroMQ (ZMQ)
         while True:
             if not bouncer_agent.device.command_queue.empty():
                 cmd = bouncer_agent.device.command_queue.get()
-                #logging.info(f"sending {cmd}")
-                bouncer_agent.send(f"agent/{bouncer_agent.device.robot_id}/move", cmd)
+                
+                # Determinamos el tópico ZMQ adecuado según el tipo de comando
+                if 'op' in cmd and cmd['op'] == 'turn':
+                    # Si es una operación compleja de giro, la mandamos al tópico de comandos
+                    topic = f"agent/{bouncer_agent.device.robot_id}/turn"
+                    cmd={cmd['angle']} # Solo mandamos el ángulo para el giro
+                else:
+                    # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
+                    topic = f"agent/{bouncer_agent.device.robot_id}/move"
+                    cmd=cmd 
+                try:
+                    bouncer_agent.send(topic, cmd)
+                    logging.info(f"Despachado a ZMQ -> {topic}: {cmd}")
+                except Exception as e:
+                    logging.error(f"Error enviando por ZMQ: {e}")
+                    
+                bouncer_agent.device.command_queue.task_done()
             time.sleep(0.01)
-
+    
     mqtt_and_dispatch()
     # Configuración MQTT
     
