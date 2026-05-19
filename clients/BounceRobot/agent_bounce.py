@@ -29,7 +29,7 @@ class BouncerRobot:
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 8.0
         self.speed = 30.0
-        self.fsm = "Avanza"
+        self.fsm = "Gira"
         self.last_wall_hit=None
         self.v=55.0
         self.w=3.0
@@ -51,7 +51,7 @@ class BouncerRobot:
         self.retrocede_duration = 0.5
         self.retrocede_start_time = 0
         self.estimate = [0.0, 0.0, 0.0] # [xe, ye, thetae] - Estima por odometría
-        self.target_theta=0.0
+        self.target_theta=30.0
         # Parámetros físicos del robot (deben coincidir con robot.h)
         self.wheel_radius = 3.35 # cm
         self.robot_width = 14.5  # cm (distancia entre ruedas)
@@ -191,8 +191,9 @@ class BouncerRobot:
                 op=raw_data.get("op")
                 if status == "done" and op == "turn":
                     logging.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
-                    if self.state == "ESPERANDO_HARDWARE":
-                        self.state = "AVANZA" # Desbloqueamos el robot
+                    if self.fsm== "Esperando_giro":
+                        self.fsm= "Avanza" # Desbloqueamos el robot
+                        logging.info(f"FSM: {self.fsm}")
                     logging.info("Estado devuelto a AVANZA.")
             except Exception as e:
                 logging.error(f"Error al decodificar feedback: {e}")
@@ -274,11 +275,11 @@ class BouncerRobot:
             # 5. FSM Mejorada con reflexión de ángulo
             if self.fsm == "Avanza":
                 if target_wall is not None:
-                    self.fsm = "PARANDO_PARA_RETROCEDER"
+                    self.fsm = "Parando_para_retroceder"
                     self.stop_start_time = ahora
                 v, w = self.speed, 0.0
 
-            elif self.fsm == "PARANDO_PARA_RETROCEDER":
+            elif self.fsm == "Parando_para_retroceder":
                 v, w = 0.0, 0.0
                 if (ahora - self.stop_start_time) >= self.stop_duration:
                     self.fsm = "Retrocede"
@@ -288,10 +289,10 @@ class BouncerRobot:
                 v, w = -20.0, 0.0
                 # Retrocede por tiempo o hasta que el sensor de distancia sea crítico
                 if (ahora - self.retrocede_start_time) >= self.retrocede_duration:
-                    self.fsm = "PARANDO_PARA_GIRAR"
+                    self.fsm = "Parando_para_girar"
                     self.stop_start_time = ahora
 
-            elif self.fsm == "PARANDO_PARA_GIRAR":
+            elif self.fsm == "Parando_para_girar":
                 v, w = 0.0, 0.0
                 if (ahora - self.stop_start_time) >= self.stop_duration:
                     self.fsm = "Gira"
@@ -303,21 +304,22 @@ class BouncerRobot:
 
             elif self.fsm == "Gira":
                 error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
-                if abs(error_angular) < 0.3: # Umbral más fino
+                if abs(error_angular) < 0.2: # Umbral más fino
                     self.fsm = "Avanza"
                     v, w = 0.0, 0.0
                 else:
                     v = 0.0
                     w = self.w if error_angular > 0 else -self.w
+            
             if self.fsm== "Gira":
                 comando_giro = {'op': 'turn', 'angle': self.target_theta}
                 logging.info(f"FSM: {self.fsm}, ang. : {self.target_theta:.2f} rad a la cola.")
-                self.command_queue.put(comando_giro)
-                self.fsm ="Esperando Giro"
-            elif self.fsm =="Esperando Giro":
+                self.command_queue.put({'angle': self.target_theta})
+                self.fsm ="Esperando_giro"
+            elif self.fsm =="Esperando_giro":
                 logging.info(f"FSM: {self.fsm}")
             else:
-                logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
+                #logging.info(f"FSM: {self.fsm}, v: {v}, w: {w}")
                 self.log_data(x, y, theta,wall_distances, v, w)
                 vl=v-(13.1/2.0)*w
                 vr=2*v-vl                    
@@ -387,14 +389,14 @@ if __name__ == "__main__":
                 cmd = bouncer_agent.device.command_queue.get()
                 
                 # Determinamos el tópico ZMQ adecuado según el tipo de comando
-                if 'op' in cmd and cmd['op'] == 'turn':
+                if 'angle' in cmd :
                     # Si es una operación compleja de giro, la mandamos al tópico de comandos
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
-                    cmd={cmd['angle']} # Solo mandamos el ángulo para el giro
+                    logging.info(f"Enviado {cmd}")
                 else:
                     # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
                     topic = f"agent/{bouncer_agent.device.robot_id}/move"
-                    cmd=cmd 
+                     
                 try:
                     bouncer_agent.send(topic, cmd)
                     logging.info(f"Despachado a ZMQ -> {topic}: {cmd}")
