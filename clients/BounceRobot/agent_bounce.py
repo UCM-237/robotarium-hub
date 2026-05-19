@@ -27,19 +27,19 @@ class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
-        self.margin = 8.0
-        self.speed = 30.0
-        self.fsm = "Gira"
+        self.margin = 20.0
+        self.speed = 20.0
+        self.fsm = "Avanza"
         self.last_wall_hit=None
-        self.v=55.0
+        self.v=35.0
         self.w=3.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 60.0 
+        self.safety_distance = 50.0 
         self.t_retrocediendo=0
-        self.control_time=0.1 #ms
+        self.control_time=0.05 #ms
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
         # --- Configuración del Logger ---
@@ -51,11 +51,11 @@ class BouncerRobot:
         self.retrocede_duration = 0.5
         self.retrocede_start_time = 0
         self.estimate = [0.0, 0.0, 0.0] # [xe, ye, thetae] - Estima por odometría
-        self.target_theta=30.0
+        self.target_theta=0.0
         # Parámetros físicos del robot (deben coincidir con robot.h)
         self.wheel_radius = 3.35 # cm
         self.robot_width = 14.5  # cm (distancia entre ruedas)
-        
+        self.angle_limit= 0.8        
         self.last_odom_time = time.time()
         self.last_vision_time = time.time()
         self.status = "INICIALIZADO"
@@ -262,7 +262,7 @@ class BouncerRobot:
             # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
             distancia_critica = self.safety_distance
             target_wall = None
-            angle_limit=0.5
+            angle_limit=self.angle_limit
             if vx < -angle_limit and d_left < distancia_critica:
                 target_wall = "IZQUIERDA"
             elif vx > angle_limit and d_right < distancia_critica:
@@ -310,7 +310,7 @@ class BouncerRobot:
                 else:
                     v = 0.0
                     w = self.w if error_angular > 0 else -self.w
-            
+            logging.info(f"FSM: {self.fsm}")
             if self.fsm== "Gira":
                 comando_giro = {'op': 'turn', 'angle': self.target_theta}
                 logging.info(f"FSM: {self.fsm}, ang. : {self.target_theta:.2f} rad a la cola.")
@@ -392,14 +392,14 @@ if __name__ == "__main__":
                 if 'angle' in cmd :
                     # Si es una operación compleja de giro, la mandamos al tópico de comandos
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
-                    logging.info(f"Enviado {cmd}")
+                    #logging.info(f"Enviado {cmd}")
                 else:
                     # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
                     topic = f"agent/{bouncer_agent.device.robot_id}/move"
                      
                 try:
                     bouncer_agent.send(topic, cmd)
-                    logging.info(f"Despachado a ZMQ -> {topic}: {cmd}")
+                    #logging.info(f"Despachado a ZMQ -> {topic}: {cmd}")
                 except Exception as e:
                     logging.error(f"Error enviando por ZMQ: {e}")
                     
