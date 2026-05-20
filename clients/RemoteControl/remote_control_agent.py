@@ -134,19 +134,17 @@ if __name__ == "__main__":
 
     logging.info(f"Iniciando configuración... ID: {args.robot_id} | Puerto ZMQ: {args.port}")
 
-    # Instanciamos el dispositivo teleop pasando las variables dinámicas
-    teleop_agent = Teleoperator(robot_id=args.robot_id)
     
     # Inicializamos el Agente pasándole el ID como string y el puerto dinámico
     teleop_agent = Agent(
         device_class=Teleoperator,
-        id=f'TeleopAgent_{args.robot_id}',
-        ip='192.168.10.1',  # Tu IP del servidor/broker
-        data_port=args.port # <-- Aquí inyectamos el puerto opcional de la línea de comandos
-    )
+        id=f'TeleopAgent_{args.robot_id}',  # ID único para el agente de red
+        ip='192.168.10.1',
+        data_port=args.port                 # Inyección del puerto dinámico
+    ) 
+    # 3. Sincronización del robot_id dentro de la clase interna Teleoperator
+    teleop_agent.device.robot_id = args.robot_id
     
-    # Guardamos la referencia cruzada como ya tenías en tu diseño
-    teleop_agent.device.agent = teleop_agent
     #MQTT_agent.register()
     logging.info(f'Agent {teleop_agent.id} is listening')
 
