@@ -11,7 +11,7 @@ import paho.mqtt.client as mqtt
 import threading
 from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
-from logger_config import setup_logger  
+from logger_config import setup_logger
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -40,7 +40,7 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 20.0
-        self.speed = 20.0
+        self.speed = 30.0
         self.fsm = RobotState.AVANZA
         self.last_wall_hit=None
         self.v=35.0
@@ -256,38 +256,39 @@ class BouncerRobot:
                 self.stop_start_time = time.time()
             
 
-            elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
-    
-                if (time.time() - self.stop_start_time) >= self.stop_duration:
-                    self.fsm = RobotState.RETROCEDE
-                    self.retrocede_start_time = time.time()
+        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
+            logger.warning(f"Timer: {time.time()-self.stop_start_time}")
 
-            elif self.fsm == RobotState.RETROCEDE:
-                # Retrocede por tiempo o hasta que el sensor de distancia sea crítico
-                if (time.time() - self.retrocede_start_time) >= self.retrocede_duration:
-                    self.fsm = RobotState.PARANDO_PARA_GIRAR
-                    self.stop_start_time = time.time()
-
-            elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
-                if (time.time() - self.stop_start_time) >= self.stop_duration:
-                    self.fsm = RobotState.GIRA
-                    self.giro_terminado=False
-                    # Calculamos ángulo de reflexión aquí una sola vez
-                    if self.last_wall_hit in ["IZQUIERDA", "DERECHA"]:
-                        self.target_theta = -theta
-                    else:
-                        self.target_theta = math.pi - theta
-
-            elif self.fsm == RobotState.GIRA:
-                error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
-                if abs(error_angular) < 0.2: # Umbral más fino
-                    self.fsm = RobotState.AVANZA
-                else:
-                    self.fsm = RobotState.ESPERANDO_GIRO
-            elif self.fsm == RobotState.ESPERANDO_GIRO:
-                if self.giro_terminado==True:
-                    self.fsm= RobotState.AVANZA
+            if (time.time() - self.stop_start_time) >= self.stop_duration:
+                self.fsm = RobotState.RETROCEDE
+                self.retrocede_start_time = time.time()
                 
+        elif self.fsm == RobotState.RETROCEDE:
+            # Retrocede por tiempo o hasta que el sensor de distancia sea crítico
+            if (time.time() - self.retrocede_start_time) >= self.retrocede_duration:
+                self.fsm = RobotState.PARANDO_PARA_GIRAR
+                self.stop_start_time = time.time()
+
+        elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
+            if (time.time() - self.stop_start_time) >= self.stop_duration:
+                self.fsm = RobotState.GIRA
+                self.giro_terminado=False
+                # Calculamos ángulo de reflexión aquí una sola vez
+                if self.last_wall_hit in ["IZQUIERDA", "DERECHA"]:
+                    self.target_theta = -theta
+                else:
+                    self.target_theta = math.pi - theta
+
+        elif self.fsm == RobotState.GIRA:
+            error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
+            if abs(error_angular) < 0.2: # Umbral más fino
+                self.fsm = RobotState.AVANZA
+            else:
+                self.fsm = RobotState.ESPERANDO_GIRO
+        elif self.fsm == RobotState.ESPERANDO_GIRO:
+            if self.giro_terminado==True:
+                self.fsm= RobotState.AVANZA
+            
         # 6. Decisión de velocidad basada en FSM
         if self.fsm== RobotState.AVANZA:
             v = self.speed
@@ -304,7 +305,7 @@ class BouncerRobot:
             self.command_queue.put({'v': wl, 'w': wr})
             
         elif self.fsm == RobotState.RETROCEDE:
-            v = -self.speed / 2.0
+            v = -self.speed 
             w = 0.0
             wl=v/3.35
             wr=v/3.35
@@ -318,7 +319,7 @@ class BouncerRobot:
             self.command_queue.put({'v': wl, 'w': wr})
             
         elif self.fsm == RobotState.GIRA:
-            comando_giro = {'op': 'turn', 'angle': self.target_theta}
+            comando_giro = {'op': 'turn', 'ang': self.target_theta}
             self.command_queue.put({'angle': self.target_theta})
         self.last_wall_hit=target_wall
         logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
@@ -372,6 +373,9 @@ if __name__ == "__main__":
       data_port = 5563,
       hub_ip='192.168.10.1'
     )
+    # 1. Creamos un manejador de consola (StreamHandler)
+    logger = setup_logger("Robot_05")
+    time.sleep(1)    
     
     t = threading.Thread(target=bouncer_agent.device.run)
     t.daemon = True # Se cierra cuando cierres el programa principal
@@ -379,9 +383,6 @@ if __name__ == "__main__":
     
     # El agente se queda escuchando MQTT
     #bouncer_agent.listen()
-    # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger("Robot_05")
-    
     #MQTT_agent.register()
     logger.info(f'Agent {bouncer_agent.id} is listening')
     def mqtt_and_dispatch():
@@ -400,7 +401,7 @@ if __name__ == "__main__":
                 cmd = bouncer_agent.device.command_queue.get()
                 
                 # Determinamos el tópico ZMQ adecuado según el tipo de comando
-                if 'angle' in cmd :
+                if 'ang' in cmd :
                     # Si es una operación compleja de giro, la mandamos al tópico de comandos
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
                     #logger.info(f"Enviado {cmd}")
