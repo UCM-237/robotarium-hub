@@ -5,18 +5,15 @@ import termios
 import select
 import time
 from agent import Agent
-import json
-import numpy as np
 from agent import Agent
 import logging
-import math
 import csv
 from datetime import datetime
 #necesario para recibir por mqtt
 import paho.mqtt.client as mqtt
 BROKER = "192.168.10.1"
 PUERTO = 1883
-
+import argparse
 
 class GetKey:
     def __init__(self):
@@ -33,11 +30,12 @@ class GetKey:
 
 # Creamos una clase nueva que EXTIEUNDE a la que ya funciona
 class Teleoperator:
-    def __init__(self, agent: Agent) -> None:
+    def __init__(self, robot_id,agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.v =0.0
         self.w =0.0
-        self.robot_id=8
+        self.robot_id=robot_id
+        self.ang=0
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
@@ -109,15 +107,46 @@ class Teleoperator:
         teleop_agent.send(f"agent/{self.robot_id}/turn", {'ang': ang})   
 
 if __name__ == "__main__":
-      # Configuración del Agente
-    teleop_agent= Agent(
-      device_class=Teleoperator,
-      id='TeleopAgent',
-      ip='192.168.10.1',
-      data_port = 5572,
-      hub_ip='192.168.10.1'
+    parser = argparse.ArgumentParser(
+        description="Agente Remote Control para el Robotarium"
     )
     
+    # Parámetro obligatorio posicional (o puedes hacerlo opcional con '--id')
+    parser.add_argument(
+        'robot_id', 
+        type=int, 
+        help="ID numérico del robot a controlar (ej. 5, 8)"
+    )
+    
+    # Parámetro opcional con valor por defecto
+    parser.add_argument(
+        '-p', '--port', 
+        type=int, 
+        default=5572,  # Cambia esto por el puerto por defecto real de tu arquitectura ZMQ
+        help="Puerto de datos (data_port) para la conexión ZeroMQ. Por defecto: 5572"
+    )
+    
+    args = parser.parse_args()
+    logging.basicConfig(
+        level=logging.INFO, 
+        format=f"[Robot {args.robot_id}] %(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    logging.info(f"Iniciando configuración... ID: {args.robot_id} | Puerto ZMQ: {args.port}")
+
+    # Instanciamos el dispositivo teleop pasando las variables dinámicas
+    teleop_agent = Teleoperator(robot_id=args.robot_id)
+    
+    # Inicializamos el Agente pasándole el ID como string y el puerto dinámico
+    teleop_agent = Agent(
+        device_class=Teleoperator,
+        id=f'TeleopAgent_{args.robot_id}',
+        ip='192.168.10.1',  # Tu IP del servidor/broker
+        data_port=args.port # <-- Aquí inyectamos el puerto opcional de la línea de comandos
+    )
+    
+    # Guardamos la referencia cruzada como ya tenías en tu diseño
+    teleop_agent.device.agent = teleop_agent
     #MQTT_agent.register()
     logging.info(f'Agent {teleop_agent.id} is listening')
 
