@@ -11,7 +11,7 @@ import paho.mqtt.client as mqtt
 import threading
 from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
-
+from logger_config import setup_logger  
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -24,32 +24,7 @@ Que lo haga en la dirección opuesta a la pared más cercana. Para esto, el robo
 TODO: Mejorar la lógica de decisión para considerar no solo la distancia a las paredes, sino también la dirección del movimiento. Por ejemplo, si el robot se está moviendo hacia una pared, esa pared debería tener más peso en la decisión de rebote que una pared que está detrás del robot. Esto se puede lograr calculando el ángulo entre la dirección del movimiento y la dirección hacia cada pared, y ajustando el umbral de distancia en función de este ángulo.
 TODO: Mejorar la fusión de datos entre la posición por visión y la estima por odometría. En lugar de simplemente priorizar la visión cuando está disponible, se podría implementar un filtro de Kalman o un sistema de ponderación que combine ambas fuentes de información para obtener una estimación más robusta de la posición del robot. Esto ayudaría a mitigar los efectos de la latencia en la visión y los errores acumulativos en la odometría, proporcionando una base más sólida para la lógica de rebote y navegación. 
 '''
-# --- COLORES PARA LA CONSOLA ---
-class ColorFormatter(logging.Formatter):
-    # Códigos de escape ANSI para colores
-    GRISEZCO = "\033[38;20m"
-    CIAN = "\033[36;20m"
-    AMARILLO = "\033[33;20m"
-    ROJO = "\033[31;20m"
-    ROJO_NEGRILLA = "\033[31;1m"
-    RESET = "\033[0m"
-    
-    # El formato base que ya usas
-    FORMATO = "%(asctime)s - %(levelname)s - %(message)s"
 
-    FORMATOS_POR_NIVEL = {
-        logging.DEBUG: GRISEZCO + FORMATO + RESET,
-        logging.INFO: CIAN + "[Robot Config] " + FORMATO + RESET,       # Info en cian
-        logging.WARNING: AMARILLO + "⚠️  " + FORMATO + RESET,          # Alertas en amarillo
-        logging.ERROR: ROJO + "❌ " + FORMATO + RESET,                # Errores en rojo
-        logging.CRITICAL: ROJO_NEGRILLA + "🚨 " + FORMATO + RESET     # Críticos en rojo negrilla
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATOS_POR_NIVEL.get(record.levelno, self.FORMATO)
-        formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
-        return formatter.format(record)
-    
 
 class RobotState(Enum):
     AVANZA = 1
@@ -82,7 +57,6 @@ class BouncerRobot:
         self.giro_terminado=False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        self.init_logger()
         self.last_pos_time = 0.0
         self.stop_duration = 0.5  # Tiempo de parada en segundos
         self.stop_start_time = 0
@@ -98,25 +72,7 @@ class BouncerRobot:
         self.last_vision_time = time.time()
         self.status = "INICIALIZADO"
 
-    def init_logger(self):
-        with open(self.log_file, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            # Cabecera con todos los datos que pediste
-            writer.writerow([
-                "timestamp", "x", "y", "theta", "x_estimate", "y_estimate", "theta_estimate","status",
-                "x_min", "x_max", "y_min", "y_max", 
-                "dist_to_wall", "decision_v", "decision_w"
-            ])
-            
-    def log_data(self, x, y, theta, dist, v, w):
-        with open(self.log_file, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([
-                time.time(), x, y, theta,
-                self.estimate[0], self.estimate[1], self.estimate[2], self.status,
-                self.boundaries[0], self.boundaries[1], self.boundaries[2], self.boundaries[3],
-                round(dist[0], 3), round(dist[1], 3),round(dist[2], 3),round(dist[3], 3),v, w
-            ])
+   
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
 
@@ -125,7 +81,7 @@ class BouncerRobot:
         self.pos = [x, y, theta]
         self.estimate = [x, y, theta] # Sincronización: la cámara manda
         self.last_vision_time = time.time()
-        logging.info(f"Posición actualizada por visión: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
+        logger.info(f"Posición actualizada por visión: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
 
     def on_odom_received(self, wl, wr):
         """Calcula el movimiento basado en encoders (Cinemática Diferencial)."""
@@ -152,12 +108,12 @@ class BouncerRobot:
         self.estimate[0] += dx
         self.estimate[1] += dy
         self.estimate[2] += dtheta # Normalizar si es necesario
-        #logging.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
+        #logger.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
         self.last_odom_time = current_time
 
 
     def on_data(self, topic: str, message: str) -> None:
-        #logging.debug(f"Incoming data. Topic {topic}, mensaje {message}")
+        #logger.debug(f"Incoming data. Topic {topic}, mensaje {message}")
         '''Handle incoming data'''
         # 1. Recibir límites del tatami (vienen del arena_agent)
         if topic == "arena/boundaries":
@@ -200,10 +156,10 @@ class BouncerRobot:
                 # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
                 if hasattr(self, 'last_pos_time'):
                     freq = 1.0 / (current_time - self.last_pos_time)
-                    #logging.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+                    #logger.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
     
                 self.last_pos_time = current_time
-                self.check_collision_and_move()
+                
                 
             except Exception as e:
                 print(f"Error al descodificar: {e}")
@@ -228,10 +184,10 @@ class BouncerRobot:
                 status=raw_data.get("status")                
                 op=raw_data.get("op")
                 if status == "done" and op == "turn":
-                    logging.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
+                    logger.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
                     self.giro_terminado = True
             except Exception as e:
-                logging.error(f"Error al decodificar feedback: {e}")
+                logger.error(f"Error al decodificar feedback: {e}")
 
     def run(self):
         """Bucle de control independiente que corre a ~20Hz"""
@@ -244,7 +200,7 @@ class BouncerRobot:
                 time_since_odom = ahora - self.last_odom_time
                 
                 if time_since_vision > 2.5 and time_since_odom > 2.5:
-                    logging.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                    logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
                     self.command_queue.put({'v': 0.0, 'w': 0.0})
                 else:
                     # 2. EJECUCIÓN DE LA LÓGICA
@@ -266,8 +222,8 @@ class BouncerRobot:
         d_right = x_max - x
         d_bottom = y - y_min
         d_top = y_max - y
-        #logging.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
-        logging.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
+        #logger.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
+        logger.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
                     
         return [d_left,d_right,d_top,d_bottom]
     
@@ -279,7 +235,7 @@ class BouncerRobot:
  
         vy = math.cos(theta)
         vx = -math.sin(theta)
-        logging.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
+        logger.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
         # 4. Lógica de "Pared de Impacto Inminente"
         # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
         distancia_critica = self.safety_distance
@@ -292,7 +248,7 @@ class BouncerRobot:
             target_wall = "ARRIBA"
         elif vy < -self.angle_limit and d_bottom < distancia_critica:
             target_wall = "ABAJO"
-        logging.info(target_wall)
+        logger.info(target_wall)
         # 5. FSM Mejorada con reflexión de ángulo
         if self.fsm == RobotState.AVANZA:
             if target_wall is not None:
@@ -336,7 +292,6 @@ class BouncerRobot:
         if self.fsm== RobotState.AVANZA:
             v = self.speed
             w = 0.0
-            self.log_data(x, y, theta,wall_distances, v, w)
             wl=v/3.35
             wr=v/3.35
             self.command_queue.put({'v': wl, 'w': wr})
@@ -344,7 +299,6 @@ class BouncerRobot:
         elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
             v = 0.0
             w = 0.0
-            self.log_data(x, y, theta,wall_distances, v, w)
             wl=v/3.35
             wr=v/3.35
             self.command_queue.put({'v': wl, 'w': wr})
@@ -352,7 +306,6 @@ class BouncerRobot:
         elif self.fsm == RobotState.RETROCEDE:
             v = -self.speed / 2.0
             w = 0.0
-            self.log_data(x, y, theta,wall_distances, v, w)
             wl=v/3.35
             wr=v/3.35
             self.command_queue.put({'v': wl, 'w': wr})
@@ -360,7 +313,6 @@ class BouncerRobot:
         elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
             v = 0.0
             w = 0.0
-            self.log_data(x, y, theta,wall_distances, v, w)
             wl=v/3.35
             wr=v/3.35
             self.command_queue.put({'v': wl, 'w': wr})
@@ -369,7 +321,7 @@ class BouncerRobot:
             comando_giro = {'op': 'turn', 'angle': self.target_theta}
             self.command_queue.put({'angle': self.target_theta})
         self.last_wall_hit=target_wall
-        logging.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
+        logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
 
     def check_position_estimate(self):
         ahora = time.time()
@@ -428,21 +380,10 @@ if __name__ == "__main__":
     # El agente se queda escuchando MQTT
     #bouncer_agent.listen()
     # 1. Creamos un manejador de consola (StreamHandler)
-    console_handler = logging.StreamHandler()
-    
-    # 2. Le asignamos nuestro formateador de colores
-    console_handler.setFormatter(ColorFormatter())
-    
-    # 3. Configuramos el logger raíz
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.addHandler(console_handler)
-
-    # ¡Listo! A partir de aquí tus logs saldrán tintados
-    logging.info(f"Iniciando configuración... ID: {args.robot_id}")
+    logger = setup_logger("Robot_05")
     
     #MQTT_agent.register()
-    logging.info(f'Agent {bouncer_agent.id} is listening')
+    logger.info(f'Agent {bouncer_agent.id} is listening')
     def mqtt_and_dispatch():
         # Configurar MQTT aquí...
         client = mqtt.Client()
@@ -450,8 +391,8 @@ if __name__ == "__main__":
         client.on_message = on_message
         client.connect(BROKER, PUERTO, 60)
         client.loop_start()
-        logging.info(f"Agent {bouncer_agent.id} en marcha")
-        logging.info(f"Agente {bouncer_agent.id} y despachador en marcha.")
+        logger.info(f"Agent {bouncer_agent.id} en marcha")
+        logger.info(f"Agente {bouncer_agent.id} y despachador en marcha.")
     
         # 3. Hilo Principal: Despachador de la cola hacia ZeroMQ (ZMQ)
         while True:
@@ -462,16 +403,16 @@ if __name__ == "__main__":
                 if 'angle' in cmd :
                     # Si es una operación compleja de giro, la mandamos al tópico de comandos
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
-                    #logging.info(f"Enviado {cmd}")
+                    #logger.info(f"Enviado {cmd}")
                 else:
                     # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
                     topic = f"agent/{bouncer_agent.device.robot_id}/move"
                      
                 try:
                     bouncer_agent.send(topic, cmd)
-                    #logging.info(f"Despachado a ZMQ -> {topic}: {cmd}")
+                    #logger.info(f"Despachado a ZMQ -> {topic}: {cmd}")
                 except Exception as e:
-                    logging.error(f"Error enviando por ZMQ: {e}")
+                    logger.error(f"Error enviando por ZMQ: {e}")
                     
                 bouncer_agent.device.command_queue.task_done()
             time.sleep(0.01)
