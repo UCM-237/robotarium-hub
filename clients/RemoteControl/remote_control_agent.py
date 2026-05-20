@@ -30,11 +30,11 @@ class GetKey:
 
 # Creamos una clase nueva que EXTIEUNDE a la que ya funciona
 class Teleoperator:
-    def __init__(self, robot_id,agent: Agent) -> None:
+    def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
         self.v =0.0
         self.w =0.0
-        self.robot_id=robot_id
+        self.robot_id=6
         self.ang=0
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -144,7 +144,8 @@ if __name__ == "__main__":
     ) 
     # 3. Sincronización del robot_id dentro de la clase interna Teleoperator
     teleop_agent.device.robot_id = args.robot_id
-    
+    teleop_agent.device.log_file = f"robot_{args.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    teleop_agent.device.init_logger() 
     #MQTT_agent.register()
     logging.info(f'Agent {teleop_agent.id} is listening')
 
