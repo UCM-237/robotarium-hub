@@ -24,6 +24,33 @@ Que lo haga en la dirección opuesta a la pared más cercana. Para esto, el robo
 TODO: Mejorar la lógica de decisión para considerar no solo la distancia a las paredes, sino también la dirección del movimiento. Por ejemplo, si el robot se está moviendo hacia una pared, esa pared debería tener más peso en la decisión de rebote que una pared que está detrás del robot. Esto se puede lograr calculando el ángulo entre la dirección del movimiento y la dirección hacia cada pared, y ajustando el umbral de distancia en función de este ángulo.
 TODO: Mejorar la fusión de datos entre la posición por visión y la estima por odometría. En lugar de simplemente priorizar la visión cuando está disponible, se podría implementar un filtro de Kalman o un sistema de ponderación que combine ambas fuentes de información para obtener una estimación más robusta de la posición del robot. Esto ayudaría a mitigar los efectos de la latencia en la visión y los errores acumulativos en la odometría, proporcionando una base más sólida para la lógica de rebote y navegación. 
 '''
+# --- COLORES PARA LA CONSOLA ---
+class ColorFormatter(logging.Formatter):
+    # Códigos de escape ANSI para colores
+    GRISEZCO = "\033[38;20m"
+    CIAN = "\033[36;20m"
+    AMARILLO = "\033[33;20m"
+    ROJO = "\033[31;20m"
+    ROJO_NEGRILLA = "\033[31;1m"
+    RESET = "\033[0m"
+    
+    # El formato base que ya usas
+    FORMATO = "%(asctime)s - %(levelname)s - %(message)s"
+
+    FORMATOS_POR_NIVEL = {
+        logging.DEBUG: GRISEZCO + FORMATO + RESET,
+        logging.INFO: CIAN + "[Robot Config] " + FORMATO + RESET,       # Info en cian
+        logging.WARNING: AMARILLO + "⚠️  " + FORMATO + RESET,          # Alertas en amarillo
+        logging.ERROR: ROJO + "❌ " + FORMATO + RESET,                # Errores en rojo
+        logging.CRITICAL: ROJO_NEGRILLA + "🚨 " + FORMATO + RESET     # Críticos en rojo negrilla
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATOS_POR_NIVEL.get(record.levelno, self.FORMATO)
+        formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
+        return formatter.format(record)
+    
+
 class RobotState(Enum):
     AVANZA = 1
     GIRA = 2
@@ -302,7 +329,7 @@ class BouncerRobot:
                 else:
                     self.fsm = RobotState.ESPERANDO_GIRO
             elif self.fsm == RobotState.ESPERANDO_GIRO:
-                if self.giro_terminado==True
+                if self.giro_terminado==True:
                     self.fsm= RobotState.AVANZA
                 
         # 6. Decisión de velocidad basada en FSM
@@ -342,7 +369,8 @@ class BouncerRobot:
             comando_giro = {'op': 'turn', 'angle': self.target_theta}
             self.command_queue.put({'angle': self.target_theta})
         self.last_wall_hit=target_wall
-            
+        logging.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
+
     def check_position_estimate(self):
         ahora = time.time()
         # DECISIÓN DE POSICIÓN
@@ -399,6 +427,19 @@ if __name__ == "__main__":
     
     # El agente se queda escuchando MQTT
     #bouncer_agent.listen()
+    # 1. Creamos un manejador de consola (StreamHandler)
+    console_handler = logging.StreamHandler()
+    
+    # 2. Le asignamos nuestro formateador de colores
+    console_handler.setFormatter(ColorFormatter())
+    
+    # 3. Configuramos el logger raíz
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(console_handler)
+
+    # ¡Listo! A partir de aquí tus logs saldrán tintados
+    logging.info(f"Iniciando configuración... ID: {args.robot_id}")
     
     #MQTT_agent.register()
     logging.info(f'Agent {bouncer_agent.id} is listening')
