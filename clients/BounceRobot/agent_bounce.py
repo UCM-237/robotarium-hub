@@ -248,6 +248,8 @@ class BouncerRobot:
             target_wall = "ARRIBA"
         elif vy < -self.angle_limit and d_bottom < distancia_critica:
             target_wall = "ABAJO"
+        if min(wall_distances)<10:
+            logger.critical(f"Pared muy cercana {wall_distances}")
         logger.info(target_wall)
         # 5. FSM Mejorada con reflexión de ángulo
         if self.fsm == RobotState.AVANZA:
@@ -278,7 +280,10 @@ class BouncerRobot:
                     self.target_theta = -theta
                 else:
                     self.target_theta = math.pi - theta
-
+                if self.target_theta >= math.pi:
+                    self.target_theta-=math.pi
+                elif self.target_theta <= -math.pi:
+                    self.target_theta+=math.pi
         elif self.fsm == RobotState.GIRA:
             error_angular = (self.target_theta - theta + math.pi) % (2 * math.pi) - math.pi
             if abs(error_angular) < 0.2: # Umbral más fino
@@ -293,38 +298,38 @@ class BouncerRobot:
         if self.fsm== RobotState.AVANZA:
             v = self.speed
             w = 0.0
-            wl=v/3.35
-            wr=v/3.35
-            self.command_queue.put({'v': wl, 'w': wr})
+            self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
             v = 0.0
             w = 0.0
             wl=v/3.35
             wr=v/3.35
-            self.command_queue.put({'v': wl, 'w': wr})
+            self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.RETROCEDE:
             v = -self.speed 
             w = 0.0
             wl=v/3.35
             wr=v/3.35
-            self.command_queue.put({'v': wl, 'w': wr})
+            self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
             v = 0.0
             w = 0.0
             wl=v/3.35
             wr=v/3.35
-            self.command_queue.put({'v': wl, 'w': wr})
+            self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.GIRA:
             #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
             self.target_theta = math.degrees(self.target_theta)
+            #TEST. Remove
+            #self.target_theta=-180
             comando_giro = {'op': 'turn', 'ang': self.target_theta}
             self.command_queue.put({'ang': self.target_theta})
         self.last_wall_hit=target_wall
-        logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
+        logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {self.target_theta:.2f}° |theta: {math.degrees(theta)} ") 
 
     def check_position_estimate(self):
         ahora = time.time()

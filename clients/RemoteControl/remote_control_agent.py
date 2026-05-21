@@ -88,12 +88,7 @@ class Teleoperator:
                     # Usamos el método move_robot que ya está definido en pi_agent_limits.py
                     # Ese método ya hace el empaquetado y envío al Arduino
                     print(f"\r V: {self.v:5.2f} | W: {self.w:5.2f} ", end='', flush=True)
-                    vl=self.v-(13.1/2.0)*self.w
-                    vr=2*self.v-vl                    
-                    wl=vl/3.35
-                    wr=vr/3.35
-                    #print(f"\r wr={wr}, wl={wl} (rad/s)",end='',flush=True)
-                    self.send_move(vl,vr)
+                    self.send_move(self.v,self.w)
                 elif key in ['g','h']:
                     print(f"Ang. giro: {self.ang} (grad)",end='',flush=True)
                     self.send_move_ang(self.ang)    
