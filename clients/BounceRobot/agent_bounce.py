@@ -319,8 +319,10 @@ class BouncerRobot:
             self.command_queue.put({'v': wl, 'w': wr})
             
         elif self.fsm == RobotState.GIRA:
+            #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
+            self.target_theta = math.degrees(self.target_theta)
             comando_giro = {'op': 'turn', 'ang': self.target_theta}
-            self.command_queue.put({'angle': self.target_theta})
+            self.command_queue.put({'ang': self.target_theta})
         self.last_wall_hit=target_wall
         logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {math.degrees(self.target_theta):.2f}° ") 
 
@@ -402,7 +404,7 @@ if __name__ == "__main__":
                 
                 # Determinamos el tópico ZMQ adecuado según el tipo de comando
                 if 'ang' in cmd :
-                    # Si es una operación compleja de giro, la mandamos al tópico de comandos
+                    # Si es una operación compleja de giro, la mandamos al topic turn para giro preciso con eng en grados
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
                     #logger.info(f"Enviado {cmd}")
                 else:
