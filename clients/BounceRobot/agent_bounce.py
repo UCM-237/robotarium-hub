@@ -40,8 +40,9 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 20.0
-        self.speed = 30.0
+        self.speed = 25.0
         self.fsm = RobotState.AVANZA
+        self.danger_distance = 20.0
         self.last_wall_hit=None
         self.v=35.0
         self.w=3.0
@@ -256,7 +257,7 @@ class BouncerRobot:
             if target_wall is not None:
                 self.fsm = RobotState.PARANDO_PARA_RETROCEDER
                 self.stop_start_time = time.time()
-            
+                
 
         elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
             logger.warning(f"Timer: {time.time()-self.stop_start_time}")
@@ -293,7 +294,7 @@ class BouncerRobot:
         elif self.fsm == RobotState.ESPERANDO_GIRO:
             if self.giro_terminado==True:
                 self.fsm= RobotState.AVANZA
-            
+        
         # 6. Decisión de velocidad basada en FSM
         if self.fsm== RobotState.AVANZA:
             v = self.speed
