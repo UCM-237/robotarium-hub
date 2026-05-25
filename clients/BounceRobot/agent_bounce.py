@@ -207,6 +207,7 @@ class BouncerRobot:
                     # 2. EJECUCIÓN DE LA LÓGICA
                     # pos_logic ahora decidirá qué posición usar
                     x,y,theta=self.check_position_estimate()
+                    logging.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
                     self.actualizar_fsm(x,y,theta)
                 self.last_time=ahora
             
