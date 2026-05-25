@@ -207,7 +207,7 @@ class BouncerRobot:
                     # 2. EJECUCIÓN DE LA LÓGICA
                     # pos_logic ahora decidirá qué posición usar
                     x,y,theta=self.check_position_estimate()
-                    logging.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
+                    logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
                     self.actualizar_fsm(x,y,theta)
                 self.last_time=ahora
             
@@ -383,7 +383,7 @@ if __name__ == "__main__":
       hub_ip='192.168.10.1'
     )
     # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger("Robot_05")
+    logger = setup_logger(f"robot_{bouncer_agent.id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     time.sleep(1)    
     
     t = threading.Thread(target=bouncer_agent.device.run)
