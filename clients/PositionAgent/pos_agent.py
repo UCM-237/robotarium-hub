@@ -112,9 +112,9 @@ class ArucoDevice:
                     # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
                     
                     #cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(0, 0, 255))
-                    #cv2.aruco.drawDetectedMarkers(frame,corners,ids,borderColor=(0,255,0))
-                    #cv2.imshow("debug_window",frame)
-                    #cv2.waitKey(1)
+                    cv2.aruco.drawDetectedMarkers(frame,corners,ids,borderColor=(0,255,0))
+                    cv2.imshow("debug_window",frame)
+                    cv2.waitKey(1)
                     if ids is None:
                         print("No markers detected on frame")
                         print(len(rejected))

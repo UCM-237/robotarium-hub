@@ -55,8 +55,21 @@ def draw_points(frame_red, points, scale):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
 
 def calibrate():
-    cap_a = cv2.VideoCapture(5)
-    cap_b = cv2.VideoCapture(1)
+    cap_a = cv2.VideoCapture(0)
+    cap_b = cv2.VideoCapture(2)
+    cap_a.set(cv2.CAP_PROP_FPS,10)
+    cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
+    cap_a.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+    cap_a.set(cv2.CAP_PROP_EXPOSURE, -7)
+    cap_a.set(cv2.CAP_PROP_BRIGHTNESS, 100) # Un valor medio/bajo
+        
+
+    cap_b.set(cv2.CAP_PROP_FPS,10)
+    cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
+    cap_b.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+    cap_b.set(cv2.CAP_PROP_EXPOSURE, -7)
+     # 3. Opcional: Bajar el brillo si la exposición no es suficiente
+    cap_b.set(cv2.CAP_PROP_BRIGHTNESS, 100)
     
     cv2.namedWindow("Camara A")
     cv2.namedWindow("Camara B")

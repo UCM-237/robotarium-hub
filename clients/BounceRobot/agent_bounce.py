@@ -40,7 +40,7 @@ class BouncerRobot:
         '''The constructor optionally receive a list of listeners'''
         self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 20.0
-        self.speed = 25.0
+        self.speed = 20.0
         self.fsm = RobotState.AVANZA
         self.danger_distance = 20.0
         self.last_wall_hit=None
