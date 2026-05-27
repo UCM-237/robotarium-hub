@@ -13,6 +13,7 @@ import base64
 import time
 from agent import Agent, Device
 from threading import Thread
+from logger_config import setup_logger
 
 MAX_WIDHT=1280
 MAX_HEIGHT=720
@@ -55,6 +56,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
     def on_data(self, topic: str, message: str) -> None:
         # Aquí recibirías datos del Hub (ej. si el Hub te pide cambiar parámetros)
         #print(f"[RECV] Dato recibido en tópico {topic}")
+        logger.debug(f"Dato recibido en tópico {topic}")
         self.running=True
 
     def run(self):
@@ -122,7 +124,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
                         "height": self.total_h
                     }
                     self.agent.send("vision/stitched", payload)
-
+                    logger.debug("Frame enviado al Hub")
                 time.sleep(0.001) # ~25 FPS
         except KeyboardInterrupt:
             self.cap_a.release()
@@ -147,5 +149,8 @@ if __name__ == "__main__":
     )
 
     agente_vision.device.gui = not args.no_gui # Seteamos el modo de visualización
+    # 1. Creamos un manejador de consola (StreamHandler)
+    logger = setup_logger(f"vision_agent_log_{time.strftime('%Y%m%d_%H%M%S')}")
+    time.sleep(1)    
 
   
