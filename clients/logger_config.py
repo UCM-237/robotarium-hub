@@ -7,13 +7,13 @@ def setup_logger(agent_name):
     # Formato para la consola (con la etiqueta de colorlog)
     console_format = "%(log_color)s%(asctime)s - [%(name)s] - %(levelname)s - %(message)s%(reset)s"
     # Formato para el archivo (limpio, sin códigos de color)
-    file_format = "%(asctime)s - [%(name)s] - %(levelname)s - %(message)s"
-    
+    file_format = "%(asctime)s.%(msecs)03d - [%(name)s] - %(levelname)s - %(message)s"
+
     date_format = '%Y-%m-%d %H:%M:%S'
 
     # 2. Obtener el logger del agente
     logger = logging.getLogger(agent_name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     # Evitar duplicar manejadores si se vuelve a llamar a la función
     if not logger.handlers:

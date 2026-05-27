@@ -114,7 +114,7 @@ class BouncerRobot:
 
 
     def on_data(self, topic: str, message: str) -> None:
-        #logger.debug(f"Incoming data. Topic {topic}, mensaje {message}")
+        logger.debug(f"Incoming data. Topic {topic}, mensaje {message}")
         '''Handle incoming data'''
         # 1. Recibir límites del tatami (vienen del arena_agent)
         if topic == "arena/boundaries":
@@ -255,7 +255,7 @@ class BouncerRobot:
         logger.info(target_wall)
         # 5. FSM Mejorada con reflexión de ángulo
         if self.fsm == RobotState.AVANZA:
-            if target_wall is not None:
+            if target_wall is not None or min(wall_distances)<self.danger_distance:
                 self.fsm = RobotState.PARANDO_PARA_RETROCEDER
                 self.stop_start_time = time.time()
                 
@@ -383,7 +383,7 @@ if __name__ == "__main__":
       hub_ip='192.168.10.1'
     )
     # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger(f"robot_{bouncer_agent.id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    logger = setup_logger(bouncer_agent.device.log_file)
     time.sleep(1)    
     
     t = threading.Thread(target=bouncer_agent.device.run)
@@ -420,7 +420,7 @@ if __name__ == "__main__":
                      
                 try:
                     bouncer_agent.send(topic, cmd)
-                    #logger.info(f"Despachado a ZMQ -> {topic}: {cmd}")
+                    logger.debug(f"Despachado a ZMQ -> {topic}: {cmd}")
                 except Exception as e:
                     logger.error(f"Error enviando por ZMQ: {e}")
                     
