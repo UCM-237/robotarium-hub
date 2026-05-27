@@ -61,7 +61,7 @@ class BouncerRobot:
         self.last_pos_time = 0.0
         self.stop_duration = 0.5  # Tiempo de parada en segundos
         self.stop_start_time = 0
-        self.retrocede_duration = 0.5
+        self.retrocede_duration = 1.5
         self.retrocede_start_time = 0
         self.estimate = [0.0, 0.0, 0.0] # [xe, ye, thetae] - Estima por odometría
         self.target_theta=0.0
@@ -310,7 +310,7 @@ class BouncerRobot:
             self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.RETROCEDE:
-            v = -self.speed 
+            v = -30 
             w = 0.0
             wl=v/3.35
             wr=v/3.35
