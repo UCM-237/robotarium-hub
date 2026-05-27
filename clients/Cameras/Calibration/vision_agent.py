@@ -26,6 +26,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
         # Configuración de cámaras (como tenías en tu vision_agent.py)
         self.cap_a = cv2.VideoCapture(0)
         #self.cap_a.set(cv2.CAP_PROP_BRIGHTNESS,200)
+        self.cap_a.set(cv2.CAP_PROP_FPS,10)
         self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.cap_a.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         self.cap_a.set(cv2.CAP_PROP_EXPOSURE, -7)
@@ -33,6 +34,7 @@ class VisionDevice: # Esta clase cumple el protocolo Device de tu agent.py
         
         self.cap_b = cv2.VideoCapture(2)
         #self.cap_b.set(cv2.CAP_PROP_BRIGHTNESS,80)
+        self.cap_b.set(cv2.CAP_PROP_FPS,10)
         self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
         self.cap_b.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         self.cap_b.set(cv2.CAP_PROP_EXPOSURE, -7)
