@@ -6,6 +6,7 @@ from agent import Agent, Device
 import string
 import time
 import argparse
+from logger_config import setup_logger
 
 
 class ArucoDevice:
@@ -69,6 +70,7 @@ class ArucoDevice:
         cuando llega un mensaje al tópico suscrito.
         """
         # ---------------------------------------
+        logger.debug(f"Dato recibido en tópico {topic}")
         if topic == "vision/stitched":
             try:
                 # 1. Convertir el string JSON a diccionario
@@ -104,6 +106,7 @@ class ArucoDevice:
                         self.aruco_dict, 
                         parameters=self.aruco_params
                     )
+                    logger.debug(f"Marcadores detectados: {len(ids) if ids is not None else 0}")
                     # --- TRUCO DE DEBUG ---
 
                     # Dibuja en ROJO los cuadros que el algoritmo VIÓ pero DESCARTÓ por no ser ArUcos válidos
@@ -180,7 +183,7 @@ class ArucoDevice:
                                     "timestamp": time.time()
                                 }
                                 self.agent.send(target_topic,payload)
-                                print(f"Mensaje {json.dumps(payload)} enviado en topic {target_topic}")
+                                logger.debug(f"Enviado -> {target_topic}: {payload}")
 
                             except cv2.error as e:
                                 print(f"Error en la transformación: {e}")
@@ -195,25 +198,7 @@ class ArucoDevice:
   
 
     def run(self, gui=True):
-        '''print(f"[INFO] {self.agent.id} ejecutándose (GUI: {gui})")
-        try:
-            while self.running:
-                if gui and self.current_frame is not None:
-                    current_time = time.time()
-                    if (current_time - self.last_draw_time) > self.Tdraw:
-                        display_frame = self.current_frame.copy()
-                        if self.last_ids is not None:
-                            cv2.aruco.drawDetectedMarkers(display_frame, self.last_corners, self.last_ids)
-                        cv2.imshow(self.window_name, display_frame)
-                        self.last_draw_time = current_time
-                    
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
-                else:
-                    # Modo consola: solo dormimos para no saturar la CPU
-                    time.sleep(0.1)
-        finally:
-            if gui: cv2.destroyAllWindows()'''
+        pass
 
 # --- LANZAMIENTO DEL AGENTE ---
 if __name__ == "__main__":
@@ -235,3 +220,6 @@ if __name__ == "__main__":
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
     aruco_agent.device.run(gui=not args.no_gui)
+    # 1. Creamos un manejador de consola (StreamHandler)
+    logger = setup_logger(f"pos_agent_log_{time.strftime('%Y%m%d_%H%M%S')}")
+    time.sleep(1)  
