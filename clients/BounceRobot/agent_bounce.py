@@ -72,7 +72,7 @@ class BouncerRobot:
         self.last_odom_time = time.time()
         self.last_vision_time = time.time()
         self.status = "INICIALIZADO"
-
+    
    
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -82,7 +82,7 @@ class BouncerRobot:
         self.pos = [x, y, theta]
         self.estimate = [x, y, theta] # Sincronización: la cámara manda
         self.last_vision_time = time.time()
-        logger.info(f"Posición actualizada por visión: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
+        logger.debug(f"Posición actualizada por visión: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
 
     def on_odom_received(self, wl, wr):
         """Calcula el movimiento basado en encoders (Cinemática Diferencial)."""
@@ -135,7 +135,7 @@ class BouncerRobot:
                 self.y_max = max(all_y)
                 self.boundaries = [self.x_min,self.x_max,self.y_min,self.y_max]
             except Exception as e:
-                print(f"Error al decodificar: {e}")
+                logger.error(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
         elif topic == f"{self.robot_id}/pos":
             
@@ -157,13 +157,13 @@ class BouncerRobot:
                 # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
                 if hasattr(self, 'last_pos_time'):
                     freq = 1.0 / (current_time - self.last_pos_time)
-                    #logger.info(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+                    logger.debug(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
     
                 self.last_pos_time = current_time
                 
                 
             except Exception as e:
-                print(f"Error al descodificar: {e}")
+                logger.error(f"Error al descodificar: {e}")
         elif topic == f"agent/{self.robot_id}/wheel":
             
             try:
@@ -176,7 +176,7 @@ class BouncerRobot:
                 wr = float(raw_data.get('Wright'))
                 self.on_odom_received(wl, wr)
             except Exception as e:
-                print(f"Error al decodificar odometría: {e}")
+                logger.error(f"Error al decodificar odometría: {e}")
         elif topic == f"agent/{self.robot_id}/feedback":
             try:
                 raw_data = json.loads(message)
@@ -272,6 +272,11 @@ class BouncerRobot:
             if (time.time() - self.retrocede_start_time) >= self.retrocede_duration:
                 self.fsm = RobotState.PARANDO_PARA_GIRAR
                 self.stop_start_time = time.time()
+            else:
+                # Si durante el retroceso detectamos que la pared sigue demasiado cerca, reiniciamos el timer de retroceso
+                if min(wall_distances)>self.safety_distance:
+                    self.fsm = RobotState.PARANDO_PARA_GIRAR
+                    self.stop_start_time = time.time() 
 
         elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
             if (time.time() - self.stop_start_time) >= self.stop_duration:
@@ -356,21 +361,11 @@ class BouncerRobot:
 # a partir de aqui es todo de recibir
 #cuando conecta
 def on_connect(client,userdata,flags,rc):
-   print("conectado al broker")
-   #client.subscribe("#")
-   #client.subscribe("agent/6/velocity")   
-   #client.subscribe("agent/6/odon")
-   client.subscribe("arena/boundaries")     
-   client.subscribe("6/pos")      
-   client.subscribe("agent/6/wheel")
-   client.subscribe("agent/6/feedback")
+    pass
    
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
-    #print("topic:", msg.topic)
-    #print("Mensaje:", msg.payload.decode()) 
-    #print("------")
-    pass
+     pass
 
 # Configuración del Agente
 if __name__ == "__main__":
@@ -383,7 +378,8 @@ if __name__ == "__main__":
       hub_ip='192.168.10.1'
     )
     # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger(bouncer_agent.device.log_file)
+    logger = setup_logger(bouncer_agent.device.log_file,console_level=logging.WARNING)
+    logger.propagate=False # Evita que los mensajes se dupliquen si el logger raíz también tiene handlers
     time.sleep(1)    
     
     t = threading.Thread(target=bouncer_agent.device.run)
@@ -403,7 +399,15 @@ if __name__ == "__main__":
         client.loop_start()
         logger.info(f"Agent {bouncer_agent.id} en marcha")
         logger.info(f"Agente {bouncer_agent.id} y despachador en marcha.")
-    
+        client.subscribe("arena/boundaries")
+        logger.info(f"Agent {bouncer_agent.id} suscrito a arena/boundaries")
+        client.subscribe("6/pos")
+        logger.info(f"Agent {bouncer_agent.id} suscrito a 6/pos")
+        client.subscribe("agent/6/wheel")
+        logger.info(f"Agent {bouncer_agent.id} suscrito a agent/6/wheel")
+        client.subscribe("agent/6/feedback")
+        logger.info(f"Agent {bouncer_agent.id} suscrito a agent/6/feedback")
+
         # 3. Hilo Principal: Despachador de la cola hacia ZeroMQ (ZMQ)
         while True:
             if not bouncer_agent.device.command_queue.empty():
@@ -413,7 +417,7 @@ if __name__ == "__main__":
                 if 'ang' in cmd :
                     # Si es una operación compleja de giro, la mandamos al topic turn para giro preciso con eng en grados
                     topic = f"agent/{bouncer_agent.device.robot_id}/turn"
-                    #logger.info(f"Enviado {cmd}")
+                    logger.debug(f"Enviado {cmd}")
                 else:
                     # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
                     topic = f"agent/{bouncer_agent.device.robot_id}/move"
@@ -425,7 +429,7 @@ if __name__ == "__main__":
                     logger.error(f"Error enviando por ZMQ: {e}")
                     
                 bouncer_agent.device.command_queue.task_done()
-            time.sleep(0.01)
+            time.sleep(0.001)
     
     mqtt_and_dispatch()
     # Configuración MQTT
