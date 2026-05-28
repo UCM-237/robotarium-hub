@@ -152,7 +152,9 @@ if __name__ == "__main__":
 
     agente_vision.device.gui = not args.no_gui # Seteamos el modo de visualización
     # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger(f"vision_agent_log_{time.strftime('%Y%m%d_%H%M%S')}")
+    fname=f"vision_agent_log_{time.strftime('%Y%m%d_%H%M%S')}"
+    logger = setup_logger(fname,console_level=logging.WARNING) # Cambia a DEBUG para ver todos los mensajes
+    logger.propagate = False # Evita que los mensajes se propaguen al logger raíz (y se dupliquen)
     time.sleep(1)    
 
   

@@ -62,7 +62,8 @@ class ArucoDevice:
         self.frame_to_show=None
 
     def connect(self) -> None:
-        print(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
+        logger.info(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
+        self.agent.setup_subscriptions() # Configuramos las suscripciones al Hub
 
     def on_data(self, topic: str, message: str) -> None:
         """
@@ -116,11 +117,11 @@ class ArucoDevice:
                     cv2.imshow("debug_window",frame)
                     cv2.waitKey(1)
                     if ids is None:
-                        print("No markers detected on frame")
-                        print(len(rejected))
+                        logger.warning("No markers detected on frame")
+                        logger.debug(f"Marcadores rechazados: {len(rejected)}")
                         self.missed_frames+=1
                         if self.missed_frames %10 ==0:
-                            print(f"Ojo {self.missed_frames} frames sin ver robots")
+                            logger.warning(f"Ojo {self.missed_frames} frames sin ver robots")
                     else:
                         self.missed_frames = 1
                         ids_flat = ids.flatten()
@@ -170,7 +171,7 @@ class ArucoDevice:
 
                                 yaw_new = np.arctan2(dy_px, dx_px)
                                 
-                                print(f"ID {ids[i][0]}: X={x_new:.2f}, Y={y_new:.2f}, Th={yaw_new:.2f}")
+                                logger.info(f"ID {ids[i][0]}: X={x_new:.2f}, Y={y_new:.2f}, Th={yaw_new:.2f}")
                                 # 4. (Opcional) Publicar para el servidor/robots
                                 # 4. ENVÍO DE DATOS
                                 robot_id = int(ids[i][0])
@@ -186,16 +187,14 @@ class ArucoDevice:
                                 logger.debug(f"Enviado -> {target_topic}: {payload}")
 
                             except cv2.error as e:
-                                print(f"Error en la transformación: {e}")
+                                logger.error(f"Error en la transformación: {e}")
 
 
                         
  
                     
             except Exception as e:
-                print(f"[ERROR] Error al procesar frame: {e}")
-
-  
+                logger.error(f"[ERROR] Error al procesar frame: {e}")
 
     def run(self, gui=True):
         pass
@@ -221,5 +220,7 @@ if __name__ == "__main__":
     #aruco_agent.device.connect()
     aruco_agent.device.run(gui=not args.no_gui)
     # 1. Creamos un manejador de consola (StreamHandler)
-    logger = setup_logger(f"pos_agent_log_{time.strftime('%Y%m%d_%H%M%S')}")
+    fname=f"pos_agent_log_{time.strftime('%Y%m%d_%H%M%S')}"
+    logger = setup_logger(fname,console_level=logging.WARNING)
+    logger.propagate = False
     time.sleep(1)  
