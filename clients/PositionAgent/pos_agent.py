@@ -7,11 +7,15 @@ import string
 import time
 import argparse
 from logger_config import setup_logger
+import logging
+import queue
+import threading
+
 
 
 class ArucoDevice:
     def __init__(self, agent: Agent) -> None:
-        print("Inicializando ArucoDevice")
+        logger.info("Inicializando ArucoDevice")
         self.agent = agent
         self.window_name = "Robotarium - Recepcion Vision"
         self.missed_frames = 0
@@ -60,11 +64,19 @@ class ArucoDevice:
         self.last_draw_time=0
         
         self.frame_to_show=None
+        # Creamos una cola para procesar las imágenes fuera del hilo de MQTT
+        self.image_queue = queue.Queue(maxsize=3) 
+        
+        # Lanzamos un hilo dedicado exclusivamente a procesar las imágenes
+        self.process_thread = threading.Thread(target=self._image_processing_loop, daemon=True)
+        self.process_thread.start()
 
     def connect(self) -> None:
         logger.info(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
-        self.agent.setup_subscriptions() # Configuramos las suscripciones al Hub
+        #self.agent.setup_subscriptions() # Configuramos las suscripciones al Hub
+        #logger.info(f"[INFO] Agente {self.agent.id} suscrito a topics")
 
+  
     def on_data(self, topic: str, message: str) -> None:
         """
         Este método es llamado automáticamente por agent.py 
@@ -74,8 +86,23 @@ class ArucoDevice:
         logger.debug(f"Dato recibido en tópico {topic}")
         if topic == "vision/stitched":
             try:
+                if not self.image_queue.full():
+                    self.image_queue.put(message)
+                else:
+                    # Si el robot va lento procesando, descartamos el frame viejo
+                    pass 
+  
+            except Exception as e:
+                logger.error(f"[ERROR] Error al procesar frame: {e}")
+
+    def _image_processing_loop(self):
+
+        """Hilo aislado. Si aquí explota OpenCV, la red MQTT sigue funcionando intacta."""
+        while True:
+            try:
+                payload = self.image_queue.get()
                 # 1. Convertir el string JSON a diccionario
-                data = json.loads(message)
+                data = json.loads(payload)
                 
                 # 2. Extraer la imagen en Base64 y decodificarla
                 # Basado en el payload que envía tu vision_agent.py
@@ -188,14 +215,12 @@ class ArucoDevice:
 
                             except cv2.error as e:
                                 logger.error(f"Error en la transformación: {e}")
-
-
+                self.image_queue.task_done()
+            except Exception as e:
+                logger.error(f"[ERROR] Error al procesar frame en hilo aislado: {e}", exc_info=True)
                         
  
                     
-            except Exception as e:
-                logger.error(f"[ERROR] Error al procesar frame: {e}")
-
     def run(self, gui=True):
         pass
 
@@ -207,7 +232,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--no-gui', action='store_true', help="Ejecutar sin ventana de video")
     args = parser.parse_args()
-
+    # 1. Creamos un manejador de consola (StreamHandler)
+    fname=f"pos_agent_log_{time.strftime('%Y%m%d_%H%M%S')}"
+    logger = setup_logger(fname,console_level=logging.WARNING)
+    logger.propagate = False
+    time.sleep(1)  
     aruco_agent = Agent(
         device_class=ArucoDevice,
         id="ArucoTracker",
@@ -215,12 +244,8 @@ if __name__ == "__main__":
         hub_ip="192.168.10.1",  # IP del Hub
         data_port = 5560
     )
-    
+    topic=b'vision/stitched'
+    aruco_agent.setup_subscriptions(topic)
     # Iniciamos el bucle pasivo
     #aruco_agent.device.connect()
     aruco_agent.device.run(gui=not args.no_gui)
-    # 1. Creamos un manejador de consola (StreamHandler)
-    fname=f"pos_agent_log_{time.strftime('%Y%m%d_%H%M%S')}"
-    logger = setup_logger(fname,console_level=logging.WARNING)
-    logger.propagate = False
-    time.sleep(1)  
