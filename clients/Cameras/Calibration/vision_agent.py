@@ -14,6 +14,7 @@ import time
 from agent import Agent, Device
 from threading import Thread
 from logger_config import setup_logger
+import logging
 
 MAX_WIDHT=1280
 MAX_HEIGHT=720

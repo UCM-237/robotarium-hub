@@ -12,6 +12,7 @@ import threading
 from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
 from logger_config import setup_logger
+import logging
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -42,6 +43,7 @@ class BouncerRobot:
         self.margin = 20.0
         self.speed = 20.0
         self.fsm = RobotState.AVANZA
+        self.fsm_last=RobotState.AVANZA
         self.danger_distance = 20.0
         self.last_wall_hit=None
         self.v=35.0
@@ -302,33 +304,28 @@ class BouncerRobot:
                 self.fsm= RobotState.AVANZA
         
         # 6. Decisión de velocidad basada en FSM
-        if self.fsm== RobotState.AVANZA:
+        if self.fsm== RobotState.AVANZA and self.fsm_last!=RobotState.AVANZA:
             v = self.speed
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
+            
+        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER and self.fsm_last!=RobotState.PARANDO_PARA_RETROCEDER:
             v = 0.0
             w = 0.0
-            wl=v/3.35
-            wr=v/3.35
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.RETROCEDE:
+        elif self.fsm == RobotState.RETROCEDE and self.fsm_last!=RobotState.RETROCEDE:
             v = -30 
             w = 0.0
-            wl=v/3.35
-            wr=v/3.35
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.PARANDO_PARA_GIRAR:
+        elif self.fsm == RobotState.PARANDO_PARA_GIRAR and self.fsm_last!=RobotState.PARANDO_PARA_GIRAR:
             v = 0.0
             w = 0.0
-            wl=v/3.35
-            wr=v/3.35
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.GIRA:
+        elif self.fsm == RobotState.GIRA and self.fsm_last!=RobotState.GIRA:
             #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
             self.target_theta = math.degrees(self.target_theta)
             #TEST. Remove
@@ -336,6 +333,7 @@ class BouncerRobot:
             comando_giro = {'op': 'turn', 'ang': self.target_theta}
             self.command_queue.put({'ang': self.target_theta})
         self.last_wall_hit=target_wall
+        self.fsm_last=self.fsm
         logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {target_wall} | Target Theta: {self.target_theta:.2f}° |theta: {math.degrees(theta)} ") 
 
     def check_position_estimate(self):
@@ -390,8 +388,23 @@ if __name__ == "__main__":
     #bouncer_agent.listen()
     #MQTT_agent.register()
     logger.info(f'Agent {bouncer_agent.id} is listening')
+
+    topic=b'6/pos'
+    bouncer_agent.setup_subscriptions(topic)
+    logger.info(f"Suscrito a topic {topic}")
+    topic=b'arena/boundaries'
+    bouncer_agent.setup_subscriptions(topic)
+    logger.info(f"Suscrito a topic {topic}")
+    topic=b'agent/6/feedback'
+    bouncer_agent.setup_subscriptions(topic)
+    logger.info(f"Suscrito a topic {topic}")
+    topic=b'agent/6/wheel'
+    bouncer_agent.setup_subscriptions(topic)
+    logger.info(f"Suscrito a topic {topic}")
     def mqtt_and_dispatch():
         # Configurar MQTT aquí...
+       
+        
         client = mqtt.Client()
         client.on_connect = on_connect
         client.on_message = on_message
@@ -399,15 +412,7 @@ if __name__ == "__main__":
         client.loop_start()
         logger.info(f"Agent {bouncer_agent.id} en marcha")
         logger.info(f"Agente {bouncer_agent.id} y despachador en marcha.")
-        client.subscribe("arena/boundaries")
-        logger.info(f"Agent {bouncer_agent.id} suscrito a arena/boundaries")
-        client.subscribe("6/pos")
-        logger.info(f"Agent {bouncer_agent.id} suscrito a 6/pos")
-        client.subscribe("agent/6/wheel")
-        logger.info(f"Agent {bouncer_agent.id} suscrito a agent/6/wheel")
-        client.subscribe("agent/6/feedback")
-        logger.info(f"Agent {bouncer_agent.id} suscrito a agent/6/feedback")
-
+       
         # 3. Hilo Principal: Despachador de la cola hacia ZeroMQ (ZMQ)
         while True:
             if not bouncer_agent.device.command_queue.empty():

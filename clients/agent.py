@@ -74,9 +74,11 @@ class Agent:
     self.connected = response['result'] == 'ok'
     Thread(target=self.listen).start()#Thread listening to the hub
 
-  def setup_subscriptions(self):
+  def setup_subscriptions(self, topic: str) ->None:
     '''Setup subscriptions to the hub. To be re-implemented by the user if needed'''
-    pass
+    if isinstance(topic, str):
+        topic = topic.encode('utf-8')
+    self.hub_data.setsockopt(zmq.SUBSCRIBE,topic)
 
   def listen(self) -> None:
     '''Receive data from other agents'''
