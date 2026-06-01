@@ -73,7 +73,7 @@ class BouncerRobot:
         self.angle_limit= 0.8        
         self.last_odom_time = time.time()
         self.last_vision_time = time.time()
-        self.status = "INICIALIZADO"
+        self.status = "ESPERANDO POSICIÓN INICIAL"
     
    
     def connect(self) -> None:
@@ -140,7 +140,7 @@ class BouncerRobot:
                 logger.error(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
         elif topic == f"{self.robot_id}/pos":
-            
+            self.status = "INICIALIZADO"
             try:
                 raw_data= json.loads(message)
                 #print(raw_data)
@@ -201,16 +201,19 @@ class BouncerRobot:
                 # Si hace más de 1.5 segundos que no sabemos nada del robot...
                 time_since_vision = ahora - self.last_pos_time
                 time_since_odom = ahora - self.last_odom_time
-                
-                if time_since_vision > 2.5 and time_since_odom > 2.5:
-                    logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                if self.status=="ESPERANDO POSICIÓN INICIAL":
+                    logger.warning("Esperando posición inicial... Aún no se han recibido datos de visión.")
                     self.command_queue.put({'v': 0.0, 'w': 0.0})
                 else:
-                    # 2. EJECUCIÓN DE LA LÓGICA
-                    # pos_logic ahora decidirá qué posición usar
-                    x,y,theta=self.check_position_estimate()
-                    logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
-                    self.actualizar_fsm(x,y,theta)
+                    if time_since_vision > 2.5 and time_since_odom > 2.5:
+                        logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                        self.command_queue.put({'v': 0.0, 'w': 0.0})
+                    else:
+                        # 2. EJECUCIÓN DE LA LÓGICA
+                        # pos_logic ahora decidirá qué posición usar
+                        x,y,theta=self.check_position_estimate()
+                        logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
+                        self.actualizar_fsm(x,y,theta)
                 self.last_time=ahora
             
 
