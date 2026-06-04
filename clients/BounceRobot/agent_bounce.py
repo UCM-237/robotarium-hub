@@ -242,7 +242,8 @@ class BouncerRobot:
  
         vy = math.cos(theta)
         vx = -math.sin(theta)
-        logger.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}")   
+        logger.info(f"Posicion: {x}, {y}, {theta} | Velocidad: {vx}, {vy}") 
+        logger.info(f"Distancia en la direccion del movimiento: {vx*d_left + vy*d_top:.2f}")  
         # 4. Lógica de "Pared de Impacto Inminente"
         # Solo nos importa la pared hacia la que apuntan nuestros vectores de velocidad
         distancia_critica = self.safety_distance
