@@ -242,7 +242,7 @@ if __name__ == "__main__":
         id="ArucoTracker",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
-        data_port = 5560
+        data_port = 5590
     )
     topic=b'vision/stitched'
     aruco_agent.setup_subscriptions(topic)

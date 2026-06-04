@@ -273,9 +273,11 @@ if __name__ == "__main__":
         id="RobotArena",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
-        data_port = 5561
+        data_port = 5591
     )
     arena_agent.device.gui = not args.no_gui # Seteamos el modo
+    topic=b"vision/stitched"
+    arena_agent.setup_subscriptions(topic)
     arena_agent.device.run()
 
     # Iniciamos el bucle pasivo

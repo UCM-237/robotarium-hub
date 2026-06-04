@@ -39,7 +39,7 @@ class RobotState(Enum):
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
-        self.boundaries=[0.0,450.0,0,140.0] #Lo inicializo asi por si acaso no recibe los limites
+        self.boundaries=[-102.0,298.0,16,160.0] #Lo inicializo asi por si acaso no recibe los limites
         self.margin = 20.0
         self.speed = 20.0
         self.fsm = RobotState.AVANZA
@@ -52,7 +52,7 @@ class BouncerRobot:
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 50.0 
+        self.safety_distance = 30.0 
         self.t_retrocediendo=0
         self.control_time=0.05 #ms
         self.last_time=0
@@ -63,7 +63,7 @@ class BouncerRobot:
         self.last_pos_time = 0.0
         self.stop_duration = 0.5  # Tiempo de parada en segundos
         self.stop_start_time = 0
-        self.retrocede_duration = 1.5
+        self.retrocede_duration = 2.0
         self.retrocede_start_time = 0
         self.estimate = [0.0, 0.0, 0.0] # [xe, ye, thetae] - Estima por odometría
         self.target_theta=0.0
@@ -308,7 +308,7 @@ class BouncerRobot:
                 self.fsm= RobotState.AVANZA
         
         # 6. Decisión de velocidad basada en FSM
-        if self.fsm== RobotState.AVANZA and self.fsm_last!=RobotState.AVANZA:
+        if self.fsm== RobotState.AVANZA:
             v = self.speed
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
@@ -320,7 +320,7 @@ class BouncerRobot:
             self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.RETROCEDE and self.fsm_last!=RobotState.RETROCEDE:
-            v = -30 
+            v = -40 
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
             
@@ -329,11 +329,11 @@ class BouncerRobot:
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.GIRA and self.fsm_last!=RobotState.GIRA:
+        elif self.fsm == RobotState.GIRA:
             #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
             self.target_theta = math.degrees(self.target_theta)
             #TEST. Remove
-            #self.target_theta=-180
+            self.target_theta=-180
             comando_giro = {'op': 'turn', 'ang': self.target_theta}
             self.command_queue.put({'ang': self.target_theta})
         self.last_wall_hit=target_wall
