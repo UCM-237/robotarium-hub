@@ -52,7 +52,7 @@ class BouncerRobot:
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 30.0 
+        self.safety_distance = 40.0 
         self.t_retrocediendo=0
         self.control_time=0.05 #ms
         self.last_time=0
@@ -225,10 +225,10 @@ class BouncerRobot:
         y_min, y_max = self.boundaries[2], self.boundaries[3]
 
         # 2. Distancias Euclidianas "puras" (¿A cuánto estoy de las bandas?)
-        d_left = x - x_min
-        d_right = x_max - x
-        d_bottom = y - y_min
-        d_top = y_max - y
+        d_left = abs(x - x_min)
+        d_right = abs(x_max - x)
+        d_bottom = abs(y - y_min)
+        d_top = abs(y_max - y)
         #logger.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
         logger.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
                     
@@ -236,63 +236,101 @@ class BouncerRobot:
     
     def calcular_distancia_en_movimiento(self, x, y, theta):
         """
-        Calcula la distancia hasta la pared que intersecta la trayectoria frontal del robot.
-        Retorna la pared de impacto proyectada y la distancia en metros.
+        Calcula la distancia hasta la pared que intersecta la trayectoria frontal del robot,
+        contemplando que yaw=0 es mirando hacia ARRIBA (eje +Y).
         """
-        cos_t = math.cos(theta)
-        sin_t = math.sin(theta)
+        # Obtenemos las componentes de movimiento según el convenio de tu odometría
+        # Si dx = v * cos(theta) y dy = v * sin(theta), entonces:
+        # cos_t representa el avance en X, sin_t representa el avance en Y.
+        # Obtenemos las direcciones de movimiento según dictamina tu odometría
+        dir_x = math.cos(theta) 
+        dir_y = math.sin(theta)
+        
         x_min, x_max = self.boundaries[0], self.boundaries[1]
         y_min, y_max = self.boundaries[2], self.boundaries[3]
+        
         candidatos = {}
         
-        # 1. Intersección con paredes verticales (Eje X)
-        if cos_t > 1e-6: # Moviéndose hacia la derecha (+X)
-            dist_x = (x_max - x) / cos_t
-            candidatos['derecha'] = dist_x
-        elif cos_t < -1e-6: # Moviéndose hacia la izquierda (-X)
-            dist_x = (x_min - x) / cos_t  # Será positivo porque (x_min - x) es negativo y cos_t es negativo
-            candidatos['izquierda'] = dist_x
-            
-        # 2. Intersección con paredes horizontales (Eje Y)
-        if sin_t > 1e-6: # Moviéndose hacia arriba (+Y)
-            dist_y = (y_max - y) / sin_t
-            candidatos['arriba'] = dist_y
-        elif sin_t < -1e-6: # Moviéndose hacia abajo (-Y)
-            dist_y = (y_min - y) / sin_t
-            candidatos['abajo'] = dist_y
+       
+        # 0. Casos evidentes
+        if abs(theta)<0.1: 
+            candidatos['arriba']=abs(y_max-y)
+        elif abs(theta-np.pi/2.0)<0.1:
+            candidatos['derecha']=abs(x_max-x)
+        elif abs(theta-np.pi)<0.1:
+            candidatos['abajo']=abs(y-y_min)
+        elif abs(theta-3*np.pi/2.0)<0.1:
+            candidatos['izquierda']=abs(x_min-x)
+        else:
+            # 1. Intersección con componentes de avance en X (Paredes Izquierda y Derecha)
+            if theta < 0 and theta > -np.pi/2.0: # El modelo matemático dice que se mueve hacia la Derecha (+X)
+                candidatos['derecha'] = (x_max - x) /dir_y
+                candidatos['arriba']=(y_max-y) / dir_x
+            elif theta <= -np.pi/2.0 and theta > -np.pi: # El modelo matemático dice que se mueve hacia la Izquierda (-X)
+                candidatos['derecha'] = abs((y_min - y) /dir_x)
+                candidatos['abajo'] = abs((x_max - x) / dir_y)
+            elif theta >np.pi/2 and theta < np.pi:
+                candidatos['izquierda'] = abs((x - x_min) /dir_y)
+                candidatos['abajo'] = abs((y_min - y) / dir_y)
+            else:
+                candidatos['izquierda'] = abs((x - x_min) / dir_y)
+                candidatos['arriba'] = abs((y_max -y) / dir_x)
+                
+        logger.critical(f"Theta: {theta}, Candidatos: {candidatos}")
+            # Filtramos para quedarnos SOLO con distancias reales hacia adelante (positivas)
+        candidatos_validos = {k: v for k, v in candidatos.items() if v > 0}
 
-        # Si por algún motivo matemático la lista está vacía, evitamos errores
-        if not candidatos:
-            return None, float('inf')
-            
-        # La pared real de impacto será la que requiera recorrer la menor distancia positiva
-        pared_impacto = np.min(list(candidatos.values()))
-        distancia_proyectada = candidatos[pared_impacto]
+        if not candidatos_validos:
+            if abs(x_max-x)<1e-5:
+                candidatos['derecha']=0
+            elif abs(x-x_min)<1e-5:
+                candidatos['izquierda']=0
+            if abs(y_max-y)<1e-5:
+                candidatos['arriba']=0
+            elif abs(y-y_min)<1e-5:
+                candidatos['abajo']=0
+
+        # La pared de impacto real será la que esté más cerca en la trayectoria
+        pared_impacto = min(candidatos_validos, key=candidatos_validos.get)
+        distancia_proyectada = candidatos_validos[pared_impacto]
         
         return pared_impacto, distancia_proyectada
-
+    
     def calcular_reflexion(self, pared, theta_actual):
-        """Calcula el ángulo de reflexión perfecta."""
-        # Trabajamos en grados para facilitar la lectura del log, luego convierte si es necesario
+        """
+        Calcula el ángulo de reflexión perfecta bajo el convenio:
+        yaw = 0 mirando hacia arriba (+Y), crece antihorario.
+        """
         theta_deg = math.degrees(theta_actual) % 360
-        nuevo_theta = theta_deg    
-        if pared in ['izquierda', 'derecha']:
+        nuevo_theta=0
+
+        if pared in ['arriba', 'abajo']:
+            # Se refleja respecto al eje horizontal (invierte componente Y)
+            # En tu convenio '0' es arriba, por lo tanto la reflexión horizontal es (180 - theta)
             nuevo_theta = (180 - theta_deg) % 360
-        elif pared in ['arriba', 'abajo']:
+        elif pared in ['izquierda', 'derecha']:
+            # Se refleja respecto al eje vertical (invierte componente X)
+            # En tu convenio, esto equivale a cambiar el signo de la desviación respecto a '0' (-theta)
             nuevo_theta = (-theta_deg) % 360
-            
+
+        if abs(abs(theta_deg - nuevo_theta) - 180) < 1.0:
+            nuevo_theta = (nuevo_theta + 5) % 360    
+        
         return math.radians(nuevo_theta)
     
     def actualizar_fsm(self,x,y,theta):
         # 1. Obtener métricas
-        pared_abs, dist_absoluta = self.get_distance_to_wall(x, y,theta)
-        pared_mov, dist_movimiento = self.calcular_distancia_en_movimiento(x, y, theta)
+        distancias= self.get_distance_to_wall(x, y,theta)
+        dist_absoluta=np.min(distancias)
         
+        pared_abs=min(range(len(distancias)), key=lambda i: distancias[i])
+        pared_mov, dist_movimiento = self.calcular_distancia_en_movimiento(x, y, theta)
+        logger.warning(f"Distancia absoluta: {dist_absoluta}, distancia proyectada: {dist_movimiento}, pared: {pared_mov}")
         # 2. Evaluación de la Máquina de Estados
         if self.fsm == RobotState.AVANZA:
             # FILTRO 1: Seguridad Absoluta. Si por colisión o inercia está pegado a un muro, va atrás.
-            if dist_absoluta <= self.danger_distance: 
-                estado = RobotState.PARANDO_PARA_RETROCEDER
+            if np.abs(dist_absoluta) <= self.danger_distance: 
+                self.fsm= RobotState.PARANDO_PARA_RETROCEDER
                 self.t_retrocediendo=time.time()
                 # Se guarda la pared absoluta de la que se debe alejar
                 pared_de_escape = pared_abs 
@@ -300,17 +338,20 @@ class BouncerRobot:
 
             # FILTRO 2: Comportamiento Billar. Si la trayectoria colisionará pronto, calcula reflexión.
             elif dist_movimiento <= self.safety_distance: 
-                target_angle = self.calcular_reflexion(pared_mov, theta)
-                estado = RobotState.GIRA
+                self.target_theta = self.calcular_reflexion(pared_mov, theta)
+                self.fsm = RobotState.GIRA
+                self.giro_terminado=False
         elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
             if (time.time() - self.t_retrocediendo) >= self.stop_duration:
-                estado = RobotState.RETROCEDE
+                self.fsm = RobotState.RETROCEDE
+                self.t_retrocediendo=time.time()
         elif self.fsm == RobotState.RETROCEDE:
-            if dist_absoluta >= self.safety_distance:
-                estado = RobotState.GIRA
+            if np.abs(dist_absoluta) >= self.safety_distance or (time.time()-self.t_retrocediendo)>self.retrocede_duration:
+                self.target_angle = self.calcular_reflexion(pared_mov, theta)
+                self.fsm = RobotState.GIRA
         elif self.fsm == RobotState.GIRA:   
             if self.giro_terminado:
-                estado = RobotState.AVANZA
+                self.fsm = RobotState.AVANZA
 
         # 6. Decisión de velocidad basada en FSM
         if self.fsm== RobotState.AVANZA:
@@ -334,11 +375,12 @@ class BouncerRobot:
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
             
-        elif self.fsm == RobotState.GIRA:
+        elif self.fsm == RobotState.GIRA and self.fsm_last!=RobotState.GIRA:
             #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
             self.target_theta = math.degrees(self.target_theta)
+            self.target_theta=(self.target_theta+ 180) % 360 - 180
             #TEST. Remove
-            self.target_theta=-180
+            #self.target_theta=-180
             comando_giro = {'op': 'turn', 'ang': self.target_theta}
             self.command_queue.put({'ang': self.target_theta})
         self.fsm_last=self.fsm
