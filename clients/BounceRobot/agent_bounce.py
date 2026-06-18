@@ -17,14 +17,6 @@ import logging
 BROKER = "192.168.10.1"
 PUERTO = 1883
 
-'''TODO: Implementar lógica de rebote basada en distancias a paredes. El robot debería "rebotar" (girar) cuando se acerque demasiado a una pared, y luego volver a avanzar.
-Que lo haga en la dirección opuesta a la pared más cercana. Para esto, el robot debe calcular su distancia a cada pared (usando su posición y los límites del tatami) y decidir hacia dónde girar. Además, implementar un sistema de "estados" (FSM) para manejar las transiciones entre avanzar, girar y parar. Por ejemplo:
-- Estado "Avanza": El robot se mueve hacia adelante. Si detecta que se acerca a una pared (distancia < umbral), cambia al estado "Gira".
-- Estado "Gira": El robot gira en la dirección opuesta a la pared más cercana durante un tiempo determinado o hasta que alcance una distancia segura. Luego vuelve al estado "Avanza".
-- Estado "Para": Si el robot detecta que está demasiado cerca de una pared (distancia < umbral crítico), se detiene completamente para evitar colisiones. Permanece en este estado hasta que la distancia vuelva a ser segura, momento en el cual puede volver a "Avanza".
-TODO: Mejorar la lógica de decisión para considerar no solo la distancia a las paredes, sino también la dirección del movimiento. Por ejemplo, si el robot se está moviendo hacia una pared, esa pared debería tener más peso en la decisión de rebote que una pared que está detrás del robot. Esto se puede lograr calculando el ángulo entre la dirección del movimiento y la dirección hacia cada pared, y ajustando el umbral de distancia en función de este ángulo.
-TODO: Mejorar la fusión de datos entre la posición por visión y la estima por odometría. En lugar de simplemente priorizar la visión cuando está disponible, se podría implementar un filtro de Kalman o un sistema de ponderación que combine ambas fuentes de información para obtener una estimación más robusta de la posición del robot. Esto ayudaría a mitigar los efectos de la latencia en la visión y los errores acumulativos en la odometría, proporcionando una base más sólida para la lógica de rebote y navegación. 
-'''
 
 
 class RobotState(Enum):
