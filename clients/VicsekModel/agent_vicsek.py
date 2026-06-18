@@ -367,7 +367,7 @@ class BouncerRobot:
             self.command_queue.put({'v': v, 'w': w})
         
         elif self.fsm == RobotState.RETROCEDE:
-            v = -20.0 # Reducido un poco para control suave en cm/s
+            v = -25.0 # Reducido un poco para control suave en cm/s
             w = 0.0
             self.command_queue.put({'v': v, 'w': w})
             
@@ -378,15 +378,23 @@ class BouncerRobot:
             # El robot gira sobre su propio eje: v = 0, w proporcional al error
             v = 0.0 
             w = self.Kp_gira * error_theta
+            # Limitamos la velocidad angular mínima para superar la zona muerta
+            if w<1.0 and w>0.1:
+                w=1.0
+            elif w>-1 and w<-0.1:
+                w=-1.0
         
             # Limitamos la velocidad angular máxima por seguridad física de los motores
             w_max = 3.0 # rad/s
             w = max(min(w, w_max), -w_max)
+            
+
         
             self.command_queue.put({'v': v, 'w': w})
 
         self.fsm_last = self.fsm
-        logger.warning(f"Estado FSM: {self.fsm.name} | Target Theta: {math.degrees(self.target_theta):.2f}° | Theta Act: {math.degrees(theta):.2f}°")[cite: 9]
+        logger.warning(f"Estado FSM: {self.fsm.name} | Target Theta: {math.degrees(self.target_theta):.2f}° | Theta Act: {math.degrees(theta):.2f}°")
+        logger.warning(f"v: {v} | w: {w}")
     
     def check_position_estimate(self):
         ahora = time.time()
