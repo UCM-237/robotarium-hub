@@ -1,1 +1,1 @@
-logger_config.py
+../logger_config.py
