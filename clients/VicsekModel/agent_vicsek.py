@@ -12,6 +12,7 @@ import threading
 from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
 from logger_config import setup_logger
+import argparse
 import logging
 
 BROKER = "192.168.10.1"
@@ -427,14 +428,39 @@ def on_message(client,userdata, msg):
 
 # Configuración del Agente
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Lanzador de agente Robotarium con parámetros dinámicos.")
+    parser.add_argument(
+        "-i", "--id", 
+        type=int, 
+        required=True, 
+        help="ID numérico del robot (ej. 5 o 6)"
+    )
+    parser.add_argument(
+        "-p", "--port", 
+        type=int, 
+        required=True, 
+        help="Puerto de datos (data_port) para el agente (ej. 5556)"
+    )
+
+    args = parser.parse_args()
+
+    # 2. Configurar el logger usando el ID del robot dinámico
+    agent_name = f"Robot_{args.id:02d}"
+    logger = setup_logger(agent_name, console_level=logging.INFO)
+    logger.info(f"Iniciando {agent_name} en el puerto de datos {args.port}...")
+
+    # 3. Inicializar el agente ZMQ pasándole el puerto dinámico
    # Configuración del Agente
     bouncer_agent = Agent(
       device_class=BouncerRobot,
       id='Bouncer Robot',
       ip='192.168.10.1',
-      data_port = 5563,
+      data_port = args.port,
       hub_ip='192.168.10.1'
     )
+    # 4. Asignar el ID correcto dentro del objeto hardware (BouncerRobot)
+    bouncer_agent.device.robot_id = args.id
+
     # 1. Creamos un manejador de consola (StreamHandler)
     logger = setup_logger(bouncer_agent.device.log_file,console_level=logging.WARNING)
     logger.propagate=False # Evita que los mensajes se dupliquen si el logger raíz también tiene handlers
@@ -449,18 +475,25 @@ if __name__ == "__main__":
     #MQTT_agent.register()
     logger.info(f'Agent {bouncer_agent.id} is listening')
 
-    topic=b'6/pos'
+    topic=f'{args.id}/pos'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
     topic=b'arena/boundaries'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/6/feedback'
+    topic=f'agent/{args.id}/feedback'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/6/wheel'
+    topic=f'agent/{args.id}/wheel'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
+
+    #Me tengo que suscribir a los topics de pos de todos los robots para poder calcular la distancia a los demás
+    for robot_id in range(1, 10):  # Asumiendo que hay 10 robots en total
+        if robot_id != args.id:  # No nos suscribimos a nuestro propio topic
+            topic = f'{robot_id}/pos'
+            bouncer_agent.setup_subscriptions(topic)
+            logger.info(f"Suscrito a topic {topic}")    
     def mqtt_and_dispatch():
         # Configurar MQTT aquí...
        
