@@ -102,6 +102,22 @@ class ArucoDevice:
             try:
                 payload = self.image_queue.get()
                 # 1. Convertir el string JSON a diccionario
+                # NUEVA COMPROBACIÓN Y DECODIFICACIÓN SEGURA:
+                if payload is None:
+                    self.image_queue.task_done()
+                    logger.warning("Payload vacion")
+                    continue
+                    
+                if isinstance(payload, bytes):
+                    payload = payload.decode('utf-8')
+                    
+                payload = payload.strip() # Limpia espacios en blanco o saltos de línea
+                
+                if not payload:
+                    logger.warning("[ADVERTENCIA] Se recibió un payload vacío en la cola.")
+                    self.image_queue.task_done()
+                    continue
+               
                 data = json.loads(payload)
                 
                 # 2. Extraer la imagen en Base64 y decodificarla

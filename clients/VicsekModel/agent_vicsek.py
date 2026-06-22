@@ -69,7 +69,9 @@ class BouncerRobot:
         self.status = "ESPERANDO POSICIÓN INICIAL"
         self.Kp_gira = 2.5            # Ganancia Proporcional para controlar la velocidad de giro
         self.tolerance_theta = 0.05    # Tolerancia de error angular en radianes (~2.8 grados)
-    
+        # Guardará datos con el formato: { id_robot: {'x': x, 'y': y, 'theta': theta, 'last_update': timestamp} }
+        self.posiciones_enjambre = {}
+        self.radio_enjambre=1.0
    
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -186,7 +188,35 @@ class BouncerRobot:
                     self.giro_terminado = True
             except Exception as e:
                 logger.error(f"Error al decodificar feedback: {e}")
-
+        else:
+            
+                # Extraemos el ID del robot desde el propio tópico (ej: "5/pos" -> 5)
+                parts = topic.split('/')
+                logger.critical(parts)
+                logger.critical(parts[0])
+                id_remoto = int(parts[0])
+                try:
+                    # 2. Limpieza del string de datos
+                    # A veces ZMQ mete los JSON en formato "['{...}']" o añade caracteres de escape.
+                    clean_message = message.strip()
+                    if clean_message.startswith("['") and clean_message.endswith("']"):
+                        clean_message = clean_message[2:-2]
+                    elif clean_message.startswith("[") and clean_message.endswith("]"):
+                        clean_message = clean_message[1:-1]
+            
+                    clean_message = clean_message.strip().strip("'").strip('"')
+                    raw_data= json.loads(clean_message)
+                
+                    if isinstance(raw_data, str):
+                        raw_data = json.loads(raw_data)
+                    x = float(raw_data.get('x'))
+                    y = float( raw_data.get('y'))
+                    theta = float (raw_data.get('yaw'))
+                    sent_time = raw_data.get("timestamp")
+                    # Enviamos los datos a la función del robot
+                    bouncer_agent.device.actualizar_con_vecinos(id_remoto, x, y, theta,sent_time)
+                except Exception as e:
+                    logger.error(f"Error al decodificar topic: {topic} {e}")
     def run(self):
         """Bucle de control independiente que corre a ~20Hz"""
         while True:
@@ -286,8 +316,12 @@ class BouncerRobot:
                 candidatos['abajo']=0
 
         # La pared de impacto real será la que esté más cerca en la trayectoria
-        pared_impacto = min(candidatos_validos, key=candidatos_validos.get)
-        distancia_proyectada = candidatos_validos[pared_impacto]
+        if not candidatos_validos:
+            pared_impacto=None
+            distancia_proyectada=100
+        else:
+            pared_impacto = min(candidatos_validos, key=candidatos_validos.get)
+            distancia_proyectada = candidatos_validos[pared_impacto]
         
         return pared_impacto, distancia_proyectada
     
@@ -417,6 +451,31 @@ class BouncerRobot:
     def send_move(self, v, w):
         bouncer_agent.send(f"agent/{self.robot_id}/move", {'v': v, 'w': w})
 
+    def actualizar_con_vecinos(self, id_remoto, x, y, theta, sent_time):
+        """
+        Registra la posición recibida de cualquier robot del laboratorio y 
+        muestra por pantalla lo que ve este robot actual.
+        """
+        # Guardamos o actualizamos la posición del robot que acaba de publicar
+        self.posiciones_enjambre[id_remoto] = {
+            'x': x,
+            'y': y,
+            'theta': theta,
+            'sent_time': sent_time,
+            'last_update': time.time()
+        }
+        
+        # Imprimimos periódicamente (o cada vez que cambia) para verificar qué ve este robot
+        # Para no saturar la consola, contamos cuántos vecinos tenemos guardados
+        num_vecinos = len(self.posiciones_enjambre)
+        
+        logger.warning(f"\n--- [Robot {self.robot_id}] Estado del Enjambre ({num_vecinos} detectados) ---")
+        for rid, datos in sorted(self.posiciones_enjambre.items()):
+            # Marcamos con un asterisco si los datos pertenecen a uno mismo
+            es_propio = " (YO)" if rid == self.robot_id else ""
+            logger.warning(f"  > Robot {rid:02d}{es_propio}: X={datos['x']:.2f}, Y={datos['y']:.2f}, Theta={math.degrees(datos['theta']):.1f}°")
+        logger.warning("-" * 50)
+
 # a partir de aqui es todo de recibir
 #cuando conecta
 def on_connect(client,userdata,flags,rc):
@@ -487,7 +546,7 @@ if __name__ == "__main__":
     topic=f'agent/{args.id}/wheel'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-
+    
     #Me tengo que suscribir a los topics de pos de todos los robots para poder calcular la distancia a los demás
     for robot_id in range(1, 10):  # Asumiendo que hay 10 robots en total
         if robot_id != args.id:  # No nos suscribimos a nuestro propio topic
