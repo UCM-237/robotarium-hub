@@ -95,7 +95,7 @@ class ArenaDevice:
                     valid_tatami = None
                     
                     if contours:
-                        # 1. Filtrar por área estimada antes de transformar
+                        # 1. Filtrar por área estimada antes de transformarlogger.info(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
                         # Solo miramos contornos que tengan un tamaño razonable en la imagen
                         # para ignorar marcadores ArUco pequeños.
                         sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
@@ -273,11 +273,9 @@ if __name__ == "__main__":
         id="RobotArena",
         ip="192.168.10.1",        # Tu IP
         hub_ip="192.168.10.1",  # IP del Hub
-        data_port = 5591
+        data_port = 5561
     )
     arena_agent.device.gui = not args.no_gui # Seteamos el modo
-    topic=b"vision/stitched"
-    arena_agent.setup_subscriptions(topic)
     arena_agent.device.run()
 
     # Iniciamos el bucle pasivo
