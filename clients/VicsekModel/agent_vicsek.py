@@ -50,6 +50,8 @@ class BouncerRobot:
         self.control_time=0.05 #ms
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
+        # Cola de mensajes recibidos
+        incoming_queue = Queue(maxsize=500) # Cola generosa para absorber ráfagas
         self.giro_terminado=False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -111,10 +113,11 @@ class BouncerRobot:
         #logger.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
         self.last_odom_time = current_time
 
-
+    
+    '''
     def on_data(self, topic: str, message: str) -> None:
         logger.debug(f"Incoming data. Topic {topic}, mensaje {message}")
-        '''Handle incoming data'''
+        #Handle incoming data
         # 1. Recibir límites del tatami (vienen del arena_agent)
         if topic == "arena/boundaries":
             try:
@@ -217,6 +220,7 @@ class BouncerRobot:
                     bouncer_agent.device.actualizar_con_vecinos(id_remoto, x, y, theta,sent_time)
                 except Exception as e:
                     logger.error(f"Error al decodificar topic: {topic} {e}")
+    '''
     def run(self):
         """Bucle de control independiente que corre a ~20Hz"""
         while True:
@@ -483,7 +487,12 @@ def on_connect(client,userdata,flags,rc):
    
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
-     pass
+     try:
+         # Meto el mensaje en la cola de mensajes entrantes para procesarlos en orden
+         if not bouncer_agent.device.command_queue.full():
+             bouncer_agent.device.command_queue.put_nowait((msg.topic, msg.payload.decode()))
+     except Exception as e:
+        logger.error(f"Error al procesar mensaje: {e}")
 
 # Configuración del Agente
 if __name__ == "__main__":
@@ -567,6 +576,52 @@ if __name__ == "__main__":
        
         # 3. Hilo Principal: Despachador de la cola hacia ZeroMQ (ZMQ)
         while True:
+            ''' Proceso los mensajes de entrada'''
+            while not bouncer_agent.device.incoming_queue.empty():
+                try:
+                    topic, payload_bytes = bouncer_agent.device.incoming_queue.get_nowait()
+                    payload_str = payload_bytes.decode('utf-8')
+                    # TODO: Filtro de seguridad
+                    data =json.loads(payload_str)
+                    parts = topic.split('/')
+                    if len(parts) >= 2 and parts[0].isdigit():
+                        id_remoto = int(parts[0])
+                        if id_remoto == bouncer_agent.device.robot_id:
+                            bouncer_agent.device.status = "INICIALIZADO"
+                            bouncer_agent.device.on_pos_received(data.get('x'), data.get('y'), data.get('yaw'))
+                            current_time = time.time()
+                            sent_time = data.get("timestamp")
+   
+                            latency = (current_time - sent_time) * 1000 # Latencia en ms
+    
+                            # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
+                            if hasattr(bouncer_agent.device, 'last_pos_time'):
+                                freq = 1.0 / (current_time - bouncer_agent.device.last_pos_time)
+                                logger.debug(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
+                
+                            bouncer_agent.device.last_pos_time = current_time
+                            
+                        else:
+                            bouncer_agent.device.actualizar_con_vecinos(id_remoto, data.get('x'), data.get('y'), data.get('yaw'), data.get('timestamp'))
+                    elif topic == "arena/boundaries":
+                        bouncer_agent.device.boundaries = data.get("points", bouncer_agent.device.boundaries)
+                    elif topic == f"agent/{bouncer_agent.device.robot_id}/wheel":
+                        wl = float(data.get('Wleft'))
+                        wr = float(data.get('Wright'))
+                        bouncer_agent.device.on_odom_received(wl, wr)
+                    elif topic == f"agent/{bouncer_agent.device.robot_id}/feedback":
+                        status = data.get("status")
+                        op = data.get("op")
+                        if status == "done" and op == "turn":
+                            logger.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
+                            bouncer_agent.device.giro_terminado = True
+                    else:
+                        logger.warning(f"Mensaje recibido en topic desconocido: {topic}")
+                except Exception as e:
+                    logger.error(f"Error procesando mensaje entrante: {e}") 
+                finally:
+                    bouncer_agent.device.incoming_queue.task_done()
+
             if not bouncer_agent.device.command_queue.empty():
                 cmd = bouncer_agent.device.command_queue.get()
                 
