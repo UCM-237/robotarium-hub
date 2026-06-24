@@ -42,7 +42,7 @@ class BouncerRobot:
         self.v=35.0
         self.w=3.0
         self.direction=[0.707, 0.707]
-        self.robot_id=6
+        self.robot_id=7
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
         self.safety_distance = 40.0 
@@ -51,7 +51,7 @@ class BouncerRobot:
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
         # Cola de mensajes recibidos
-        incoming_queue = Queue(maxsize=500) # Cola generosa para absorber ráfagas
+        self.incoming_queue = Queue(maxsize=500) # Cola generosa para absorber ráfagas
         self.giro_terminado=False
         # --- Configuración del Logger ---
         self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -70,7 +70,7 @@ class BouncerRobot:
         self.last_vision_time = time.time()
         self.status = "ESPERANDO POSICIÓN INICIAL"
         self.Kp_gira = 2.5            # Ganancia Proporcional para controlar la velocidad de giro
-        self.tolerance_theta = 0.05    # Tolerancia de error angular en radianes (~2.8 grados)
+        self.tolerance_theta = 0.5      # Tolerancia de error angular en radianes (~2.8 grados)
         # Guardará datos con el formato: { id_robot: {'x': x, 'y': y, 'theta': theta, 'last_update': timestamp} }
         self.posiciones_enjambre = {}
         self.radio_enjambre=1.0
@@ -113,114 +113,57 @@ class BouncerRobot:
         #logger.info(f"Actualización por odometría: Δx={dx:.2f}, Δy={dy:.2f}, Δθ={dtheta:.2f}")
         self.last_odom_time = current_time
 
-    
-    '''
-    def on_data(self, topic: str, message: str) -> None:
-        logger.debug(f"Incoming data. Topic {topic}, mensaje {message}")
-        #Handle incoming data
-        # 1. Recibir límites del tatami (vienen del arena_agent)
-        if topic == "arena/boundaries":
-            try:
-                raw_data = json.loads(message)
-                if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
+    def on_data(self,topic:str,message:str)->None:
+        logger.info(f"Recibido mensaje {message} en el topic {topic}")
+        try:
+            # Meto el mensaje en la cola de mensajes entrantes para procesarlos en orden
+            if not self.incoming_queue.full():
+                self.incoming_queue.put_nowait((topic, message))
+        except Exception as e:
+            logger.error(f"Error al procesar mensaje: {e}")
+        
+    def calculate_vicsek_angle(self, r_interaction=600.0, noise=0.1):
+        """
+        Calcula el nuevo ángulo del robot basándose en el modelo de Vicsek:
+        Promedio de las orientaciones de los vecinos dentro de un radio R + Ruido.
+        """
+        # Obtenemos nuestra posición actual (asumiendo que poseemos nuestras coordenadas)
+        # Nota: Si bouncer_agent guarda su propia pos en self.x, self.y, self.theta:
+        my_x=self.pos[0]
+        my_y=self.pos[1]
+        my_theta=self.pos[2]
+        avg_theta=my_theta
                 
-                puntos = raw_data["points"]
+        # Iteramos sobre los vecinos conocidos
+        # self.neighbors debe ser el diccionario donde guardas las posiciones de los otros robots
+        # Si en tu código usas bouncer_agent.neighbors u otra estructura, adáptalo:
+        count=1
+        enjambre=self.posiciones_enjambre.copy()
+        logger.critical(f"Enjambre {enjambre}")
+        for robot_id, pos in enjambre.items():
+            logging.warning(f"Robot {robot_id}, x {pos['x']}, y {pos['y']}")
+            # Calculamos la distancia euclídea al vecino
+            dx = pos['x'] - my_x
+            dy = pos['y'] - my_y
+            distance = math.sqrt(dx**2 + dy**2)
             
-                all_x = [p["x"] for p in puntos]
-                all_y = [p["y"] for p in puntos]
+            # Si está dentro del radio de interacción, acumulamos su orientación
+            if distance <= r_interaction:
+                avg_theta +=pos['theta']
+                count += 1
+        
+        # Calculamos el ángulo promedio (fase del vector resultante)
+        avg_theta = avg_theta/ (count)
+        
+        # Añadimos un ruido uniforme aleatorio entre [-noise/2, noise/2]
+        #if noise > 0:
+            #avg_theta += np.random.uniform(-noise / 2.0, noise / 2.0)
             
-                # 4. Guardar los valores extremos para la lógica de rebote
-                self.x_min = min(all_x)
-                self.x_max = max(all_x)
-                self.y_min = min(all_y)
-                self.y_max = max(all_y)
-                self.boundaries = [self.x_min,self.x_max,self.y_min,self.y_max]
-            except Exception as e:
-                logger.error(f"Error al decodificar: {e}")
-        # 2. Recibir posición del robot (vienen del pos_agent)
-        elif topic == f"{self.robot_id}/pos":
-            self.status = "INICIALIZADO"
-            try:
-                raw_data= json.loads(message)
-                #print(raw_data)
-                if isinstance(raw_data, str):
-                        raw_data = json.loads(raw_data)
-                
-                self.pos[0]=float(raw_data.get('x'))
-                self.pos[1]=float(raw_data.get('y'))
-                self.pos[2]=float(raw_data.get('yaw'))
-                self.on_pos_received(self.pos[0], self.pos[1], self.pos[2])
-                current_time = time.time()
-                sent_time = raw_data.get("timestamp")
-   
-                latency = (current_time - sent_time) * 1000 # Latencia en ms
-    
-                # Calcular frecuencia (Delta tiempo entre este mensaje y el anterior)
-                if hasattr(self, 'last_pos_time'):
-                    freq = 1.0 / (current_time - self.last_pos_time)
-                    logger.debug(f"Frecuencia: {freq:.2f} Hz | Latencia Red/Proc: {latency:.2f} ms")
-    
-                self.last_pos_time = current_time
-                
-                
-            except Exception as e:
-                logger.error(f"Error al descodificar: {e}")
-        elif topic == f"agent/{self.robot_id}/wheel":
-            
-            try:
-                raw_data = json.loads(message)
-                if isinstance(raw_data, str):
-                    
-                    raw_data = json.loads(raw_data)
-                
-                wl = float(raw_data.get('Wleft'))
-                wr = float(raw_data.get('Wright'))
-                self.on_odom_received(wl, wr)
-            except Exception as e:
-                logger.error(f"Error al decodificar odometría: {e}")
-        elif topic == f"agent/{self.robot_id}/feedback":
-            try:
-                raw_data = json.loads(message)
-                if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
-                status=raw_data.get("status")                
-                op=raw_data.get("op")
-                if status == "done" and op == "turn":
-                    logger.info("¡Confirmación recibida desde Arduino! Giro terminado exitosamente.")
-                    self.giro_terminado = True
-            except Exception as e:
-                logger.error(f"Error al decodificar feedback: {e}")
-        else:
-            
-                # Extraemos el ID del robot desde el propio tópico (ej: "5/pos" -> 5)
-                parts = topic.split('/')
-                logger.critical(parts)
-                logger.critical(parts[0])
-                id_remoto = int(parts[0])
-                try:
-                    # 2. Limpieza del string de datos
-                    # A veces ZMQ mete los JSON en formato "['{...}']" o añade caracteres de escape.
-                    clean_message = message.strip()
-                    if clean_message.startswith("['") and clean_message.endswith("']"):
-                        clean_message = clean_message[2:-2]
-                    elif clean_message.startswith("[") and clean_message.endswith("]"):
-                        clean_message = clean_message[1:-1]
-            
-                    clean_message = clean_message.strip().strip("'").strip('"')
-                    raw_data= json.loads(clean_message)
-                
-                    if isinstance(raw_data, str):
-                        raw_data = json.loads(raw_data)
-                    x = float(raw_data.get('x'))
-                    y = float( raw_data.get('y'))
-                    theta = float (raw_data.get('yaw'))
-                    sent_time = raw_data.get("timestamp")
-                    # Enviamos los datos a la función del robot
-                    bouncer_agent.device.actualizar_con_vecinos(id_remoto, x, y, theta,sent_time)
-                except Exception as e:
-                    logger.error(f"Error al decodificar topic: {topic} {e}")
-    '''
+        # Normalizamos el ángulo entre -PI y PI
+        avg_theta = math.atan2(math.sin(avg_theta), math.cos(avg_theta))
+        
+        return avg_theta
+
     def run(self):
         """Bucle de control independiente que corre a ~20Hz"""
         while True:
@@ -242,6 +185,8 @@ class BouncerRobot:
                         # pos_logic ahora decidirá qué posición usar
                         x,y,theta=self.check_position_estimate()
                         logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
+                        vic_angle=self.calculate_vicsek_angle()
+                        logger.critical(f"Vicsek angle {vic_angle}")
                         self.actualizar_fsm(x,y,theta)
                 self.last_time=ahora
             
@@ -305,7 +250,7 @@ class BouncerRobot:
                 candidatos['izquierda'] = abs((x - x_min) / dir_y)
                 candidatos['arriba'] = abs((y_max -y) / dir_x)
                 
-        logger.critical(f"Theta: {theta}, Candidatos: {candidatos}")
+        logger.info(f"Theta: {theta}, Candidatos: {candidatos}")
             # Filtramos para quedarnos SOLO con distancias reales hacia adelante (positivas)
         candidatos_validos = {k: v for k, v in candidatos.items() if v > 0}
 
@@ -352,13 +297,16 @@ class BouncerRobot:
         return math.radians(nuevo_theta)
     
     def actualizar_fsm(self,x,y,theta):
+        #0. Inicializo
+        v=0.0
+        w=0.0
         # 1. Obtener métricas
         distancias= self.get_distance_to_wall(x, y,theta)
         dist_absoluta=np.min(distancias)
         
         pared_abs=min(range(len(distancias)), key=lambda i: distancias[i])
         pared_mov, dist_movimiento = self.calcular_distancia_en_movimiento(x, y, theta)
-        logger.warning(f"Distancia absoluta: {dist_absoluta}, distancia proyectada: {dist_movimiento}, pared: {pared_mov}")
+        logger.info(f"Distancia absoluta: {dist_absoluta}, distancia proyectada: {dist_movimiento}, pared: {pared_mov}")
         # 2. Evaluación de la Máquina de Estados
         if self.fsm == RobotState.AVANZA:
             # FILTRO 1: Seguridad Absoluta. Si por colisión o inercia está pegado a un muro, va atrás.
@@ -396,8 +344,34 @@ class BouncerRobot:
 
         # 6. Decisión de velocidad basada en FSM
         if self.fsm == RobotState.AVANZA:
-            v = self.speed
-            w = 0.0
+           # 1. Calculamos el ángulo objetivo según el modelo de Vicsek
+            # Ajusta el radio (ej: 80 px/cm) y el ruido (ej: 0.2 rad) según vuestro escenario
+            target_theta = self.calculate_vicsek_angle(r_interaction=600.0, noise=0.2)
+            
+            # 2. Obtenemos nuestro ángulo actual
+            my_theta = getattr(self, 'theta', 0.0)
+            
+            # 3. Calculamos el error de orientación
+            angle_error = target_theta - my_theta
+            # Normalizar el error entre -PI y PI para que el robot siempre gire por el camino más corto
+            angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
+            
+            # 4. Convertimos el error de ángulo en velocidad angular (w) usando una constante P (proporcional)
+            Kp_w = 4.0  # Ajusta esta ganancia para que el giro sea más o menos agresivo
+            w = angle_error * Kp_w
+            
+            # Mantener una velocidad lineal constante para el avance del enjambre
+            v = 25.0  
+            
+            # 5. Cinemática de robot diferencial para calcular las velocidades de cada rueda (rad/s)
+            # R = Radio de la rueda, L = Distancia entre ruedas (puedes leerlos de tu robot.h si los tienes en Python)
+            R = 3.35   # según tu robot.h (RobotWheelRadius)
+            L = 14.5   # según tu robot.h (RobotDiameter)
+            
+            w_left = (v - (w * L / 2.0)) / R
+            w_right = (v + (w * L / 2.0)) / R
+            
+            # 6. Empaquetamos el comando de movimiento para la cola de salida (ZMQ -> Arduino)
             self.command_queue.put({'v': v, 'w': w})
         
         elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
@@ -433,7 +407,7 @@ class BouncerRobot:
 
         self.fsm_last = self.fsm
         logger.warning(f"Estado FSM: {self.fsm.name} | Target Theta: {math.degrees(self.target_theta):.2f}° | Theta Act: {math.degrees(theta):.2f}°")
-        logger.warning(f"v: {v} | w: {w}")
+        logger.info(f"v: {v} | w: {w}")
     
     def check_position_estimate(self):
         ahora = time.time()
@@ -473,12 +447,13 @@ class BouncerRobot:
         # Para no saturar la consola, contamos cuántos vecinos tenemos guardados
         num_vecinos = len(self.posiciones_enjambre)
         
-        logger.warning(f"\n--- [Robot {self.robot_id}] Estado del Enjambre ({num_vecinos} detectados) ---")
+        logger.info(f"\n--- [Robot {self.robot_id}] Estado del Enjambre ({num_vecinos} detectados) ---")
         for rid, datos in sorted(self.posiciones_enjambre.items()):
             # Marcamos con un asterisco si los datos pertenecen a uno mismo
             es_propio = " (YO)" if rid == self.robot_id else ""
-            logger.warning(f"  > Robot {rid:02d}{es_propio}: X={datos['x']:.2f}, Y={datos['y']:.2f}, Theta={math.degrees(datos['theta']):.1f}°")
-        logger.warning("-" * 50)
+            logger.info(f"  > Robot {rid:02d}{es_propio}: X={datos['x']:.2f}, Y={datos['y']:.2f}, Theta={math.degrees(datos['theta']):.1f}°")
+        #
+        #logger.warning("-" * 50)
 
 # a partir de aqui es todo de recibir
 #cuando conecta
@@ -487,12 +462,7 @@ def on_connect(client,userdata,flags,rc):
    
 #cuando llega el mensaje
 def on_message(client,userdata, msg):
-     try:
-         # Meto el mensaje en la cola de mensajes entrantes para procesarlos en orden
-         if not bouncer_agent.device.command_queue.full():
-             bouncer_agent.device.command_queue.put_nowait((msg.topic, msg.payload.decode()))
-     except Exception as e:
-        logger.error(f"Error al procesar mensaje: {e}")
+     pass
 
 # Configuración del Agente
 if __name__ == "__main__":
@@ -514,9 +484,7 @@ if __name__ == "__main__":
 
     # 2. Configurar el logger usando el ID del robot dinámico
     agent_name = f"Robot_{args.id:02d}"
-    logger = setup_logger(agent_name, console_level=logging.INFO)
-    logger.info(f"Iniciando {agent_name} en el puerto de datos {args.port}...")
-
+    
     # 3. Inicializar el agente ZMQ pasándole el puerto dinámico
    # Configuración del Agente
     bouncer_agent = Agent(
@@ -528,9 +496,11 @@ if __name__ == "__main__":
     )
     # 4. Asignar el ID correcto dentro del objeto hardware (BouncerRobot)
     bouncer_agent.device.robot_id = args.id
-
+    bouncer_agent.device.log_file = f"robot_{bouncer_agent.device.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
     # 1. Creamos un manejador de consola (StreamHandler)
     logger = setup_logger(bouncer_agent.device.log_file,console_level=logging.WARNING)
+    logger.info(f"Iniciando {agent_name} en el puerto de datos {args.port}...")
     logger.propagate=False # Evita que los mensajes se dupliquen si el logger raíz también tiene handlers
     time.sleep(1)    
     
@@ -579,11 +549,18 @@ if __name__ == "__main__":
             ''' Proceso los mensajes de entrada'''
             while not bouncer_agent.device.incoming_queue.empty():
                 try:
-                    topic, payload_bytes = bouncer_agent.device.incoming_queue.get_nowait()
-                    payload_str = payload_bytes.decode('utf-8')
+                    topic, payload_str= bouncer_agent.device.incoming_queue.get_nowait()
+                    if '{' in payload_str:
+                        # Cortamos todo lo que haya antes de la primera llave '{' por si hay restos del topic
+                        payload_str = payload_str[payload_str.find('{'):]
+                    else:
+                        # Si ni siquiera tiene una llave de apertura, es basura pura de red. Descartamos.
+                        continue
+                    #payload_str = payload_bytes.decode('utf-8')
                     # TODO: Filtro de seguridad
                     data =json.loads(payload_str)
                     parts = topic.split('/')
+                    logger.debug(f"procesando {parts}")
                     if len(parts) >= 2 and parts[0].isdigit():
                         id_remoto = int(parts[0])
                         if id_remoto == bouncer_agent.device.robot_id:
@@ -630,7 +607,7 @@ if __name__ == "__main__":
                      
                 try:
                     bouncer_agent.send(topic, cmd)
-                    logger.debug(f"Despachado a ZMQ -> {topic}: {cmd}")
+                    logger.critical(f"Despachado a ZMQ -> {topic}: {cmd}")
                 except Exception as e:
                     logger.error(f"Error enviando por ZMQ: {e}")
                     
