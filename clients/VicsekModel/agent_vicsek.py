@@ -132,12 +132,13 @@ class BouncerRobot:
         my_x=self.pos[0]
         my_y=self.pos[1]
         my_theta=self.pos[2]
-        avg_theta=my_theta
-                
+
+        sin_sum = math.sin(my_theta)
+        cos_sum = math.cos(my_theta)        
+
         # Iteramos sobre los vecinos conocidos
         # self.neighbors debe ser el diccionario donde guardas las posiciones de los otros robots
         # Si en tu código usas bouncer_agent.neighbors u otra estructura, adáptalo:
-        count=1
         enjambre=self.posiciones_enjambre.copy()
         logger.critical(f"Enjambre {enjambre}")
         for robot_id, pos in enjambre.items():
@@ -149,18 +150,17 @@ class BouncerRobot:
             
             # Si está dentro del radio de interacción, acumulamos su orientación
             if distance <= r_interaction:
-                avg_theta +=pos['theta']
-                count += 1
+                sin_sum += math.sin(pos['theta'])
+                cos_sum += math.cos(pos['theta'])
+                
         
         # Calculamos el ángulo promedio (fase del vector resultante)
-        avg_theta = avg_theta/ (count)
-        
+        avg_theta = math.atan2(sin_sum, cos_sum)
+
         # Añadimos un ruido uniforme aleatorio entre [-noise/2, noise/2]
         #if noise > 0:
             #avg_theta += np.random.uniform(-noise / 2.0, noise / 2.0)
             
-        # Normalizamos el ángulo entre -PI y PI
-        avg_theta = math.atan2(math.sin(avg_theta), math.cos(avg_theta))
         
         return avg_theta
 
