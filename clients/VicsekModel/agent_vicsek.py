@@ -361,8 +361,8 @@ class BouncerRobot:
             w = angle_error * Kp_w
             
             # Mantener una velocidad lineal constante para el avance del enjambre
-            v = 25.0  
-            
+            #v = 25.0  
+            v = 0.0
             # 5. Cinemática de robot diferencial para calcular las velocidades de cada rueda (rad/s)
             # R = Radio de la rueda, L = Distancia entre ruedas (puedes leerlos de tu robot.h si los tienes en Python)
             R = 3.35   # según tu robot.h (RobotWheelRadius)
