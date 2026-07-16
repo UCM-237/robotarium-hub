@@ -42,7 +42,7 @@ class BouncerRobot:
         self.v=35.0
         self.w=3.0
         self.direction=[0.707, 0.707]
-        self.robot_id=7
+        self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
         self.safety_distance = 40.0 
@@ -69,11 +69,12 @@ class BouncerRobot:
         self.last_odom_time = time.time()
         self.last_vision_time = time.time()
         self.status = "ESPERANDO POSICIÓN INICIAL"
-        self.Kp_gira = 2.5            # Ganancia Proporcional para controlar la velocidad de giro
+        self.Kp_gira =2.5          # Ganancia Proporcional para controlar la velocidad de giro
         self.tolerance_theta = 0.5      # Tolerancia de error angular en radianes (~2.8 grados)
         # Guardará datos con el formato: { id_robot: {'x': x, 'y': y, 'theta': theta, 'last_update': timestamp} }
         self.posiciones_enjambre = {}
         self.radio_enjambre=1.0
+        self.vic_angle=0.0
    
     def connect(self) -> None:
         '''Establish a connection with the hardware'''
@@ -116,9 +117,14 @@ class BouncerRobot:
     def on_data(self,topic:str,message:str)->None:
         logger.info(f"Recibido mensaje {message} en el topic {topic}")
         try:
+            if not message or '{' not in message:
+                logger.debug(f"Mensaje {message} descartado en topic {topic}")
+                return
+            payload_str=message[message.find('{'):]
+
             # Meto el mensaje en la cola de mensajes entrantes para procesarlos en orden
             if not self.incoming_queue.full():
-                self.incoming_queue.put_nowait((topic, message))
+                self.incoming_queue.put_nowait((topic, payload_str))
         except Exception as e:
             logger.error(f"Error al procesar mensaje: {e}")
         
@@ -142,7 +148,7 @@ class BouncerRobot:
         enjambre=self.posiciones_enjambre.copy()
         logger.critical(f"Enjambre {enjambre}")
         for robot_id, pos in enjambre.items():
-            logging.warning(f"Robot {robot_id}, x {pos['x']}, y {pos['y']}")
+            logging.debug(f"Robot {robot_id}, x {pos['x']}, y {pos['y']}")
             # Calculamos la distancia euclídea al vecino
             dx = pos['x'] - my_x
             dy = pos['y'] - my_y
@@ -179,14 +185,15 @@ class BouncerRobot:
                 else:
                     if time_since_vision > 2.5 and time_since_odom > 2.5:
                         logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                        logger.warning(f"Delay vision: {time_since_vision}, delay odom: {time_since_odom}")
                         self.command_queue.put({'v': 0.0, 'w': 0.0})
                     else:
                         # 2. EJECUCIÓN DE LA LÓGICA
                         # pos_logic ahora decidirá qué posición usar
                         x,y,theta=self.check_position_estimate()
                         logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
-                        vic_angle=self.calculate_vicsek_angle()
-                        logger.critical(f"Vicsek angle {vic_angle}")
+                        self.vic_angle=self.calculate_vicsek_angle()
+                        logger.info(f"Vicsek angle {self.vic_angle}")
                         self.actualizar_fsm(x,y,theta)
                 self.last_time=ahora
             
@@ -346,8 +353,8 @@ class BouncerRobot:
         if self.fsm == RobotState.AVANZA:
            # 1. Calculamos el ángulo objetivo según el modelo de Vicsek
             # Ajusta el radio (ej: 80 px/cm) y el ruido (ej: 0.2 rad) según vuestro escenario
-            target_theta = self.calculate_vicsek_angle(r_interaction=600.0, noise=0.2)
-            
+            #target_theta = self.calculate_vicsek_angle(r_interaction=600.0, noise=0.2)
+            target_theta=self.vic_angle
             # 2. Obtenemos nuestro ángulo actual
             my_theta = getattr(self, 'theta', 0.0)
             
@@ -357,7 +364,7 @@ class BouncerRobot:
             angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
             
             # 4. Convertimos el error de ángulo en velocidad angular (w) usando una constante P (proporcional)
-            Kp_w = 4.0  # Ajusta esta ganancia para que el giro sea más o menos agresivo
+            Kp_w = 5.0  # Ajusta esta ganancia para que el giro sea más o menos agresivo
             w = angle_error * Kp_w
             
             # Mantener una velocidad lineal constante para el avance del enjambre
@@ -370,6 +377,7 @@ class BouncerRobot:
             
             w_left = (v - (w * L / 2.0)) / R
             w_right = (v + (w * L / 2.0)) / R
+            logger.critical(f"Viczek angle: {target_theta} = {target_theta*180/3.1415} grad., w: {w}")
             
             # 6. Empaquetamos el comando de movimiento para la cola de salida (ZMQ -> Arduino)
             self.command_queue.put({'v': v, 'w': w})
@@ -385,29 +393,15 @@ class BouncerRobot:
             self.command_queue.put({'v': v, 'w': w})
             
         elif self.fsm == RobotState.GIRA:
-            # Volvemos a calcular el error para aplicar el control proporcional
-            error_theta = math.atan2(math.sin(self.target_theta - theta), math.cos(self.target_theta - theta))
-        
-            # El robot gira sobre su propio eje: v = 0, w proporcional al error
-            v = 0.0 
-            w = self.Kp_gira * error_theta
-            # Limitamos la velocidad angular mínima para superar la zona muerta
-            if w<1.0 and w>0.1:
-                w=1.0
-            elif w>-1 and w<-0.1:
-                w=-1.0
-        
-            # Limitamos la velocidad angular máxima por seguridad física de los motores
-            w_max = 3.0 # rad/s
-            w = max(min(w, w_max), -w_max)
-            
-
-        
-            self.command_queue.put({'v': v, 'w': w})
+            # Aplico el giro preciso en este caso
+            comando_giro = {'op': 'turn', 'ang': self.target_theta}
+            self.command_queue.put({'ang': self.target_theta})
 
         self.fsm_last = self.fsm
         logger.warning(f"Estado FSM: {self.fsm.name} | Target Theta: {math.degrees(self.target_theta):.2f}° | Theta Act: {math.degrees(theta):.2f}°")
-        logger.info(f"v: {v} | w: {w}")
+        logger.info(f"v: {v}, w: {w}")
+        
+        
     
     def check_position_estimate(self):
         ahora = time.time()
@@ -603,15 +597,23 @@ if __name__ == "__main__":
                 cmd = bouncer_agent.device.command_queue.get()
                 
                 # Determinamos el tópico ZMQ adecuado según el tipo de comando
-                topic = f"agent/{bouncer_agent.device.robot_id}/move"
+                 # Determinamos el tópico ZMQ adecuado según el tipo de comando
+                if 'ang' in cmd :
+                    # Si es una operación compleja de giro, la mandamos al topic turn para giro preciso con eng en grados
+                    topic = f"agent/{bouncer_agent.device.robot_id}/turn"
+                    logger.debug(f"Enviado {cmd}")
+                else:
+                    # Si es velocidad cruda (v, w), va al tópico tradicional de movimiento
+                    topic = f"agent/{bouncer_agent.device.robot_id}/move"
                      
                 try:
                     bouncer_agent.send(topic, cmd)
-                    logger.critical(f"Despachado a ZMQ -> {topic}: {cmd}")
+                    logger.debug(f"Despachado a ZMQ -> {topic}: {cmd}")
                 except Exception as e:
                     logger.error(f"Error enviando por ZMQ: {e}")
                     
                 bouncer_agent.device.command_queue.task_done()
+            
             time.sleep(0.001)
     
     mqtt_and_dispatch()
