@@ -8,6 +8,7 @@ import logging
 from threading import Thread
 from agent import Agent, Device
 from logger_config import setup_logger
+import os  # Importación añadida para manejo de rutas de archivos
 
 # Dimensiones máximas de tu sistema de visión
 MAX_WIDTH = 1280
@@ -41,7 +42,9 @@ class VisionPosDevice:
         self.total_w = MAX_WIDTH
         self.total_h = MAX_HEIGHT
         self.H = np.load("homography_matrix.npy")
-        
+        self.boundaries_path = os.path.join(os.path.dirname(__file__), "tatami_config.json")
+        self.boundaries = None
+        self.load_arena_boundaries()
         
         # Parámetros de stitching
         self.offset_x = 0
@@ -59,7 +62,32 @@ class VisionPosDevice:
         self.aruco_params.minMarkerPerimeterRate = 0.01
 
         logger.info("VisionPosDevice inicializado correctamente. Cámaras y ArUco listos.")
-
+    
+    def load_arena_boundaries(self):
+        """Intenta cargar los límites guardados localmente desde un archivo JSON."""
+        if os.path.exists(self.boundaries_path):
+            try:
+                with open(self.boundaries_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                limites = data["boundaries"]
+                logger.critical(f"Boundaries: {limites}")
+                puntos = limites["points"]
+                all_x = [p["x"] for p in puntos]
+                all_y = [p["y"] for p in puntos]
+                self.M_trans = np.array(data["M_pixel_to_real"])
+                self.boundaries = {
+                    "x_min": min(all_x),
+                    "x_max": max(all_x),
+                    "y_min": min(all_y),
+                    "y_max": max(all_y)
+                }
+                logger.critical(f"Límites del tatami cargados localmente: {self.boundaries}")
+                logger.critical(f"Matriz pixel2cm: {self.M_trans}")
+            except Exception as e:
+                logger.error(f"Error cargando los límites del tatami desde JSON: {e}")
+        else:
+            logger.warning(f"No se encontró el archivo de límites {self.boundaries_path}. Se usarán coordenadas crudas de píxeles.")
+    
     def connect(self) -> None:
         logger.info(f"[INFO] Agente {self.agent.id} conectado y esperando video...")
     
@@ -145,19 +173,25 @@ class VisionPosDevice:
                         marker_id = int(ids[i][0])
                         c = corners[i][0]
                         
-                        # Calcular centro del marcador (X, Y)
+                        # Calcular centro del marcador (X, Y) en pixeles
                         center_x = float(np.mean(c[:, 0]))
                         center_y = float(np.mean(c[:, 1]))
-                        
+                        pt_pixel = np.array([[[center_x, center_y]]], dtype=np.float32)
+                        pt_real = cv2.perspectiveTransform(pt_pixel, self.M_trans)[0][0]
+
+                        real_x = pt_real[0] # Coordenada X en centímetros reales
+                        real_y = pt_real[1] # Coordenada Y en centímetros reales
+
                         # Calcular orientación (theta) en radianes
+                        # Calculamos theta directamente en el espacio de la imagen (Y hacia abajo)
                         v = c[1] - c[0]
-                        theta = float(np.arctan2(-v[1], v[0]))
+                        theta = float(np.arctan2(v[1], v[0]))
 
                         # Estructura de payload individualizada
                         # (Ajusta los campos "x", "y" o el formato según lo que tuvieses en tu pos_agent original)
                         payload = {
-                            "x": round(float(center_x), 2),
-                            "y": round(float(center_y), 2),
+                            "x": round(float(real_x), 2),
+                            "y": round(float(real_y), 2),
                             "yaw": round(float(theta), 3),
                             "timestamp": time.time()
                         }
