@@ -98,7 +98,7 @@ class Agent:
 
   def send(self, topic: str, data: dict) -> None:
     '''Send data to a topic'''
-    logging.debug(f'Agent {self.id} sends message with topic {topic}')
+    #logging.info(f'Agent {self.id} sends message with topic {topic}')
     self.data.send_string(topic, flags=zmq.SNDMORE)
     self.data.send_json(data)
 

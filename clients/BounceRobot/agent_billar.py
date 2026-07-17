@@ -27,26 +27,27 @@ TODO: Mejorar la fusión de datos entre la posición por visión y la estima por
 '''
 
 
-class RobotState(Enum):
+class BillarState(Enum):
     AVANZA = 1
-    GIRA = 2
-    PARA = 3
-    PARANDO_PARA_RETROCEDER = 4
-    RETROCEDE = 5
-    PARANDO_PARA_GIRAR = 6
-    ESPERANDO_GIRO = 7
+    PARANDO_PARA_GIRAR = 2
+    GIRANDO = 3
+    ESPERANDO_GIRO = 4
     
 class BouncerRobot:
     def __init__(self, agent: Agent) -> None:
         '''The constructor optionally receive a list of listeners'''
-        self.boundaries=[-102.0,298.0,16,160.0] #Lo inicializo asi por si acaso no recibe los limites
+        self.boundaries=[0,419,0,140] #Lo inicializo asi por si acaso no recibe los limites
+        self.x_min=0
+        self.x_max=419
+        self.y_max=140
+        self.y_min=0
         self.margin = 20.0
         self.speed = 20.0
-        self.fsm = RobotState.AVANZA
-        self.fsm_last=RobotState.AVANZA
+        self.fsm = BillarState.AVANZA
+        self.fsm_last=BillarState.AVANZA
         self.danger_distance = 20.0
         self.last_wall_hit=None
-        self.v=35.0
+        self.v=10.0
         self.w=3.0
         self.direction=[0.707, 0.707]
         self.robot_id=6
@@ -54,7 +55,7 @@ class BouncerRobot:
         self.angular_speed=1.0
         self.safety_distance = 40.0 
         self.t_retrocediendo=0
-        self.control_time=0.05 #ms
+        self.control_rate=0.05 #ms
         self.last_time=0
         self.command_queue = Queue() # Cola para enviar comandos al agente
         self.giro_terminado=False
@@ -140,12 +141,17 @@ class BouncerRobot:
                 logger.error(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
         elif topic == f"{self.robot_id}/pos":
+            logger.info(f"Message {message} received on topic {topic}")
             self.status = "INICIALIZADO"
             try:
-                raw_data= json.loads(message)
-                #print(raw_data)
+                # Validar que no estemos recibiendo un string plano o un tópico desalineado
+                if not message.startswith('{'):
+                    logger.error(f"Mensaje malformado o trama desalineada detectada: {message}")
+                    return
+                
+                raw_data = json.loads(message)
                 if isinstance(raw_data, str):
-                        raw_data = json.loads(raw_data)
+                    raw_data = json.loads(raw_data)
                 
                 self.pos[0]=float(raw_data.get('x'))
                 self.pos[1]=float(raw_data.get('y'))
@@ -192,200 +198,102 @@ class BouncerRobot:
             except Exception as e:
                 logger.error(f"Error al decodificar feedback: {e}")
 
-    def run(self):
-        """Bucle de control independiente que corre a ~20Hz"""
-        while True:
-            ahora = time.time()
-            if (ahora-self.last_time) >= self.control_time:
-                # 1. VERIFICACIÓN DE SEGURIDAD (WATCHDOG)
-                # Si hace más de 1.5 segundos que no sabemos nada del robot...
-                time_since_vision = ahora - self.last_pos_time
-                time_since_odom = ahora - self.last_odom_time
-                if self.status=="ESPERANDO POSICIÓN INICIAL":
-                    logger.warning("Esperando posición inicial... Aún no se han recibido datos de visión.")
-                    self.command_queue.put({'v': 0.0, 'w': 0.0})
-                else:
-                    if time_since_vision > 2.5 and time_since_odom > 2.5:
-                        logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
-                        self.command_queue.put({'v': 0.0, 'w': 0.0})
-                    else:
-                        # 2. EJECUCIÓN DE LA LÓGICA
-                        # pos_logic ahora decidirá qué posición usar
-                        x,y,theta=self.check_position_estimate()
-                        logger.info(f"Usando posición {self.status}: x={x:.2f}, y={y:.2f}, θ={theta:.2f}")
-                        self.actualizar_fsm(x,y,theta)
-                self.last_time=ahora
             
 
   
         
     def get_distance_to_wall(self, x, y, theta):
-        # 1. Límites actuales (centímetros)
+        # 1. Límites del tatami (cm)
         x_min, x_max = self.boundaries[0], self.boundaries[1]
         y_min, y_max = self.boundaries[2], self.boundaries[3]
+        # Vector unitario de dirección del robot
+        # 2. Vector de dirección del movimiento según la convención de tu código
+        vy = math.cos(theta)
+        vx = -math.sin(theta)
+        logger.critical(f"Velocidades proyectadas vx: {vx}, vy: {vy}")
+        # 3. Calcular la distancia proyectada en la trayectoria para el eje X e Y
+        dist_x = float('inf')
+        if vx > 0:
+            dist_x = (x_max - x) / vx  # Pared derecha
+            pared_l="derecha"
+        elif vx < 0:
+            dist_x = (x) / -vx  # Pared izquierda
+            pared_l="izquierda"
 
-        # 2. Distancias Euclidianas "puras" (¿A cuánto estoy de las bandas?)
-        d_left = abs(x - x_min)
-        d_right = abs(x_max - x)
-        d_bottom = abs(y - y_min)
-        d_top = abs(y_max - y)
-        #logger.info(f"Limites: x {x_min} ,{x_max}, y {y_min}, {y_max}")
-        logger.info(f"Distancias a paredes: Left: {d_left:.2f}, Right: {d_right:.2f}, Top: {d_top:.2f}, Bottom: {d_bottom:.2f}")       
-                    
-        return [d_left,d_right,d_top,d_bottom]
-    
-    def calcular_distancia_en_movimiento(self, x, y, theta):
-        """
-        Calcula la distancia hasta la pared que intersecta la trayectoria frontal del robot,
-        contemplando que yaw=0 es mirando hacia ARRIBA (eje +Y).
-        """
-        # Obtenemos las componentes de movimiento según el convenio de tu odometría
-        # Si dx = v * cos(theta) y dy = v * sin(theta), entonces:
-        # cos_t representa el avance en X, sin_t representa el avance en Y.
-        # Obtenemos las direcciones de movimiento según dictamina tu odometría
-        dir_x = math.cos(theta) 
-        dir_y = math.sin(theta)
-        
-        x_min, x_max = self.boundaries[0], self.boundaries[1]
-        y_min, y_max = self.boundaries[2], self.boundaries[3]
-        
-        candidatos = {}
-        
-       
-        # 0. Casos evidentes
-        if abs(theta)<0.1: 
-            candidatos['arriba']=abs(y_max-y)
-        elif abs(theta-np.pi/2.0)<0.1:
-            candidatos['derecha']=abs(x_max-x)
-        elif abs(theta-np.pi)<0.1:
-            candidatos['abajo']=abs(y-y_min)
-        elif abs(theta-3*np.pi/2.0)<0.1:
-            candidatos['izquierda']=abs(x_min-x)
+        dist_y = float('inf')
+        if vy > 0:
+            dist_y = (y) / vy  # Pared de arriba
+            pared_f="arriba"
+            # Nota: Si tu eje Y crece hacia abajo, dist_y = (y_max - y) / vy es correcto.
+            # Si el eje Y crece hacia arriba, ajusta los signos según corresponda.
+        elif vy < 0:
+            dist_y = (y_max - y) / -vy  # Pared de abajo
+            pared_f="abajo"
+        # 4. La distancia real a la pared que impactará primero en su trayectoria
+        distance_to_target_wall = min(dist_x, dist_y)
+        if dist_x<dist_y:
+            pared=pared_l
         else:
-            # 1. Intersección con componentes de avance en X (Paredes Izquierda y Derecha)
-            if theta < 0 and theta > -np.pi/2.0: # El modelo matemático dice que se mueve hacia la Derecha (+X)
-                candidatos['derecha'] = (x_max - x) /dir_y
-                candidatos['arriba']=(y_max-y) / dir_x
-            elif theta <= -np.pi/2.0 and theta > -np.pi: # El modelo matemático dice que se mueve hacia la Izquierda (-X)
-                candidatos['derecha'] = abs((y_min - y) /dir_x)
-                candidatos['abajo'] = abs((x_max - x) / dir_y)
-            elif theta >np.pi/2 and theta < np.pi:
-                candidatos['izquierda'] = abs((x - x_min) /dir_y)
-                candidatos['abajo'] = abs((y_min - y) / dir_y)
-            else:
-                candidatos['izquierda'] = abs((x - x_min) / dir_y)
-                candidatos['arriba'] = abs((y_max -y) / dir_x)
+            pared=pared_f
+        logger.critical(f"Distancia a la pared {pared} en trayectoria: {distance_to_target_wall:.2f} cm")
+        return distance_to_target_wall,pared
+    
+    def run(self):
+        """Bucle principal de control a ~20Hz"""
+        while True:
+            ahora = time.time()
+            if (ahora - self.last_time) >= self.control_rate:
                 
-        logger.critical(f"Theta: {theta}, Candidatos: {candidatos}")
-            # Filtramos para quedarnos SOLO con distancias reales hacia adelante (positivas)
-        candidatos_validos = {k: v for k, v in candidatos.items() if v > 0}
-
-        if not candidatos_validos:
-            if abs(x_max-x)<1e-5:
-                candidatos['derecha']=0
-            elif abs(x-x_min)<1e-5:
-                candidatos['izquierda']=0
-            if abs(y_max-y)<1e-5:
-                candidatos['arriba']=0
-            elif abs(y-y_min)<1e-5:
-                candidatos['abajo']=0
-
-        # La pared de impacto real será la que esté más cerca en la trayectoria
-        pared_impacto = min(candidatos_validos, key=candidatos_validos.get)
-        distancia_proyectada = candidatos_validos[pared_impacto]
+                self.last_time = ahora
+                time_since_vision = ahora - self.last_pos_time
+                time_since_odom = ahora - self.last_odom_time
+                
+                if self.status=="ESPERANDO POSICIÓN INICIAL":
+                    logger.warning("Esperando posición inicial... Aún no se han recibido datos de visión.")
+                    self.command_queue.put({'v': 0.0, 'w': 0.0})
+                    continue
+                else:
+                    if time_since_vision > 2.5 and time_since_odom > 2.5:
+                        logger.warning("SISTEMA DESCONECTADO: Parando robot por seguridad")
+                        self.command_queue.put({'v': 0.0, 'w': 0.0})
+                        continue
+                    else:
+                        x, y, theta = self.pos
+                        dist_frontal, pared = self.get_distance_to_wall(x, y, theta)
+                        
+                        logger.warning(f"Pos: ({x:.1f}, {y:.1f}) | Yaw: {math.degrees(theta):.1f}° | Dist Frontal: {dist_frontal:.1f} cm a la pared {pared}")
+                        
+                        # Máquina de Estados Finitos (FSM)
+                        if self.fsm == BillarState.AVANZA:
+                            if dist_frontal < self.danger_distance:
+                                logger.warning(f"¡Obstáculo detectado a {dist_frontal:.1f} cm! Parando robot para iniciar giro.")
+                                self.fsm = BillarState.PARANDO_PARA_GIRAR
+                                self.stop_start_time = time.time()
+                                self.command_queue.put({'v': 0.0, 'w': 0.0})
+                            else:
+                                # Mantiene velocidad lineal constante y velocidad angular nula
+                                self.command_queue.put({'v': self.v, 'w': 0.0})
+                                
+                        elif self.fsm == BillarState.PARANDO_PARA_GIRAR:
+                            # Esperar a que el robot se detenga físicamente antes de ordenar la rotación sobre su eje
+                            if (time.time() - self.stop_start_time) >= self.stop_duration:
+                                self.fsm = BillarState.GIRANDO
+                                
+                        elif self.fsm == BillarState.GIRANDO:
+                            logger.info("Enviando comando para rotar 180 grados.")
+                            # El firmware del Arduino ya cuenta con la rutina de giro preciso en grados
+                            self.command_queue.put({'ang': 180.0})
+                            self.giro_terminado = False
+                            self.fsm = BillarState.ESPERANDO_GIRO
+                            
+                        elif self.fsm == BillarState.ESPERANDO_GIRO:
+                            if self.giro_terminado:
+                                logger.info("Giro completado con éxito. Reanudando avance.")
+                                self.fsm = BillarState.AVANZA
+                logger.debug(f"FSM: {self.fsm}")
+                self.last_time=ahora
         
-        return pared_impacto, distancia_proyectada
     
-    def calcular_reflexion(self, pared, theta_actual):
-        """
-        Calcula el ángulo de reflexión perfecta bajo el convenio:
-        yaw = 0 mirando hacia arriba (+Y), crece antihorario.
-        """
-        theta_deg = math.degrees(theta_actual) % 360
-        nuevo_theta=0
-
-        if pared in ['arriba', 'abajo']:
-            # Se refleja respecto al eje horizontal (invierte componente Y)
-            # En tu convenio '0' es arriba, por lo tanto la reflexión horizontal es (180 - theta)
-            nuevo_theta = (180 - theta_deg) % 360
-        elif pared in ['izquierda', 'derecha']:
-            # Se refleja respecto al eje vertical (invierte componente X)
-            # En tu convenio, esto equivale a cambiar el signo de la desviación respecto a '0' (-theta)
-            nuevo_theta = (-theta_deg) % 360
-
-        if abs(abs(theta_deg - nuevo_theta) - 180) < 1.0:
-            nuevo_theta = (nuevo_theta + 5) % 360    
-        
-        return math.radians(nuevo_theta)
-    
-    def actualizar_fsm(self,x,y,theta):
-        # 1. Obtener métricas
-        distancias= self.get_distance_to_wall(x, y,theta)
-        dist_absoluta=np.min(distancias)
-        
-        pared_abs=min(range(len(distancias)), key=lambda i: distancias[i])
-        pared_mov, dist_movimiento = self.calcular_distancia_en_movimiento(x, y, theta)
-        logger.warning(f"Distancia absoluta: {dist_absoluta}, distancia proyectada: {dist_movimiento}, pared: {pared_mov}")
-        # 2. Evaluación de la Máquina de Estados
-        if self.fsm == RobotState.AVANZA:
-            # FILTRO 1: Seguridad Absoluta. Si por colisión o inercia está pegado a un muro, va atrás.
-            if np.abs(dist_absoluta) <= self.danger_distance: 
-                self.fsm= RobotState.PARANDO_PARA_RETROCEDER
-                self.t_retrocediendo=time.time()
-                # Se guarda la pared absoluta de la que se debe alejar
-                pared_de_escape = pared_abs 
-                self.last_wall_hit=pared_de_escape
-
-            # FILTRO 2: Comportamiento Billar. Si la trayectoria colisionará pronto, calcula reflexión.
-            elif dist_movimiento <= self.safety_distance: 
-                self.target_theta = self.calcular_reflexion(pared_mov, theta)
-                self.fsm = RobotState.GIRA
-                self.giro_terminado=False
-        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER:
-            if (time.time() - self.t_retrocediendo) >= self.stop_duration:
-                self.fsm = RobotState.RETROCEDE
-                self.t_retrocediendo=time.time()
-        elif self.fsm == RobotState.RETROCEDE:
-            if np.abs(dist_absoluta) >= self.safety_distance or (time.time()-self.t_retrocediendo)>self.retrocede_duration:
-                self.target_angle = self.calcular_reflexion(pared_mov, theta)
-                self.fsm = RobotState.GIRA
-        elif self.fsm == RobotState.GIRA:   
-            if self.giro_terminado:
-                self.fsm = RobotState.AVANZA
-
-        # 6. Decisión de velocidad basada en FSM
-        if self.fsm== RobotState.AVANZA:
-            v = self.speed
-            w = 0.0
-            self.command_queue.put({'v': v, 'w': w})
-            
-            
-        elif self.fsm == RobotState.PARANDO_PARA_RETROCEDER and self.fsm_last!=RobotState.PARANDO_PARA_RETROCEDER:
-            v = 0.0
-            w = 0.0
-            self.command_queue.put({'v': v, 'w': w})
-            
-        elif self.fsm == RobotState.RETROCEDE and self.fsm_last!=RobotState.RETROCEDE:
-            v = -40 
-            w = 0.0
-            self.command_queue.put({'v': v, 'w': w})
-            
-        elif self.fsm == RobotState.PARANDO_PARA_GIRAR and self.fsm_last!=RobotState.PARANDO_PARA_GIRAR:
-            v = 0.0
-            w = 0.0
-            self.command_queue.put({'v': v, 'w': w})
-            
-        elif self.fsm == RobotState.GIRA and self.fsm_last!=RobotState.GIRA:
-            #Pasamos self.target_theta a grados porque el Arduino lo espera así para la operación de giro preciso
-            self.target_theta = math.degrees(self.target_theta)
-            self.target_theta=(self.target_theta+ 180) % 360 - 180
-            #TEST. Remove
-            #self.target_theta=-180
-            comando_giro = {'op': 'turn', 'ang': self.target_theta}
-            self.command_queue.put({'ang': self.target_theta})
-        self.fsm_last=self.fsm
-        logger.warning(f"Estado FSM: {self.fsm.name} | Target Wall: {self.last_wall_hit} | Target Theta: {self.target_theta:.2f}° |theta: {math.degrees(theta)} ") 
-
     def check_position_estimate(self):
         ahora = time.time()
         # DECISIÓN DE POSICIÓN

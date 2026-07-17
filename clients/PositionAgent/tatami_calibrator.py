@@ -15,7 +15,27 @@ class TatamiCalibrator:
         self.points = []
         self.homography_path = "homography_matrix.npy"
         self.config_path = "tatami_config.json"
+           # Configuración de cámaras (como tenías en tu vision_agent.py)
+        self.cap_a = cv2.VideoCapture(0)
+        #self.cap_a.set(cv2.CAP_PROP_BRIGHTNESS,200)
+        self.cap_a.set(cv2.CAP_PROP_FPS,10)
+        self.cap_a.set(cv2.CAP_PROP_BUFFERSIZE,1)
+        self.cap_a.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        self.cap_a.set(cv2.CAP_PROP_EXPOSURE, -7)
+        self.cap_a.set(cv2.CAP_PROP_BRIGHTNESS, 100) # Un valor medio/bajo
         
+        self.cap_b = cv2.VideoCapture(2)
+        #self.cap_b.set(cv2.CAP_PROP_BRIGHTNESS,80)
+        self.cap_b.set(cv2.CAP_PROP_FPS,10)
+        self.cap_b.set(cv2.CAP_PROP_BUFFERSIZE,1)
+        self.cap_b.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        self.cap_b.set(cv2.CAP_PROP_EXPOSURE, -7)
+        # 3. Opcional: Bajar el brillo si la exposición no es suficiente
+        self.cap_b.set(cv2.CAP_PROP_BRIGHTNESS, 100)
+        
+        # Dimensiones estimadas del mosaico
+        self.total_w = MAX_WIDTH
+        self.total_h = MAX_HEIGHT
         # Intentar cargar la homografía
         if os.path.exists(self.homography_path):
             self.H = np.load(self.homography_path)
@@ -25,13 +45,7 @@ class TatamiCalibrator:
             self.H = np.eye(3) # Matriz identidad por defecto si no existe
 
         # Inicializar capturas (Mismos índices que en tu VisionPosDevice)
-        self.cap_a = cv2.VideoCapture(0)
-        self.cap_b = cv2.VideoCapture(2)
         
-        # Configuración rápida de cámaras
-        for cap in [self.cap_a, self.cap_b]:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     def get_stitched_frame(self):
         ret_a, frame_a = self.cap_a.read()
