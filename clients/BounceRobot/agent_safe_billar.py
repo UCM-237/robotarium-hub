@@ -12,7 +12,7 @@ from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
 from logger_config import setup_logger
 import logging
-
+import json
 BROKER = "192.168.10.1"
 PUERTO = 1883
 
@@ -44,7 +44,7 @@ class BouncerRobot:
         self.robot_id=6
         self.pos=[0.0,0.0,0.0]
         self.angular_speed=1.0
-        self.safety_distance = 40.0 
+        self.safety_distance = 30.0 
         self.t_retrocediendo=0
         self.control_rate=0.05 #ms
         self.last_time=0
@@ -133,7 +133,7 @@ class BouncerRobot:
                 logger.error(f"Error al decodificar: {e}")
         # 2. Recibir posición del robot (vienen del pos_agent)
         elif topic == f"{self.robot_id}/pos":
-            logger.info(f"Message {message} received on topic {topic}")
+            logger.debug(f"Message {message} received on topic {topic}")
             self.status = "INICIALIZADO"
             try:
                 # Validar que no estemos recibiendo un string plano o un tópico desalineado
@@ -141,7 +141,7 @@ class BouncerRobot:
                 #     logger.error(f"Mensaje malformado o trama desalineada detectada: {message}")
                 #     return
                 
-                raw_data = message
+                raw_data = json.loads(message)
                 # if isinstance(raw_data, str):
                 #     raw_data = raw_data
                 
@@ -192,7 +192,7 @@ class BouncerRobot:
         if topic.endswith("/pos") and not topic.startswith(f"{self.robot_id}/"):
             try:
                 other_id = int(topic.split("/")[0])
-                raw_data = message
+                raw_data = json.loads(message)
                 self.other_robots[other_id] = [
                     float(raw_data.get('x')),
                     float(raw_data.get('y')),
@@ -204,7 +204,7 @@ class BouncerRobot:
 
   
         
-    def get_distance_to_wall(self, x, y, theta):
+    def     get_distance_to_wall(self, x, y, theta):
         # 1. Límites del tatami (cm)
         x_min, x_max = self.boundaries[0], self.boundaries[1]
         y_min, y_max = self.boundaries[2], self.boundaries[3]
@@ -214,13 +214,15 @@ class BouncerRobot:
         vx = -math.sin(theta)
         logger.critical(f"Velocidades proyectadas vx: {vx}, vy: {vy}")
         # 3. Calcular la distancia proyectada en la trayectoria para el eje X e Y
+        pared_l=""
+        pared_f=""
         dist_x = float('inf')
         if vx > 0:
-            dist_x = (x_max - x) / vx  # Pared derecha
-            pared_l="derecha"
-        elif vx < 0:
-            dist_x = (x) / -vx  # Pared izquierda
+            dist_x = (x) / vx  # Pared derecha
             pared_l="izquierda"
+        elif vx < 0:
+            dist_x = (x_max-x) / -vx  # Pared izquierda
+            pared_l="derecha"
 
         dist_y = float('inf')
         if vy > 0:
@@ -231,6 +233,8 @@ class BouncerRobot:
         elif vy < 0:
             dist_y = (y_max - y) / -vy  # Pared de abajo
             pared_f="abajo"
+        logger.critical(f"Distancia lateral {dist_x}, pared {pared_l}")
+        logger.critical(f"Distancia frontal {dist_y}, pared {pared_f}")
         # 4. La distancia real a la pared que impactará primero en su trayectoria
         distance_to_target_wall = min(dist_x, dist_y)
         if dist_x<dist_y:
@@ -278,10 +282,11 @@ class BouncerRobot:
                                 self.stop_start_time = time.time()
                                 self.command_queue.put({'v': 0.0, 'w': 0.0})
                             elif len(dist)>0: 
-                                logger.warning(f"¡Robot (lejos) detectado! ")
+                                logger.debug(f"¡Robot (lejos) detectado! ")
                                 self.command_queue.put({'v': self.v, 'w': 0.0})
-                                if min(dist)< self.danger_distance:
-                                    logger.warning(f"¡Robot detectado a cm! Parando robot para iniciar giro.")
+                                if min(dist)< self.safety_distance:
+                                    m_d=min(dist)
+                                    logger.warning(f"¡Robot detectado a {m_d    } cm! Parando robot para iniciar giro.")
                                     self.fsm = BillarState.PARANDO_PARA_GIRAR
                                     self.stop_start_time = time.time()
                                     self.command_queue.put({'v': 0.0, 'w': 0.0})
