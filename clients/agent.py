@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 #!/bin/python3
+import json
 import logging
 import time
 import zmq
@@ -84,34 +85,51 @@ class Agent:
     '''Receive data from other agents'''
     logging.debug(f'Connecting to hub at {self._get_hub_data_url()}')
     self.hub_data.connect(self._get_hub_data_url())
-
+    
     '''logging.debug('Subscribing to data')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'data')
 
     logging.debug('Subscribing to control')
     self.hub_data.setsockopt(zmq.SUBSCRIBE, b'')'''
 
+    poller = zmq.Poller()
+    poller.register(self.hub_data, zmq.POLLIN)
     while True:
-      topic = self.hub_data.recv_string()
-      message = self.hub_data.recv_string()
-      self.device.on_data(topic, message)
+      # Espera máximo 5000ms (5 segundos) por un mensaje
+      socks = dict(poller.poll(5000))
+      if self.hub_data in socks:
+        try:
+          topic, message = [part.decode('utf-8') for part in self.hub_data.recv_multipart()]
+          self.device.on_data(topic, json.loads(message))
+        except Exception as e:
+          print(e)
+      else:
+          print("Alerta: No se han recibido mensajes en los últimos 5 segundos.")
+
+
 
   def send(self, topic: str, data: dict) -> None:
     '''Send data to a topic'''
     #logging.info(f'Agent {self.id} sends message with topic {topic}')
-    self.data.send_string(topic, flags=zmq.SNDMORE)
-    self.data.send_json(data)
-
+    self.data.send_multipart([
+      topic.encode('utf-8'),
+      json.dumps(data).encode('utf-8')
+    ])
 
   def send_measurement(self, data) -> None:
     '''Send a new measurement'''
     payload ={self.id:data}
-    self.data.send_string('data', flags=zmq.SNDMORE)
-    self.data.send_json({
+    topic = 'data'
+    jsondata = {
       'topic': 'measurement',
-       'payload':payload,
+      'payload': payload,
       'timestamp': 1000*time.time(),
-    })
+    }
+
+    self.data.send_multipart([
+      topic.encode('utf-8'),
+      json.dumps(jsondata).encode('utf-8')
+    ])
 
 
 if __name__ == "__main__":

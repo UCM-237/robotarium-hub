@@ -1,4 +1,3 @@
-import json
 import numpy as np
 from agent import Agent
 import logging
@@ -123,9 +122,9 @@ class BouncerRobot:
         # 1. Recibir límites del tatami (vienen del arena_agent)
         if topic == "arena/boundaries":
             try:
-                raw_data = json.loads(message)
+                raw_data = message
                 if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
+                    raw_data = raw_data
                 
                 puntos = raw_data["points"]
             
@@ -146,13 +145,13 @@ class BouncerRobot:
             self.status = "INICIALIZADO"
             try:
                 # Validar que no estemos recibiendo un string plano o un tópico desalineado
-                if not message.startswith('{'):
-                    logger.error(f"Mensaje malformado o trama desalineada detectada: {message}")
-                    return
+                # if not message.startswith('{'):
+                #     logger.error(f"Mensaje malformado o trama desalineada detectada: {message}")
+                #     return
                 
-                raw_data = json.loads(message)
-                if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
+                raw_data = message
+                # if isinstance(raw_data, str):
+                #     raw_data = raw_data
                 
                 self.pos[0]=float(raw_data.get('x'))
                 self.pos[1]=float(raw_data.get('y'))
@@ -176,10 +175,9 @@ class BouncerRobot:
         elif topic == f"agent/{self.robot_id}/wheel":
             
             try:
-                raw_data = json.loads(message)
-                if isinstance(raw_data, str):
-                    
-                    raw_data = json.loads(raw_data)
+                raw_data = message
+                if isinstance(raw_data, str):                   
+                    raw_data = raw_data
                 
                 wl = float(raw_data.get('Wleft'))
                 wr = float(raw_data.get('Wright'))
@@ -188,9 +186,9 @@ class BouncerRobot:
                 logger.error(f"Error al decodificar odometría: {e}")
         elif topic == f"agent/{self.robot_id}/feedback":
             try:
-                raw_data = json.loads(message)
+                raw_data = message
                 if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
+                    raw_data = raw_data
                 status=raw_data.get("status")                
                 op=raw_data.get("op")
                 if status == "done" and op == "turn":
@@ -202,7 +200,7 @@ class BouncerRobot:
         if topic.endswith("/pos") and not topic.startswith(f"{self.robot_id}/"):
             try:
                 other_id = int(topic.split("/")[0])
-                raw_data = json.loads(message)
+                raw_data = message
                 self.other_robots[other_id] = [
                     float(raw_data.get('x')),
                     float(raw_data.get('y')),
@@ -286,11 +284,11 @@ class BouncerRobot:
                                 self.fsm = BillarState.PARANDO_PARA_GIRAR
                                 self.stop_start_time = time.time()
                                 self.command_queue.put({'v': 0.0, 'w': 0.0})
-                            elif dist is not None: 
+                            elif len(dist)>0: 
                                 logger.warning(f"¡Robot (lejos) detectado! ")
                                 self.command_queue.put({'v': self.v, 'w': 0.0})
                                 if min(dist)< self.danger_distance:
-                                    logger.warning(f"¡Robot detectado a {dist:.1f} cm! Parando robot para iniciar giro.")
+                                    logger.warning(f"¡Robot detectado a cm! Parando robot para iniciar giro.")
                                     self.fsm = BillarState.PARANDO_PARA_GIRAR
                                     self.stop_start_time = time.time()
                                     self.command_queue.put({'v': 0.0, 'w': 0.0})
