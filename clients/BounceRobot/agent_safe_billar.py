@@ -12,8 +12,8 @@ from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
 from logger_config import setup_logger
 import logging
-import argparse
 import json
+import argparse
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -389,16 +389,16 @@ if __name__ == "__main__":
     #MQTT_agent.register()
     logger.info(f'Agent {bouncer_agent.id} is listening')
    
-    topic=b'{args.robot_id}/pos'
+    topic=f'{args.robot_id}/pos'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
     topic=b'arena/boundaries'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/{args.robot_id}/feedback'
+    topic=f'agent/{args.robot_id}/feedback'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/{args.robot_id}/wheel'
+    topic=f'agent/{args.robot_id}/wheel'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
 
@@ -444,6 +444,3 @@ if __name__ == "__main__":
     
     mqtt_and_dispatch()
     # Configuración MQTT
-    
-
-    
