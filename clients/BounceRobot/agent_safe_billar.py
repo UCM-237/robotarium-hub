@@ -12,6 +12,7 @@ from queue import Queue # Para comunicar hilos de forma segura
 from enum import Enum
 from logger_config import setup_logger
 import logging
+import argparse
 
 BROKER = "192.168.10.1"
 PUERTO = 1883
@@ -254,7 +255,7 @@ class BouncerRobot:
                 for opp_id, opp_pos in self.other_robots.items():
                     dist.append(math.sqrt((opp_pos[0] - self.pos[0])**2 + (opp_pos[1] - self.pos[1])**2))
                     logger.warning(f"Distancia a robot {opp_id}: {dist[-1]:.2f} cm")
-                    
+
                 if self.status=="ESPERANDO POSICIÓN INICIAL":
                     logger.warning("Esperando posición inicial... Aún no se han recibido datos de visión.")
                     self.command_queue.put({'v': 0.0, 'w': 0.0})
@@ -340,12 +341,32 @@ def on_message(client,userdata, msg):
 
 # Configuración del Agente
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Agente Billar para el Robotarium"
+    )
+    
+    # Parámetro obligatorio posicional (o puedes hacerlo opcional con '--id')
+    parser.add_argument(
+        'robot_id', 
+        type=int, 
+        help="ID numérico del robot a controlar (ej. 5, 8)"
+    )
+    
+    # Parámetro opcional con valor por defecto
+    parser.add_argument(
+        '-p', '--port', 
+        type=int, 
+        default=5572,  # Cambia esto por el puerto por defecto real de tu arquitectura ZMQ
+        help="Puerto de datos (data_port) para la conexión ZeroMQ. Por defecto: 5572"
+    )
+    
+    args = parser.parse_args()
    # Configuración del Agente
     bouncer_agent = Agent(
       device_class=BouncerRobot,
-      id='Bouncer Robot',
+      id=f'BillarRobot_{args.robot_id}',
       ip='192.168.10.1',
-      data_port = 5563,
+      data_port = args.port,
       hub_ip='192.168.10.1'
     )
     # 1. Creamos un manejador de consola (StreamHandler)
@@ -362,16 +383,16 @@ if __name__ == "__main__":
     #MQTT_agent.register()
     logger.info(f'Agent {bouncer_agent.id} is listening')
    
-    topic=b'6/pos'
+    topic=b'{args.robot_id}/pos'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
     topic=b'arena/boundaries'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/6/feedback'
+    topic=b'agent/{args.robot_id}/feedback'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
-    topic=b'agent/6/wheel'
+    topic=b'agent/{args.robot_id}/wheel'
     bouncer_agent.setup_subscriptions(topic)
     logger.info(f"Suscrito a topic {topic}")
 
