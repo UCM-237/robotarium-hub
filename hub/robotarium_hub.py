@@ -20,7 +20,7 @@ MQTT_BROKER = '127.0.0.1'
 MQTT_PORT = 1883
 MQTT_TOPIC = "#"
 # Generate a Client ID with the publish prefix.
-MQTT_CLIENT_ID = f'publish-{random.randint(0, 1000)}'
+# MQTT_CLIENT_ID = f'publish-{random.randint(0, 1000)}'
 # MQTT_USERNAME = 'emqx'
 # MQTT_PASSWORD = 'public'
 
@@ -32,42 +32,47 @@ class RobotariumHub:
         }
         self.context = zmq.Context()
         self.commands_socket = self.context.socket(zmq.REP)
-        self.commands_socket.bind(f'tcp://192.168.10.1:{CMD_PORT}')
+        self.commands_socket.bind(f'tcp://*:{CMD_PORT}')
         self.data_socket = self.context.socket(zmq.PUB)
-        self.data_socket.bind(f'tcp://192.168.10.1:{DATA_PORT}')
+        self.data_socket.bind(f'tcp://*:{DATA_PORT}')
         self.agents = {}
         self.camera = {}
         self.running = True
         self.accepting = Thread(target=self.accept, args=())
         self.accepting.start()
         self.poller = zmq.Poller()
+        self.mqtt_client = self.connect_mqtt()
         self.listening = Thread(target=self.listen, args=())
         self.listening.start()
-        #self.mqtt_client = self.connect_mqtt()
 
     def connect_mqtt(self):
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                print("Connected to MQTT Broker!")
-            else:
-                print("Failed to connect, return code %d\n", rc)
-
-            client = mqtt_client.Client(MQTT_CLIENT_ID)
-            # client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-            client.on_connect = on_connect
-            client.connect(MQTT_BROKER, MQTT_PORT)
-            client.loop_start()
-            client.subscribe('#')
-            client.on_message = self.on_mqtt_message
-            return client
+        client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
+        # client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        client.on_connect = self.on_mqtt_connect
+        client.on_message = self.on_mqtt_message
+        client.on_disconnect = self.on_mqtt_disconnect
+        client.connect(MQTT_BROKER, MQTT_PORT)
+        client.loop_start()
+        client.subscribe('#')
+        return client
         
+    def on_mqtt_connect(self, client, userdata, flags, reason_code, properties):
+        logging.info(f'MQTT client {client}: connected')
+        if reason_code == 0:
+            print("Connected to MQTT Broker!")
+            client.subscribe('#')
+        else:
+            print("Failed to connect, return code %d\n", reason_code)
 
     def on_mqtt_message(self, client, userdate, msg):
-        self.data_socket.send_string(msg.topic, flags=zmq.SNDMORE)
-        self.data_socket.send_string(msg.payload.decode())
+        self.data_socket.send_multipart([msg.topic.encode('utf-8'), msg.payload.decode().encode('utf-8')])
+        
 
+    def on_mqtt_disconnect(self, client, userdata, rc):
+        logging.info(f'MQTT client {client}: disconnected')
+  
     def add_agent(self, id, url):
-        #logging.info(f'Agent {id} registered with url {url}')
+        logging.info(f'Agent {id} registered with url {url}')
         self.agents[id] = {
             'url': url,
             'socket': self.context.socket(zmq.SUB)
@@ -84,27 +89,23 @@ class RobotariumHub:
                 s = self.agents[a]['socket']
                 if s in socks and socks[s] == zmq.POLLIN:
                     try:
-                        topic = s.recv_string()
-                        message = s.recv_json()
+                        topic, message = [part.decode('utf-8') for part in s.recv_multipart()]
+                        logging.info(f'Received message from topic {topic}')
+
                     except json.JSONDecodeError:
                         logging.error(f'Agent {id} sent invalid JSON')
 
                     if topic == "data":
                         data = message["payload"]
-                        #print(data)
                         for k in data:
                             new_topic = f'{topic}/{k}/{message["topic"]}'
-                            self.data_socket.send_string(new_topic, flags=zmq.SNDMORE)
-                            self.data_socket.send_json(data[k])
-                            
+                            jsondata = json.dumps(data[k])
+                            self.data_socket.send_multipart([new_topic.encode('utf-8'), jsondata.encode('utf-8')])
+                            self.mqtt_client.publish(topic, jsondata)
                     else:
-                        self.data_socket.send_string(topic, flags=zmq.SNDMORE)
-                        self.data_socket.send_json(message)
-                        print(topic)
-                        print(message)
-                    
-                    #self.mqtt_client.publish(topic, json.dumps(message))
-                    
+                        jsondata = json.dumps(message)
+                        self.data_socket.send_multipart([topic.encode('utf-8'), jsondata.encode('utf-8')])
+                        self.mqtt_client.publish(topic, jsondata)
 
     def accept(self):
         '''Wait for next request from client'''
@@ -119,6 +120,7 @@ class RobotariumHub:
 
 def subscribe(client: mqtt_client):
   def on_message(client, userdata, msg):
+    logging.info(f'Received topic {msg.topic}')
     print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
 
   #client.subscribe(topic)

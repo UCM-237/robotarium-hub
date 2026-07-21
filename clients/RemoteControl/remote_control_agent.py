@@ -37,7 +37,7 @@ class Teleoperator:
         self.robot_id=6
         self.ang=0
         # --- Configuración del Logger ---
-        self.log_file = f"robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        self.log_file = f"logs/robot_{self.robot_id}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         self.init_logger()
         self.gk = GetKey()
 

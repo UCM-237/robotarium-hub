@@ -131,4 +131,6 @@ dmypy.json
 
 # Others
 .avi
-hub/localization/output.avi
+
+# logs
+logs/
